@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.PartETag;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.Constants;
@@ -29,12 +30,12 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.hadoop.fs.s3a.Constants.*;
-
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static com.google.common.base.Preconditions.*;
 
 /**
@@ -202,7 +203,7 @@ public final class CommitUtils {
    * @return a new path.
    */
   public static Path pendingSubdir(Path destDir) {
-    return new Path(destDir.getParent(), Constants.PENDING_PATH);
+    return new Path(destDir.getParent(), PENDING_PATH);
   }
 
   /**
@@ -290,6 +291,28 @@ public final class CommitUtils {
     if (!(fs instanceof S3AFileSystem)) {
       throw new PathCommitException(path, E_WRONG_FS);
     }
+  }
+
+  /**
+   * Get the S3A FS of a path.
+   * @param path path to examine
+   * @param conf config
+   * @param delayedCommitRequired is delayed complete requires of the FS
+   * @throws PathCommitException output path isn't to an S3A FS instance, or
+   * if {code delayedCommitRequired} is set, if doesn't support delayed commits.
+   * @throws IOException failure to instantiate the FS.
+   */
+  public static S3AFileSystem getS3AFileSystem(Path path,
+      Configuration conf,
+      boolean delayedCommitRequired)
+      throws IOException, PathCommitException {
+    FileSystem fs = path.getFileSystem(conf);
+    verifyIsS3AFS(fs, path);
+    S3AFileSystem s3a = (S3AFileSystem) fs;
+    if (delayedCommitRequired) {
+      verifyIsDelayedCommitFS(s3a);
+    }
+    return s3a;
   }
 
   /**

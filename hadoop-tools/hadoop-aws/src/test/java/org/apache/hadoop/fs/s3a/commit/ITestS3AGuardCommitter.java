@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
@@ -63,6 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Test the job/task commit actions of the S3A Committer, including trying to
@@ -71,13 +71,13 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
  * {@code org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter}.
  */
 @SuppressWarnings("unchecked")
-public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
+public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
   private Path outDir;
 
   private String SUB_DIR = "SUB_DIR";
 
   protected static final Logger LOG =
-      LoggerFactory.getLogger(ITestS3AOutputCommitter.class);
+      LoggerFactory.getLogger(ITestS3AGuardCommitter.class);
 
   // A random task attempt id for testing.
   private static final String ATTEMPT_0 =
@@ -136,6 +136,29 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     FileSystemTestHelper.addFileSystemForTesting(path.toUri(), conf, fs);
   }
 
+  /**
+   * Create a committer for a task.
+   * @param context task context
+   * @return new committer
+   * @throws IOException failure
+   */
+
+  protected S3GuardCommitter createCommitter(TaskAttemptContext context)
+      throws IOException {
+    return new S3GuardCommitter(outDir, context);
+  }
+
+  /**
+   * Create a committer for a job.
+   * @param context job context
+   * @return new committer
+   * @throws IOException failure
+   */
+  public S3GuardCommitter createCommitter(JobContext context)
+      throws IOException {
+    return new S3GuardCommitter(outDir, context);
+  }
+
   protected void writeTextOutput(TaskAttemptContext tContext)
       throws IOException, InterruptedException {
     describe("write output");
@@ -182,7 +205,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -214,12 +237,12 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext2 = new JobContextImpl(conf2, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext2 = new TaskAttemptContextImpl(conf2,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer2 = new S3GuardCommitter(outDir, tContext2);
+    S3GuardCommitter committer2 = createCommitter(tContext2);
     committer2.setupJob(tContext2);
 
     assertFalse("recoverySupported in " + committer2,
         committer2.isRecoverySupported());
-    intercept(IOException.class, "Unsupported",
+    intercept(IOException.class,
         () -> committer2.recoverTask(tContext2));
 
     committer2.commitJob(jContext2);
@@ -305,7 +328,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -335,7 +358,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     Job job = Job.getInstance(getConfiguration());
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-    conf.setBoolean(Constants.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
+    conf.setBoolean(SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
     FileOutputFormat.setOutputPath(job, outDir);
     return job;
   }
@@ -347,7 +370,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -379,8 +402,8 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    CommitterWithFailedThenSucceed committer =
-        new CommitterWithFailedThenSucceed(outDir, tContext);
+    AbstractS3GuardCommitter committer =
+        createFailingCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -402,13 +425,18 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
 
   }
 
-  protected void expectFNFEonJobCommit(S3GuardCommitter committer,
+  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
+      throws IOException {
+    return new CommitterWithFailedThenSucceed(outDir, tContext);
+  }
+
+  protected void expectFNFEonJobCommit(AbstractS3GuardCommitter committer,
       JobContext jContext) throws Exception {
     intercept(FileNotFoundException.class,
         () -> committer.commitJob(jContext));
   }
 
-  protected void expectFNFEonTaskCommit(S3GuardCommitter committer,
+  protected void expectFNFEonTaskCommit(AbstractS3GuardCommitter committer,
       TaskAttemptContext tContext) throws Exception {
     intercept(FileNotFoundException.class,
         () -> committer.commitTask(tContext));
@@ -420,12 +448,12 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
 
   protected void assertSuccessMarkerExists(Path dir) throws IOException {
     assertPathExists("Success marker",
-        new Path(dir, Constants.SUCCEEDED_FILE_NAME));
+        new Path(dir, SUCCEEDED_FILE_NAME));
   }
 
   protected void assertSuccessMarkerDoesNotExist(Path dir) throws IOException {
     assertPathDoesNotExist("Success marker",
-        new Path(dir, Constants.SUCCEEDED_FILE_NAME));
+        new Path(dir, SUCCEEDED_FILE_NAME));
   }
 
   /**
@@ -442,8 +470,8 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    CommitterWithFailedThenSucceed committer =
-        new CommitterWithFailedThenSucceed(outDir, tContext);
+    AbstractS3GuardCommitter committer =
+        createFailingCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -463,7 +491,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
   }
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
-      CommitterWithFailedThenSucceed committer) throws Exception {
+      AbstractS3GuardCommitter committer) throws Exception {
     intercept(IOException.class, CommitterWithFailedThenSucceed.MESSAGE,
         () -> committer.commitJob(jContext));
   }
@@ -476,7 +504,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -558,7 +586,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
    * @param tContext task context
    * @throws IOException problems
    */
-  protected void setup(S3GuardCommitter committer,
+  protected void setup(AbstractS3GuardCommitter committer,
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
     describe("\nsetup");
@@ -574,7 +602,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
    * @param tContext task context
    * @throws IOException problems
    */
-  protected void commit(S3GuardCommitter committer,
+  protected void commit(AbstractS3GuardCommitter committer,
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
     describe("\ncommitting");
@@ -591,7 +619,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup
     setup(committer, jContext, tContext);
@@ -605,7 +633,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     assertPathDoesNotExist("task temp dir still exists", expectedPath);
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
-    Path pendingDir = new Path(outDir, Constants.PENDING_PATH);
+    Path pendingDir = new Path(outDir, PENDING_PATH);
     assertPathDoesNotExist("job temp dir still exists", pendingDir);
     FileStatus[] children = listChildren(getFileSystem(), outDir);
     assertArrayEquals("Output directory not empty " + ls(outDir),
@@ -620,7 +648,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer = new S3GuardCommitter(outDir, tContext);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup
     setup(committer, jContext, tContext);
@@ -698,8 +726,7 @@ public class ITestS3AOutputCommitter extends AbstractS3ACommitTestCase {
 
     final JobContext jContext = new JobContextImpl(conf,
         TASK_ATTEMPT_0.getJobID());
-    final S3GuardCommitter amCommitter =
-        new S3GuardCommitter(outDir, jContext);
+    AbstractS3GuardCommitter amCommitter = createCommitter(jContext);
     amCommitter.setupJob(jContext);
 
     final TaskAttemptContext[] taCtx = new TaskAttemptContextImpl[2];

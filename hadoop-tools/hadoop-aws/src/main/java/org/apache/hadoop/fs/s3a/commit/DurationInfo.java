@@ -18,15 +18,29 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class TestDataSerialization extends Assert {
-
-
-  @Test
-  public void testValidRoundTrip() throws Throwable {
- // TODO
+/**
+ * A duration with logging of final state at info in the close() call.
+ */
+final class DurationInfo extends Duration
+    implements AutoCloseable {
+  private final String text;
+  private static final Logger LOG = LoggerFactory.getLogger(DurationInfo.class);
+  DurationInfo(String format, Object... args) {
+    this.text = String.format(format, args);
+    LOG.info("Starting {}", text);
   }
 
+  @Override
+  public String toString() {
+    return text + ": " + super.toString();
+  }
+
+  @Override
+  public void close() {
+    finished();
+    LOG.info("{}", this);
+  }
 }

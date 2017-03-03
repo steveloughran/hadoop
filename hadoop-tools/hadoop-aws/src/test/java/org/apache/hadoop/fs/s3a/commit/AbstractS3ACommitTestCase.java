@@ -24,6 +24,7 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Test case for committer operations; sets up the config for delayed commit

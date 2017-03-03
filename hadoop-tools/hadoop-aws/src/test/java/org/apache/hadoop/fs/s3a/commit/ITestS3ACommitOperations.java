@@ -41,6 +41,7 @@ import java.util.List;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -148,7 +149,7 @@ public class ITestS3ACommitOperations extends AbstractS3ACommitTestCase {
 
   private static Path makePendingChild(Path destFile, String name) {
     return new Path(destFile.getParent(),
-        Constants.PENDING_PATH + '/' + name);
+        PENDING_PATH + '/' + name);
   }
 
   @Test

@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileStatus;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
@@ -34,7 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
-import static org.apache.hadoop.fs.s3a.Constants.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * The implementation of the various actions a committer needs.
@@ -228,7 +227,7 @@ public class FileCommitActions {
    * @throws IOException IO problem
    */
   public void touchSuccessMarker(Path outputPath) throws IOException {
-    Path markerPath = new Path(outputPath, Constants.SUCCEEDED_FILE_NAME);
+    Path markerPath = new Path(outputPath, SUCCEEDED_FILE_NAME);
     fs.create(markerPath, true).close();
   }
 
@@ -296,7 +295,7 @@ public class FileCommitActions {
 
     /**
      * Rethrow the exception in the first failure entry.
-     * @throws Exception the first exception caught.
+     * @throws IOException the first exception caught.
      */
     public void maybeRethrow() throws IOException {
       if (!failed.isEmpty()) {

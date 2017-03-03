@@ -100,6 +100,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.DelayedCommitFSIntegration;
 import org.apache.hadoop.fs.s3a.commit.DefaultPutTracker;
 import org.apache.hadoop.fs.s3a.s3guard.DirListingMetadata;
@@ -279,10 +280,10 @@ public class S3AFileSystem extends FileSystem {
       serverSideEncryptionAlgorithm = getEncryptionAlgorithm(conf);
       inputPolicy = S3AInputPolicy.getPolicy(
           conf.getTrimmed(INPUT_FADVISE, INPUT_FADV_NORMAL));
-      boolean committerEnabled = conf.getBoolean(COMMITTER_ENABLED,
-          DEFAULT_COMMITTER_ENABLED);
+      boolean committerEnabled = conf.getBoolean(CommitConstants.COMMITTER_ENABLED,
+          CommitConstants.DEFAULT_COMMITTER_ENABLED);
       if (committerEnabled) {
-        LOG.info("S3A Committer is enabled");
+        LOG.info("S3Guard Committer is enabled");
       }
       committerIntegration = new DelayedCommitFSIntegration(
           this, committerEnabled);

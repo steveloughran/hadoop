@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 
 /**
  * All the constants used with the {@link S3AFileSystem}.
@@ -433,6 +432,7 @@ public final class Constants {
   public static final String FAIL_INJECT_INCONSISTENCY_MSEC =
       "fs.s3a.failinject.inconsistency.msec";
 
+<<<<<<< HEAD
   @InterfaceStability.Unstable
   public static final String FAIL_INJECT_INCONSISTENCY_PROBABILITY =
       "fs.s3a.failinject.inconsistency.probability";

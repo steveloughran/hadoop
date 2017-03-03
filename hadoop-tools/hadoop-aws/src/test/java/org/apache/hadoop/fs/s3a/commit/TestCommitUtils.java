@@ -30,7 +30,7 @@ import java.util.List;
 
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
-import static org.apache.hadoop.fs.s3a.Constants.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Tests for {@link CommitUtils} methods.
