@@ -53,7 +53,7 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
     NUMBER_FORMAT.setMinimumIntegerDigits(5);
     NUMBER_FORMAT.setGroupingUsed(false);
   }
-  private FileOutputCommitter committer = null;
+  private PathOutputCommitter committer = null;
 public static final String COMPRESS ="mapreduce.output.fileoutputformat.compress";
 public static final String COMPRESS_CODEC = 
 "mapreduce.output.fileoutputformat.compress.codec";
@@ -219,7 +219,7 @@ public static final String OUTDIR = "mapreduce.output.fileoutputformat.outputdir
   public static Path getWorkOutputPath(TaskInputOutputContext<?,?,?,?> context
                                        ) throws IOException, 
                                                 InterruptedException {
-    FileOutputCommitter committer = (FileOutputCommitter) 
+    PathOutputCommitter committer = (PathOutputCommitter)
       context.getOutputCommitter();
     return committer.getWorkPath();
   }
@@ -281,10 +281,9 @@ public static final String OUTDIR = "mapreduce.output.fileoutputformat.outputdir
    */
   public Path getDefaultWorkFile(TaskAttemptContext context,
                                  String extension) throws IOException{
-    FileOutputCommitter committer = 
-      (FileOutputCommitter) getOutputCommitter(context);
-    return new Path(committer.getWorkPath(), getUniqueFile(context, 
-      getOutputName(context), extension));
+    return new Path(((PathOutputCommitter) getOutputCommitter(context))
+        .getWorkPath(),
+        getUniqueFile(context, getOutputName(context), extension));
   }
 
   /**
@@ -306,7 +305,8 @@ public static final String OUTDIR = "mapreduce.output.fileoutputformat.outputdir
                                         ) throws IOException {
     if (committer == null) {
       Path output = getOutputPath(context);
-      committer = new FileOutputCommitter(output, context);
+      committer = PathOutputCommitterFactory.getOutputCommitterFactory(
+          context.getConfiguration()).createOutputCommitter(output, context);
     }
     return committer;
   }

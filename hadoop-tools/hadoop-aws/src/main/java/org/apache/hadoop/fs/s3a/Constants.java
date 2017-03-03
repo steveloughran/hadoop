@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 
 /**
  * All the constants used with the {@link S3AFileSystem}.
@@ -325,14 +326,6 @@ public final class Constants {
   @InterfaceAudience.Private
   public static final int MAX_MULTIPART_COUNT = 10000;
 
-  /**
-   * Classname of the S3A-specific output committer factory. This
-   * is what must be declared when attempting to use
-   */
-  @InterfaceStability.Unstable
-  public static final String S3A_OUTPUT_COMMITTER_FACTORY =
-      "org.apache.hadoop.fs.s3a.commit.S3AOutputCommitterFactory";
-
   /* Constants. */
   public static final String S3_METADATA_STORE_IMPL =
       "fs.s3a.metadatastore.impl";
@@ -408,13 +401,6 @@ public final class Constants {
   public static final int S3GUARD_DDB_BACKGROUND_SLEEP_MSEC_DEFAULT = 25;
 
   /**
-   * V1 committer.
-   */
-  @InterfaceStability.Unstable
-  public static final String S3A_OUTPUT_COMMITTER_MRV1 =
-      "org.apache.hadoop.fs.s3a.commit.S3OutputCommitterMRv1";
-
-  /**
    * The default "Null" metadata store: {@value}.
    */
   @InterfaceStability.Unstable
@@ -450,5 +436,53 @@ public final class Constants {
   @InterfaceStability.Unstable
   public static final String FAIL_INJECT_INCONSISTENCY_PROBABILITY =
       "fs.s3a.failinject.inconsistency.probability";
+
+  /**
+   * Flag to indicate whether the S3 committer is enabled, and
+   * so {@code create()} calls under the path {@link #PENDING_PATH} will
+   * be converted to pending commit operations.
+   * Value: {@value}.
+   */
+  public static final String COMMITTER_ENABLED
+      = "fs.s3a.committer.enabled";
+
+  /**
+   * Is the committer enabled by default? No.
+   */
+  public static final boolean DEFAULT_COMMITTER_ENABLED = false;
+
+  /**
+   * Path under which all pending writes will go: {@value}.
+   */
+  public static final String PENDING_PATH = "__pending";
+
+  /**
+   * Marker of the start of a directory tree for calculating
+   * the final path names: {@value}.
+   */
+  public static final String BASE_PATH = "__base";
+
+  /**
+   * Temp data which is not auto-committed: {@value}.
+   * Uses a different name from normal just to make clear it is different.
+   */
+  public static final String TEMP_DATA_PATH = "__temp-data";
+
+
+  /**
+   * Suffix applied to pending commit data: {@value}.
+   */
+  public static final String PENDING_SUFFIX = ".pending";
+
+  /**
+   * Flag to trigger creation of a marker file on job completion.
+   */
+  public static final String SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
+      = FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
+
+  /**
+   * Marker file to create on success.
+   */
+  public static final String SUCCEEDED_FILE_NAME = "_SUCCESS";
 
 }

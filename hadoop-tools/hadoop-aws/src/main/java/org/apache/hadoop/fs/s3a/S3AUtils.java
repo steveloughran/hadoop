@@ -32,6 +32,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3native.S3xLoginHelper;
 import org.apache.hadoop.security.ProviderUtils;
@@ -744,6 +745,40 @@ public final class S3AUtils {
     return dest;
   }
 
+
+  /**
+   * Delete a path quietly: failures are logged at DEBUG.
+   * @param fs filesystem
+   * @param path path
+   * @param recursive recursive?
+   */
+  public static void deleteQuietly(FileSystem fs,
+      Path path,
+      boolean recursive) {
+    try {
+      fs.delete(path, recursive);
+    } catch (Exception e) {
+      LOG.debug("Failed to delete {}", path, e);
+    }
+  }
+
+  /**
+   * Delete a path quietly: failures are logged at DEBUG.
+   * @param fs filesystem
+   * @param path path
+   * @param recursive recursive?
+   */
+  public static void deleteWithWarning(FileSystem fs,
+      Path path,
+      boolean recursive) {
+    try {
+      fs.delete(path, recursive);
+    } catch (Exception e) {
+      LOG.warn("Failed to delete {}", path, e);
+    }
+  }
+
+
   /**
    * Patch the security credential provider information in
    * {@link #CREDENTIAL_PROVIDER_PATH}
@@ -880,5 +915,4 @@ public final class S3AUtils {
       }
     }
   }
-
 }

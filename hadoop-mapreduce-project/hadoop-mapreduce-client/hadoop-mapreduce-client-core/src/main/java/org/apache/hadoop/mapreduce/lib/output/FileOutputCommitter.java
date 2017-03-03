@@ -45,7 +45,7 @@ import com.google.common.annotations.VisibleForTesting;
  **/
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class FileOutputCommitter extends OutputCommitter {
+public class FileOutputCommitter extends PathOutputCommitter {
   private static final Log LOG = LogFactory.getLog(FileOutputCommitter.class);
 
   /** 
@@ -704,5 +704,18 @@ public class FileOutputCommitter extends OutputCommitter {
     } else {
       LOG.warn("Output Path is null in recoverTask()");
     }
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "FileOutputCommitter{");
+    sb.append("outputPath=").append(outputPath);
+    sb.append(", workPath=").append(workPath);
+    sb.append(", algorithmVersion=").append(algorithmVersion);
+    sb.append(", skipCleanup=").append(skipCleanup);
+    sb.append(", ignoreCleanupFailures=").append(ignoreCleanupFailures);
+    sb.append('}');
+    return sb.toString();
   }
 }

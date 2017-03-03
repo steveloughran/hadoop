@@ -1,0 +1,138 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.fs.s3a.commit;
+
+import com.amazonaws.services.s3.model.PartETag;
+import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+/**
+ * Put tracker for delayed commits.
+ */
+@InterfaceAudience.Private
+public class DelayedCommitTracker extends DefaultPutTracker {
+  public static final Logger LOG = LoggerFactory.getLogger(
+      DelayedCommitTracker.class);
+
+  private final String pendingPartKey;
+  private final Path path;
+  private final S3AFileSystem.WriteOperationHelper writer;
+
+  /**
+   * Delayed commit tracker.
+   * @param path path nominally being written to
+   * @param destKey key for the destination
+   * @param pendingPartKey key of the pending part
+   * @param writer writer instance to use for operations
+   */
+  public DelayedCommitTracker(Path path,
+      String destKey,
+      String pendingPartKey,
+      S3AFileSystem.WriteOperationHelper writer) {
+    super(destKey);
+    this.path = path;
+    this.pendingPartKey = pendingPartKey;
+    this.writer = writer;
+  }
+
+  /**
+   * Initialize the tracker.
+   * @return true, indicating that the multipart commit must start.
+   * @throws IOException any IO problem.
+   */
+  @Override
+  public boolean inited() throws IOException {
+    return true;
+  }
+
+  /**
+   * Complete operation: generate the final commit data, put it.
+   * @param uploadId Upload ID
+   * @param parts list of parts
+   * @param bytesWritten bytes written
+   * @return false, indicating that the commit must fail.
+   * @throws IOException any IO problem.
+   * @throws IllegalArgumentException bad argument
+   * @throws IllegalStateException if there's a problem with the validity
+   * of the request.
+   */
+  @Override
+  public boolean aboutToComplete(String uploadId,
+      List<PartETag> parts,
+      long bytesWritten)
+      throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(uploadId),
+        "empty/null upload Id: "+ uploadId);
+    Preconditions.checkArgument(parts != null,
+        "No uploaded parts list");
+    Preconditions.checkArgument(!parts.isEmpty(),
+        "No uploaded parts to save");
+    PersistentCommitData commitData = new PersistentCommitData();
+    commitData.destinationKey = getDestKey();
+    commitData.uri = path.toUri().toString();
+    commitData.uploadId = uploadId;
+    commitData.notes = "";
+    long time = System.currentTimeMillis();
+    commitData.created = time;
+    commitData.saved = time;
+    commitData.date = new Date(time).toString();
+    commitData.size = bytesWritten;
+    List<String> etags = new ArrayList<>(parts.size());
+    int counter = 1;
+    for (PartETag part : parts) {
+      Preconditions.checkState(part.getPartNumber() == counter,
+          "Expected part number %s but got %s", counter, part.getPartNumber());
+      etags.add(part.getETag());
+      counter++;
+    }
+    commitData.etags = etags;
+    commitData.validate();
+    byte[] bytes = PersistentCommitData.getSerializer().toBytes(commitData);
+    PutObjectRequest put = writer.newPutRequest(
+        new ByteArrayInputStream(bytes), bytes.length);
+    writer.putObjectAndFinalize(put, bytes.length);
+    LOG.debug("{} — put delayed commit information to {}:\n{}",
+        this, path, commitData);
+    return false;
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "DelayedCompleteTracker{");
+    sb.append(", destKey=").append(getDestKey());
+    sb.append(", pendingPartKey='").append(pendingPartKey).append('\'');
+    sb.append(", path=").append(path);
+    sb.append(", writer=").append(writer);
+    sb.append('}');
+    return sb.toString();
+  }
+}

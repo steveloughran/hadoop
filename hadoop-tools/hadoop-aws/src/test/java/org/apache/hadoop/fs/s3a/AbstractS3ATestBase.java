@@ -58,7 +58,11 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
 
   @Before
   public void nameThread() {
-    Thread.currentThread().setName("JUnit-" + methodName.getMethodName());
+    Thread.currentThread().setName("JUnit-" + getMethodName());
+  }
+
+  protected String getMethodName() {
+    return methodName.getMethodName();
   }
 
   @Override
@@ -98,7 +102,7 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
    */
   protected void describe(String text, Object... args) {
     LOG.info("\n\n{}: {}\n",
-        methodName.getMethodName(),
+        getMethodName(),
         String.format(text, args));
   }
 

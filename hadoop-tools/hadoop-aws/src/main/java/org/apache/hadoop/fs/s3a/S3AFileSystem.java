@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.URI;
+import java.nio.file.AccessDeniedException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,8 +53,11 @@ import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
+import com.amazonaws.services.s3.model.ListMultipartUploadsRequest;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.MultiObjectDeleteException;
+import com.amazonaws.services.s3.model.MultipartUpload;
+import com.amazonaws.services.s3.model.MultipartUploadListing;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PartETag;
@@ -96,6 +100,8 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.s3a.commit.DelayedCommitFSIntegration;
+import org.apache.hadoop.fs.s3a.commit.DefaultPutTracker;
 import org.apache.hadoop.fs.s3a.s3guard.DirListingMetadata;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStoreListFilesIterator;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStore;
@@ -167,6 +173,7 @@ public class S3AFileSystem extends FileSystem {
   private String blockOutputBuffer;
   private S3ADataBlocks.BlockFactory blockFactory;
   private int blockOutputActiveBlocks;
+  private DelayedCommitFSIntegration committerIntegration;
 
   /** Add any deprecated keys. */
   @SuppressWarnings("deprecation")
@@ -272,8 +279,18 @@ public class S3AFileSystem extends FileSystem {
       serverSideEncryptionAlgorithm = getEncryptionAlgorithm(conf);
       inputPolicy = S3AInputPolicy.getPolicy(
           conf.getTrimmed(INPUT_FADVISE, INPUT_FADV_NORMAL));
+      boolean committerEnabled = conf.getBoolean(COMMITTER_ENABLED,
+          DEFAULT_COMMITTER_ENABLED);
+      if (committerEnabled) {
+        LOG.info("S3A Committer is enabled");
+      }
+      committerIntegration = new DelayedCommitFSIntegration(
+          this, committerEnabled);
 
-      blockUploadEnabled = conf.getBoolean(FAST_UPLOAD, DEFAULT_FAST_UPLOAD);
+      // is fast upload enabled? If the committer is turned on, this
+      // is always true.
+      blockUploadEnabled = committerEnabled
+          || conf.getBoolean(FAST_UPLOAD, DEFAULT_FAST_UPLOAD);
 
       if (blockUploadEnabled) {
         blockOutputBuffer = conf.getTrimmed(FAST_UPLOAD_BUFFER,
@@ -358,20 +375,32 @@ public class S3AFileSystem extends FileSystem {
         PURGE_EXISTING_MULTIPART_AGE, DEFAULT_PURGE_EXISTING_MULTIPART_AGE, 0);
 
     if (purgeExistingMultipart) {
-      Date purgeBefore =
-          new Date(new Date().getTime() - purgeExistingMultipartAge * 1000);
-
       try {
-        transfers.abortMultipartUploads(bucket, purgeBefore);
-      } catch (AmazonServiceException e) {
-        if (e.getStatusCode() == 403) {
-          instrumentation.errorIgnored();
-          LOG.debug("Failed to purging multipart uploads against {}," +
-              " FS may be read only", bucket, e);
-        } else {
-          throw translateException("purging multipart uploads", bucket, e);
-        }
+        abortOutstandingMultipartUploads(purgeExistingMultipartAge);
+      } catch (AccessDeniedException e) {
+        instrumentation.errorIgnored();
+        LOG.debug("Failed to purging multipart uploads against {}," +
+            " FS may be read only", bucket, e);
       }
+    }
+  }
+
+  /**
+   * Abort all outstanding MPUs older than a given age.
+   * @param seconds time in seconds
+   * @throws IOException on any failure, other than 403 "permission denied"
+   */
+  public void abortOutstandingMultipartUploads(long seconds)
+      throws IOException {
+    Preconditions.checkArgument(seconds >=0);
+    Date purgeBefore =
+        new Date(new Date().getTime() - seconds * 1000);
+    LOG.debug("Purging outstanding multipart uploads older than {}",
+        purgeBefore);
+    try {
+      transfers.abortMultipartUploads(bucket, purgeBefore);
+    } catch (AmazonServiceException e) {
+      throw translateException("purging multipart uploads", bucket, e);
     }
   }
 
@@ -536,7 +565,7 @@ public class S3AFileSystem extends FileSystem {
    * @param key input key
    * @return the fully qualified path including URI scheme and bucket name.
    */
-  Path keyToQualifiedPath(String key) {
+  public Path keyToQualifiedPath(String key) {
     return qualify(keyToPath(key));
   }
 
@@ -614,22 +643,23 @@ public class S3AFileSystem extends FileSystem {
   public FSDataOutputStream create(Path f, FsPermission permission,
       boolean overwrite, int bufferSize, short replication, long blockSize,
       Progressable progress) throws IOException {
-    String key = pathToKey(f);
+    final Path path = qualify(f);
+    String key = pathToKey(path);
     FileStatus status = null;
     try {
       // get the status or throw an FNFE
-      status = getFileStatus(f);
+      status = getFileStatus(path);
 
       // if the thread reaches here, there is something at the path
       if (status.isDirectory()) {
         // path references a directory: automatic error
-        throw new FileAlreadyExistsException(f + " is a directory");
+        throw new FileAlreadyExistsException(path + " is a directory");
       }
       if (!overwrite) {
         // path references a file and overwrite is disabled
-        throw new FileAlreadyExistsException(f + " already exists");
+        throw new FileAlreadyExistsException(path + " already exists");
       }
-      LOG.debug("Overwriting file {}", f);
+      LOG.debug("Overwriting file {}", path);
     } catch (FileNotFoundException e) {
       // this means the file is not found
 
@@ -637,17 +667,20 @@ public class S3AFileSystem extends FileSystem {
     instrumentation.fileCreated();
     FSDataOutputStream output;
     if (blockUploadEnabled) {
+      DefaultPutTracker putTracker =
+          committerIntegration.getTracker(path, key);
+      String destKey = putTracker.getDestKey();
       output = new FSDataOutputStream(
           new S3ABlockOutputStream(this,
-              key,
+              destKey,
               new SemaphoredDelegatingExecutor(boundedThreadPool,
                   blockOutputActiveBlocks, true),
               progress,
               partSize,
               blockFactory,
               instrumentation.newOutputStreamStatistics(statistics),
-              new WriteOperationHelper(key)
-          ),
+              createWriteOperationHelper(destKey),
+              putTracker),
           null);
     } else {
 
@@ -662,6 +695,24 @@ public class S3AFileSystem extends FileSystem {
           null);
     }
     return output;
+  }
+
+  /**
+   * Create a new WriteOperationHelper instance against a specific key.
+   *
+   * This class contains methods for writing to the specific path, along with
+   * other low-level operations against the store. It is unstable and
+   * only intended for code with intimate knowledge of the object store.
+   * If using this, be prepared for changes even on minor point releases.
+   * @param key key to the path
+   * @return a new helper.
+   */
+  @InterfaceAudience.Private
+  public WriteOperationHelper createWriteOperationHelper(String key) {
+    Preconditions.checkArgument(key != null, "No key");
+    WriteOperationHelper helper = new WriteOperationHelper(key);
+    LOG.debug("Created {}", helper);
+    return helper;
   }
 
   /**
@@ -824,7 +875,7 @@ public class S3AFileSystem extends FileSystem {
             throw new RenameFailedException(src, dst,
                 "destination parent is not a directory");
           }
-        } catch (FileNotFoundException e2) {
+        } catch (FileNotFoundException ignored) {
           throw new RenameFailedException(src, dst,
               "destination has no parent ");
         }
@@ -862,7 +913,7 @@ public class S3AFileSystem extends FileSystem {
         S3Guard.addMoveFile(metadataStore, srcPaths, dstMetas, src, dst,
             length, getDefaultBlockSize(dst), username);
       }
-      innerDelete(srcStatus, false);
+      innerDelete(srcStatus, false, false);
     } else {
       LOG.debug("rename: renaming directory {} to {}", src, dst);
 
@@ -1221,6 +1272,8 @@ public class S3AFileSystem extends FileSystem {
     } else {
       len = putObjectRequest.getMetadata().getContentLength();
     }
+    LOG.debug("PUT {} bytes to {} via transfer manager ",
+        len, putObjectRequest.getKey());
     incrementPutStartStatistics(len);
     try {
       Upload upload = transfers.upload(putObjectRequest);
@@ -1400,7 +1453,7 @@ public class S3AFileSystem extends FileSystem {
    */
   public boolean delete(Path f, boolean recursive) throws IOException {
     try {
-      return innerDelete(innerGetFileStatus(f, true), recursive);
+      return innerDelete(innerGetFileStatus(f, true), recursive, true);
     } catch (FileNotFoundException e) {
       LOG.debug("Couldn't delete {} - does not exist", f);
       instrumentation.errorIgnored();
@@ -1417,11 +1470,15 @@ public class S3AFileSystem extends FileSystem {
    * @param recursive if path is a directory and set to
    * true, the directory is deleted else throws an exception. In
    * case of a file the recursive can be set to either true or false.
+   * @param createFakeDirectory create a fake dir if needed (adds extra GETs).
    * @return  true if delete is successful else false.
    * @throws IOException due to inability to delete a directory or file.
    * @throws AmazonClientException on failures inside the AWS SDK
    */
-  private boolean innerDelete(S3AFileStatus status, boolean recursive)
+  @InterfaceAudience.Private
+  public boolean innerDelete(S3AFileStatus status,
+      boolean recursive,
+      boolean createFakeDirectory)
       throws IOException, AmazonClientException {
     Path f = status.getPath();
     LOG.debug("Delete path {} - recursive {}", f , recursive);
@@ -1491,7 +1548,7 @@ public class S3AFileSystem extends FileSystem {
     }
 
     Path parent = f.getParent();
-    if (parent != null) {
+    if (parent != null && createFakeDirectory) {
       createFakeDirectoryIfNecessary(parent);
     }
     return true;
@@ -2504,6 +2561,25 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
+   * Is delayed complete enabled?
+   * @return true if delayed completion is turned on.
+   */
+  public boolean isDelayedCompleteEnabled() {
+    return committerIntegration.isDelayedCommitEnabled();
+  }
+
+  /**
+   * Predicate: is a path a delayed commit path?
+   * True if delayed commit is enabled and the path contains the pending path
+   * somewhere in it.
+   * @param path path to examine
+   * @return true if the path is or is under a pending directory
+   */
+  public boolean isDelayedCompletePath(Path path) {
+    return committerIntegration.isDelayedCompletePath(path);
+  }
+
+  /**
    * Increments the statistic {@link Statistic#INVOCATION_GLOB_STATUS}.
    * {@inheritDoc}
    */
@@ -2730,6 +2806,17 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
+   * Listing all multipart uploads; limited to the first few hundred.
+   * @return a listing of multipart uploads.
+   */
+  @InterfaceAudience.Private
+  public List<MultipartUpload> listMultipartUploads() {
+    MultipartUploadListing l = s3.listMultipartUploads(
+        new ListMultipartUploadsRequest(bucket));
+    return l.getMultipartUploads();
+  }
+
+  /**
    * Helper for an ongoing write operation.
    * <p>
    * It hides direct access to the S3 API from the output stream,
@@ -2747,7 +2834,8 @@ public class S3AFileSystem extends FileSystem {
    *
    * Each instance of this state is unique to a single output stream.
    */
-  final class WriteOperationHelper {
+  @InterfaceAudience.Private
+  public final class WriteOperationHelper {
     private final String key;
 
     private WriteOperationHelper(String key) {
@@ -2762,10 +2850,23 @@ public class S3AFileSystem extends FileSystem {
      * @param length size, if known. Use -1 for not known
      * @return the request
      */
-    PutObjectRequest newPutRequest(InputStream inputStream, long length) {
-      PutObjectRequest request = newPutObjectRequest(key,
-          newObjectMetadata(length), inputStream);
-      return request;
+    public PutObjectRequest newPutRequest(InputStream inputStream,
+        long length) {
+      return createPutObjectRequest(key, inputStream, length);
+    }
+
+    /**
+     * Create a {@link PutObjectRequest} request against the specific key.
+     * @param destKey destination key
+     * @param inputStream source data.
+     * @param length size, if known. Use -1 for not known
+     * @return the request
+     */
+    public PutObjectRequest createPutObjectRequest(String destKey,
+        InputStream inputStream, long length) {
+      return newPutObjectRequest(destKey,
+          newObjectMetadata(length),
+          inputStream);
     }
 
     /**
@@ -2773,7 +2874,17 @@ public class S3AFileSystem extends FileSystem {
      * @param sourceFile source file
      * @return the request
      */
-    PutObjectRequest newPutRequest(File sourceFile) {
+    public PutObjectRequest newPutRequest(File sourceFile) {
+      return createPutObjectRequest(key, sourceFile);
+    }
+
+    /**
+     * Create a {@link PutObjectRequest} request to upload a file.
+     * @param key key to PUT to.
+     * @param sourceFile source file
+     * @return the request
+     */
+    public PutObjectRequest createPutObjectRequest(String key, File sourceFile) {
       int length = (int) sourceFile.length();
       PutObjectRequest request = newPutObjectRequest(key,
           newObjectMetadata(length), sourceFile);
@@ -2782,16 +2893,17 @@ public class S3AFileSystem extends FileSystem {
 
     /**
      * Callback on a successful write.
+     * @param length length of the write
      */
-    void writeSuccessful(long length) {
-      finishedWrite(key, length);
+    public void writeSuccessful(long length) {
+      LOG.debug("Successful write to {}, len {}", key, length);
     }
 
     /**
      * Callback on a write failure.
      * @param e Any exception raised which triggered the failure.
      */
-    void writeFailed(Exception e) {
+    public void writeFailed(Exception e) {
       LOG.debug("Write to {} failed", this, e);
     }
 
@@ -2811,7 +2923,7 @@ public class S3AFileSystem extends FileSystem {
      * @return the upload result containing the ID
      * @throws IOException IO problem
      */
-    String initiateMultiPartUpload() throws IOException {
+    public String initiateMultiPartUpload() throws IOException {
       LOG.debug("Initiating Multipart upload");
       final InitiateMultipartUploadRequest initiateMPURequest =
           new InitiateMultipartUploadRequest(bucket,
@@ -2827,14 +2939,72 @@ public class S3AFileSystem extends FileSystem {
       }
     }
 
+
     /**
-     * Complete a multipart upload operation.
+     * Abort a multipart upload operation.
+     * @param uploadId multipart operation Id
+     * @throws IOException on problems.
+     */
+    public void abortMultipartCommit(String destination,
+        String uploadId) throws IOException {
+      try {
+        abortMultipartUpload(uploadId);
+      } catch (AmazonClientException e) {
+        throw translateException("aborting multipart commit",
+            destination, e);
+      }
+    }
+
+    /**
+     * Commplete the multipart commit operation.
      * @param uploadId multipart operation Id
      * @param partETags list of partial uploads
-     * @return the result
+     * @return the result of the operation.
+     * @throws IOException on problems.
+     */
+    public CompleteMultipartUploadResult finalizeMultipartCommit(
+        String destination,
+        String uploadId,
+        List<PartETag> partETags,
+        long length) throws IOException {
+      return finalizeMultipartUpload(destination, uploadId, partETags, length);
+    }
+
+    /**
+     * Finalize a multipart PUT operation.
+     * This completes the upload, and, if that works, calls
+     * {@link #finishedWrite(String, long)} to update the filesystem.
+     * @param uploadId multipart operation Id
+     * @param partETags list of partial uploads
+     * @return the result of the operation.
+     * @throws IOException on problems.
+     */
+    public CompleteMultipartUploadResult finalizeMultipartUpload(
+        String destination,
+        String uploadId,
+        List<PartETag> partETags,
+        long length) throws IOException {
+      try {
+        CompleteMultipartUploadResult result
+            = completeMultipartUpload(uploadId, partETags);
+        finishedWrite(destination, length);
+        return result;
+      } catch (AmazonClientException e) {
+        throw translateException("Completing multipart commit",
+            destination, e);
+      }
+    }
+
+    /**
+     * Complete a multipart upload operation.
+     * This one does not finalize the write.
+     * @param uploadId multipart operation Id
+     * @param partETags list of partial uploads
+     * @return the result of the operation.
      * @throws AmazonClientException on problems.
      */
-    CompleteMultipartUploadResult completeMultipartUpload(String uploadId,
+    public CompleteMultipartUploadResult completeMultipartUpload(
+        String uploadId,
         List<PartETag> partETags) throws AmazonClientException {
       Preconditions.checkNotNull(uploadId);
       Preconditions.checkNotNull(partETags);
@@ -2856,7 +3026,8 @@ public class S3AFileSystem extends FileSystem {
      * @param uploadId multipart operation Id
      * @throws AmazonClientException on problems.
      */
-    void abortMultipartUpload(String uploadId) throws AmazonClientException {
+    public void abortMultipartUpload(String uploadId)
+        throws AmazonClientException {
       LOG.debug("Aborting multipart upload {}", uploadId);
       s3.abortMultipartUpload(
           new AbortMultipartUploadRequest(bucket, key, uploadId));
@@ -2866,20 +3037,28 @@ public class S3AFileSystem extends FileSystem {
      * Create and initialize a part request of a multipart upload.
      * Exactly one of: {@code uploadStream} or {@code sourceFile}
      * must be specified.
+     * A subset of the file may be posted, by providing the starting point
+     * in {@code offset} and a length of block in {@code size} equal to
+     * or less than the remaining bytes.
      * @param uploadId ID of ongoing upload
      * @param partNumber current part number of the upload
      * @param size amount of data
      * @param uploadStream source of data to upload
      * @param sourceFile optional source file.
+     * @param offset offset in file to start reading.
      * @return the request.
      */
-    UploadPartRequest newUploadPartRequest(String uploadId,
-        int partNumber, int size, InputStream uploadStream, File sourceFile) {
+    public UploadPartRequest newUploadPartRequest(String uploadId,
+        int partNumber,
+        int size,
+        InputStream uploadStream,
+        File sourceFile,
+        Long offset) {
       Preconditions.checkNotNull(uploadId);
       // exactly one source must be set; xor verifies this
       Preconditions.checkArgument((uploadStream != null) ^ (sourceFile != null),
           "Data source");
-      Preconditions.checkArgument(size > 0, "Invalid partition size %s", size);
+      Preconditions.checkArgument(size >= 0, "Invalid partition size %s", size);
       Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000,
           "partNumber must be between 1 and 10000 inclusive, but is %s",
           partNumber);
@@ -2896,7 +3075,18 @@ public class S3AFileSystem extends FileSystem {
         // there's an upload stream. Bind to it.
         request.setInputStream(uploadStream);
       } else {
+        Preconditions.checkArgument(sourceFile.exists(),
+            "Source file does not exist: %s", sourceFile);
+        Preconditions.checkArgument(offset >= 0, "Invalid offset %d", offset);
+        long length = sourceFile.length();
+        Preconditions.checkArgument(offset == 0 || offset < length,
+            "Offset %d beyond length of file %d", offset, length);
+        long range = length = offset;
+        Preconditions.checkArgument( range <= size,
+            "Partion size %d > available bytes %d from offset %d in file %s",
+            size, range, offset);
         request.setFile(sourceFile);
+        request.setFileOffset(offset);
       }
       return request;
     }
@@ -2916,16 +3106,61 @@ public class S3AFileSystem extends FileSystem {
 
     /**
      * PUT an object directly (i.e. not via the transfer manager).
+     * Byte length is calculated from the file length, or, if there is no
+     * file, from the content length of the header.
      * @param putObjectRequest the request
      * @return the upload initiated
      * @throws IOException on problems
      */
-    PutObjectResult putObject(PutObjectRequest putObjectRequest)
+    public PutObjectResult putObject(PutObjectRequest putObjectRequest)
         throws IOException {
       try {
         return putObjectDirect(putObjectRequest);
       } catch (AmazonClientException e) {
         throw translateException("put", putObjectRequest.getKey(), e);
+      }
+    }
+
+    /**
+     * PUT an object directly (i.e. not via the transfer manager),
+     * then finish the write (via {@link #finishedWrite(String, long)}.
+     * Byte length is calculated from the file length, or, if there is no
+     * file, from the content length of the header.
+     * After the put, any parent directory entries are deleted.
+     * @param putObjectRequest the request
+     * @param length length of data put; this is used in updating the metadata
+     * @return the upload initiated
+     * @throws IOException on problems
+     */
+    public PutObjectResult putObjectAndFinalize(
+        PutObjectRequest putObjectRequest,
+        int length) throws IOException {
+      PutObjectResult result = putObject(putObjectRequest);
+      finishedWrite(putObjectRequest.getKey(), length);
+      return result;
+    }
+
+    /**
+     * Delete a Path; a special entry point for committers.
+     * This entry point does not attempt to create a fake parent directory.
+     * @param status the status entry on the target path
+     * @param recursive if path is a directory and set to
+     * true, the directory is deleted else throws an exception. In
+     * case of a file the recursive can be set to either true or false.
+     * @return true if delete is successful else false.
+     * @throws IOException due to inability to delete a directory or file.
+     */
+    public boolean deleteInCommit(S3AFileStatus status, boolean recursive)
+        throws IOException {
+      Path f = status.getPath();
+      try {
+        return innerDelete(status, recursive, false);
+      } catch (FileNotFoundException e) {
+        LOG.debug("Couldn't delete {} - does not exist", f);
+        instrumentation.errorIgnored();
+        return false;
+      } catch (AmazonClientException e) {
+        throw translateException("deleteInCommit", f, e);
       }
     }
   }

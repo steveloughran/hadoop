@@ -25,7 +25,7 @@ external artifacts which are needed for this support —enabling downstream
 applications to easily use this support.
 
 To make it part of Apache Hadoop's default classpath, simply make sure that
-HADOOP_OPTIONAL_TOOLS in hadoop-env.sh has 'hadoop-aws' in the list.
+`HADOOP_OPTIONAL_TOOLS` in `hadoop-env.sh` has `hadoop-aws` in the list.
 
 ### Features
 
@@ -38,6 +38,12 @@ data between hadoop and other applications via the S3 object store.
 1. The third generation, `s3a:` filesystem. Designed to be a switch in
 replacement for `s3n:`, this filesystem binding supports larger files and promises
 higher performance.
+1. The [S3Guard](s3guard.html) extension to S3A adds an optional consistent
+and high-performance view of the object metadata. This can deliver
+significant performance improvements.
+1. The [S3A Committer](s3a_committer.html) offers high-performance committing
+of executed work directly to an S3 object store offering a consistent
+view of the metadata. For Amazon S3, that means with S3Guard.
 
 The specifics of using these filesystems are documented in this section.
 
