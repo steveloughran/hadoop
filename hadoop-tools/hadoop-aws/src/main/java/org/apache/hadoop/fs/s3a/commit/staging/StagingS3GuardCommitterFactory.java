@@ -16,11 +16,13 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
-
-import org.apache.hadoop.mapreduce.JobContext;
+package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.S3GuardCommitter;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
@@ -30,20 +32,20 @@ import java.io.IOException;
  * For S3A output, uses the {@link S3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
-public class S3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
+public class StagingS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.S3GuardCommitterFactory";
+      = "org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitterFactory";
 
   protected AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new S3GuardCommitter(outputPath, context);
+    return new StagingS3GuardCommitter(outputPath, context);
   }
 
   protected AbstractS3GuardCommitter createJobCommitter(Path outputPath,
       JobContext context) throws IOException {
-    return new S3GuardCommitter(outputPath, context);
+    return new StagingS3GuardCommitter(outputPath, context);
   }
 }

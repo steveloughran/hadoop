@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A duration with logging of final state at info in the close() call.
  */
-final class DurationInfo extends Duration
+public class DurationInfo extends Duration
     implements AutoCloseable {
   private final String text;
   private static final Logger LOG = LoggerFactory.getLogger(DurationInfo.class);

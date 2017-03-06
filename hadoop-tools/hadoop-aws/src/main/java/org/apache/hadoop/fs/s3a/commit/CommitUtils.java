@@ -23,7 +23,6 @@ import com.amazonaws.services.s3.model.PartETag;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
@@ -383,7 +382,8 @@ public final class CommitUtils {
    * Compute a path for temporary data associated with a job.
    * This data is <i>not pending</i>
    * @param appAttemptId the ID of the application attempt for this job.
-   * @return the path to store job attempt data.
+   * @param out output directory of job
+   * @return the path to store temporary job attempt data.
    */
   public static Path getTempJobAttemptPath(int appAttemptId, Path out) {
     return new Path(new Path(out, TEMP_DATA_PATH),
@@ -392,8 +392,9 @@ public final class CommitUtils {
 
   /**
    * Compute the path where the output of a given job attempt will be placed.
-   * @param appAttemptId the ID of the application attempt for this job.
-   * @return the path to store job attempt data.
+   * @param context task context
+   * @param out output directory of job
+   * @return the path to store temporary job attempt data.
    */
   public static Path getTempTaskAttemptPath(TaskAttemptContext context, Path out) {
     return new Path(getTempJobAttemptPath(getAppAttemptId(context), out),

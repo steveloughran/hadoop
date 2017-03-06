@@ -57,9 +57,9 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
 
   /**
    * Instantiate.
-   * @param outputPath output path; may be null.
+   * @param outputPath output path
    * @param context job context
-   * @throws IOException
+   * @throws IOException on a failure
    */
   public S3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
@@ -69,8 +69,7 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
 
   /**
    * Create a committer.
-   * @param outputPath the job's output path, or null if you want the output
-   * committer to act as a no-op.
+   * @param outputPath the job's output path
    * @param context the task's context
    * @throws IOException on a failure
    */
@@ -85,6 +84,10 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
         getWorkPath());
   }
 
+  /**
+   * require delayed commit supported in the FS
+   * @return true, always.
+   */
   @Override
   protected boolean isDelayedCommitRequired() {
     return true;

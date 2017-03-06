@@ -43,7 +43,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *
  * Requiring an output directory simplifies coding and testing.
  */
-abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
+public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
   private Path outputPath;
@@ -189,7 +189,7 @@ abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * Flag to indicate whether or not the destination filesystem needs
    * to be configured to support the delayed commit mechanism.
-   * @return
+   * @return what the requirements of the committer are of the S3 endpoint
    */
   protected abstract boolean isDelayedCommitRequired();
 
@@ -200,10 +200,7 @@ abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   @Override
   public void recoverTask(TaskAttemptContext taskContext) throws IOException {
-    String message = String.format("Unable to recover task %s",
-        taskContext.getTaskAttemptID());
-    IOException ex = new IOException(message);
-    LOG.warn(message, ex);
-    throw ex;
+    throw new IOException(String.format("Unable to recover task %s",
+        taskContext.getTaskAttemptID()));
   }
 }
