@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,13 +72,13 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  * {@code org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter}.
  */
 @SuppressWarnings("unchecked")
-public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
+public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
   private Path outDir;
 
   private String SUB_DIR = "SUB_DIR";
 
   protected static final Logger LOG =
-      LoggerFactory.getLogger(ITestS3AGuardCommitter.class);
+      LoggerFactory.getLogger(ITestMagicCommitResilience.class);
 
   // A random task attempt id for testing.
   private static final String ATTEMPT_0 =
@@ -143,9 +144,9 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
    * @throws IOException failure
    */
 
-  protected S3GuardCommitter createCommitter(TaskAttemptContext context)
+  protected MagicS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
-    return new S3GuardCommitter(outDir, context);
+    return new MagicS3GuardCommitter(outDir, context);
   }
 
   /**
@@ -154,9 +155,9 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
    * @return new committer
    * @throws IOException failure
    */
-  public S3GuardCommitter createCommitter(JobContext context)
+  public MagicS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new S3GuardCommitter(outDir, context);
+    return new MagicS3GuardCommitter(outDir, context);
   }
 
   protected void writeTextOutput(TaskAttemptContext tContext)
@@ -237,7 +238,7 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
     JobContext jContext2 = new JobContextImpl(conf2, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext2 = new TaskAttemptContextImpl(conf2,
         TASK_ATTEMPT_0);
-    S3GuardCommitter committer2 = createCommitter(tContext2);
+    MagicS3GuardCommitter committer2 = createCommitter(tContext2);
     committer2.setupJob(tContext2);
 
     assertFalse("recoverySupported in " + committer2,
@@ -633,7 +634,7 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
     assertPathDoesNotExist("task temp dir still exists", expectedPath);
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
-    Path pendingDir = new Path(outDir, PENDING_PATH);
+    Path pendingDir = new Path(outDir, MAGIC_DIR_NAME);
     assertPathDoesNotExist("job temp dir still exists", pendingDir);
     FileStatus[] children = listChildren(getFileSystem(), outDir);
     assertArrayEquals("Output directory not empty " + ls(outDir),
@@ -739,7 +740,7 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
         @Override
         public Path getDefaultWorkFile(TaskAttemptContext context,
             String extension) throws IOException {
-          final S3GuardCommitter foc = (S3GuardCommitter)
+          final MagicS3GuardCommitter foc = (MagicS3GuardCommitter)
               getOutputCommitter(context);
           return new Path(new Path(foc.getWorkPath(), SUB_DIR),
               getUniqueFile(context, getOutputName(context), extension));
@@ -796,7 +797,7 @@ public class ITestS3AGuardCommitter extends AbstractS3ACommitTestCase {
    */
 
   private static class CommitterWithFailedThenSucceed extends
-      S3GuardCommitter {
+      MagicS3GuardCommitter {
     public static final String MESSAGE = "oops";
     private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
 

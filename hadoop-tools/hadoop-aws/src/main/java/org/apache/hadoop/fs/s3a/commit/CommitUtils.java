@@ -92,7 +92,7 @@ public final class CommitUtils {
    * @return true if a path is considered pending
    */
   public static boolean isPendingPath(List<String> elements) {
-    return elements.contains(PENDING_PATH);
+    return elements.contains(MAGIC_DIR_NAME);
   }
 
   /**
@@ -112,7 +112,7 @@ public final class CommitUtils {
    * @throws IllegalArgumentException if there is no pending element
    */
   public static int pendingElementIndex(List<String> elements) {
-    return getElementIndex(PENDING_PATH, elements);
+    return getElementIndex(MAGIC_DIR_NAME, elements);
   }
 
   protected static int getElementIndex(String name, List<String> elements) {
@@ -202,7 +202,7 @@ public final class CommitUtils {
    * @return a new path.
    */
   public static Path pendingSubdir(Path destDir) {
-    return new Path(destDir.getParent(), PENDING_PATH);
+    return new Path(destDir.getParent(), MAGIC_DIR_NAME);
   }
 
   /**
@@ -222,7 +222,8 @@ public final class CommitUtils {
     if (isPendingPath(elements)) {
       List<String> destDir = pendingPathParents(elements);
       List<String> children = pendingPathChildren(elements);
-      checkArgument(!children.isEmpty(), "No path found under " + PENDING_PATH);
+      checkArgument(!children.isEmpty(), "No path found under " +
+          MAGIC_DIR_NAME);
       ArrayList<String> dest = new ArrayList<>(destDir);
       if (containsBasePath(children)) {
         // there's a base marker in the path
@@ -319,8 +320,17 @@ public final class CommitUtils {
    * @param out the base output directory.
    * @return the location of pending job attempts.
    */
+  public static Path getMagicJobAttemptsPath(Path out) {
+    return new Path(out, MAGIC_DIR_NAME);
+  }
+
+  /**
+   * Get the location of pending job attempts.
+   * @param out the base output directory.
+   * @return the location of pending job attempts.
+   */
   public static Path getPendingJobAttemptsPath(Path out) {
-    return new Path(out, PENDING_PATH);
+    return new Path(out, MAGIC_DIR_NAME);
   }
 
   /**
@@ -338,8 +348,8 @@ public final class CommitUtils {
    * @param appAttemptId the ID of the application attempt for this job.
    * @return the path to store job attempt data.
    */
-  public static Path getJobAttemptPath(int appAttemptId, Path out) {
-    return new Path(getPendingJobAttemptsPath(out),
+  public static Path getMagicJobAttemptPath(int appAttemptId, Path out) {
+    return new Path(getMagicJobAttemptsPath(out),
         formatAppAttemptDir(appAttemptId));
   }
 
@@ -357,8 +367,8 @@ public final class CommitUtils {
    * @param context the context of the job with pending tasks.
    * @return the path where the output of pending task attempts are stored.
    */
-  public static Path getPendingTaskAttemptsPath(JobContext context, Path out) {
-    return new Path(getJobAttemptPath(
+  public static Path getMagicTaskAttemptsPath(JobContext context, Path out) {
+    return new Path(getMagicJobAttemptPath(
         getAppAttemptId(context), out), "tasks");
   }
 
@@ -371,8 +381,8 @@ public final class CommitUtils {
    * @param out The output path to put things in.
    * @return the path where a task attempt should be stored.
    */
-  public static Path getTaskAttemptPath(TaskAttemptContext context, Path out) {
-    Path p1 = new Path(getPendingTaskAttemptsPath(context, out),
+  public static Path getMagicTaskAttemptPath(TaskAttemptContext context, Path out) {
+    Path p1 = new Path(getMagicTaskAttemptsPath(context, out),
         String.valueOf(context.getTaskAttemptID()));
     return new Path(p1, BASE_PATH);
   }

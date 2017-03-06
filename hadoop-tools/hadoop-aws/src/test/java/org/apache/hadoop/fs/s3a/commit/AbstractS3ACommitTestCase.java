@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
@@ -48,7 +49,7 @@ public class AbstractS3ACommitTestCase extends AbstractS3ATestBase {
     conf.set(FAST_UPLOAD_BUFFER, FAST_UPLOAD_BUFFER_ARRAY);
     conf.setBoolean(COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        S3GuardCommitterFactory.NAME);
+        MagicS3GuardCommitterFactory.NAME);
 
     return conf;
   }

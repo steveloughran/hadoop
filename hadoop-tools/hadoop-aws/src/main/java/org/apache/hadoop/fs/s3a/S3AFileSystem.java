@@ -432,7 +432,7 @@ public class S3AFileSystem extends FileSystem {
    * Returns the S3 client used by this filesystem.
    * @return AmazonS3Client
    */
-  AmazonS3 getAmazonS3Client() {
+  public AmazonS3 getAmazonS3Client() {
     return s3;
   }
 

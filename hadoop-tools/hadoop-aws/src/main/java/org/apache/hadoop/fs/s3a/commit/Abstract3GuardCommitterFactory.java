@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.commit;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
@@ -32,7 +33,7 @@ import java.io.IOException;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link S3GuardCommitter}; for other filesystems
+ * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
 public abstract class Abstract3GuardCommitterFactory
@@ -44,7 +45,7 @@ public abstract class Abstract3GuardCommitterFactory
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.S3GuardCommitterFactory";
+      = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory";
 
   @Override
   public PathOutputCommitter createOutputCommitter(Path outputPath,

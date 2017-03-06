@@ -72,7 +72,7 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
 
     // set up the paths for the commit operation
     finalDirectory = new Path(scaleTestDir, "commit");
-    pendingDir = new Path(finalDirectory, PENDING_PATH);
+    pendingDir = new Path(finalDirectory, MAGIC_DIR_NAME);
     jobDir = new Path(pendingDir, "job_001");
     String filename = "commit.bin";
     hugefile = new Path(finalDirectory, filename);

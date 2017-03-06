@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.magic;
 
+import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 
 import org.apache.hadoop.fs.Path;
@@ -27,23 +29,23 @@ import java.io.IOException;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link S3GuardCommitter}; for other filesystems
+ * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
-public class S3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
+public class MagicS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.S3GuardCommitterFactory";
+      = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory";
 
   protected AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new S3GuardCommitter(outputPath, context);
+    return new MagicS3GuardCommitter(outputPath, context);
   }
 
   protected AbstractS3GuardCommitter createJobCommitter(Path outputPath,
       JobContext context) throws IOException {
-    return new S3GuardCommitter(outputPath, context);
+    return new MagicS3GuardCommitter(outputPath, context);
   }
 }

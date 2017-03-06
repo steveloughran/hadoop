@@ -117,10 +117,12 @@ public class Paths {
     return new Path(localTemp(conf, taskId, attemptId), uuid);
   }
 
+  // if/when this is used. need to support cross-FS temp dirs
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
                                                         String uuid)
       throws IOException {
     // no need to use localTemp, this is HDFS in production
+
     Path work = FileSystem.get(conf).makeQualified(
         new Path("/tmp", uuid));
     return new Path(work, "pending-uploads");
@@ -129,9 +131,8 @@ public class Paths {
   // TODO: verify this is correct, it comes from dse-storage
   private static Path localTemp(Configuration conf, int taskId, int attemptId)
       throws IOException {
-    String localDirs = conf.get("mapreduce.cluster.local.dir");
+    String[] dirs = conf.getStrings("mapreduce.cluster.local.dir");
     Random rand = new Random(Objects.hashCode(taskId, attemptId));
-    String[] dirs = localDirs.split(",");
     String dir = dirs[rand.nextInt(dirs.length)];
 
     return FileSystem.getLocal(conf).makeQualified(new Path(dir));

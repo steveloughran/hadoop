@@ -28,7 +28,7 @@ public class DurationInfo extends Duration
     implements AutoCloseable {
   private final String text;
   private static final Logger LOG = LoggerFactory.getLogger(DurationInfo.class);
-  DurationInfo(String format, Object... args) {
+  public DurationInfo(String format, Object... args) {
     this.text = String.format(format, args);
     LOG.info("Starting {}", text);
   }

@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.PartETag;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
@@ -39,7 +40,6 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
@@ -149,7 +149,7 @@ public class ITestS3ACommitOperations extends AbstractS3ACommitTestCase {
 
   private static Path makePendingChild(Path destFile, String name) {
     return new Path(destFile.getParent(),
-        PENDING_PATH + '/' + name);
+        MAGIC_DIR_NAME + '/' + name);
   }
 
   @Test
@@ -204,21 +204,21 @@ public class ITestS3ACommitOperations extends AbstractS3ACommitTestCase {
   public void testCommitterFactory() throws Throwable {
     Configuration conf = new Configuration();
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        S3GuardCommitterFactory.NAME);
+        MagicS3GuardCommitterFactory.NAME);
     PathOutputCommitterFactory factory
         = PathOutputCommitterFactory.getOutputCommitterFactory(conf);
     PathOutputCommitter committer = factory.createOutputCommitter(
         path("testFactory"),
         new TaskAttemptContextImpl(getConfiguration(),
             new TaskAttemptID(new TaskID(), 1)));
-    S3GuardCommitter s3a = (S3GuardCommitter) committer;
+    MagicS3GuardCommitter s3a = (MagicS3GuardCommitter) committer;
   }
 
   @Test
   public void testBaseRelativePath() throws Throwable {
     Path destDir = methodPath("testBaseRelativePath");
     Path pendingBaseDir = new Path(destDir,
-        PENDING_PATH + "/child/" + BASE_PATH);
+        MAGIC_DIR_NAME + "/child/" + BASE_PATH);
     String child = "subdir/child.txt";
     Path pendingChildPath = new Path(pendingBaseDir, child);
     Path expectedDestPath = new Path(destDir, child);

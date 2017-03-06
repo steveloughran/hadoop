@@ -16,9 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.magic;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitUtils;
+import org.apache.hadoop.fs.s3a.commit.DurationInfo;
+import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
+import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,15 +48,15 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
-public class S3GuardCommitter extends AbstractS3GuardCommitter {
+public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   private static final Logger LOG =
-      LoggerFactory.getLogger(S3GuardCommitter.class);
+      LoggerFactory.getLogger(MagicS3GuardCommitter.class);
 
   /**
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.S3GuardCommitter";
+      = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter";
 
   private FileCommitActions commitActions;
 
@@ -61,7 +66,7 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context job context
    * @throws IOException on a failure
    */
-  public S3GuardCommitter(Path outputPath,
+  public MagicS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
     super(outputPath, context);
     commitActions = new FileCommitActions(getDestFS());
@@ -73,7 +78,7 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context the task's context
    * @throws IOException on a failure
    */
-  public S3GuardCommitter(Path outputPath,
+  public MagicS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
     commitActions = new FileCommitActions(getDestFS());
@@ -146,10 +151,10 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d = new DurationInfo("Cleanup job %s",
         context.getJobID())) {
       deleteWithWarning(getDestFS(),
-          getPendingJobAttemptsPath(getOutputPath()), true);
+          getMagicJobAttemptsPath(getOutputPath()), true);
       deleteWithWarning(getDestFS(),
           getTempJobAttemptPath(getAppAttemptId(context),
-              getPendingJobAttemptsPath(getOutputPath())), true);
+              getMagicJobAttemptsPath(getOutputPath())), true);
     }
   }
 
@@ -238,4 +243,33 @@ public class S3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
 
+  /**
+   * Compute the path where the output of a given job attempt will be placed.
+   * @param appAttemptId the ID of the application attempt for this job.
+   * @return the path to store job attempt data.
+   */
+  protected Path getJobAttemptPath(int appAttemptId) {
+    return getMagicJobAttemptPath(appAttemptId, getOutputPath());
+  }
+
+  /**
+   * Compute the path where the output of a task attempt is stored until
+   * that task is committed.
+   *
+   * @param context the context of the task attempt.
+   * @return the path where a task attempt should be stored.
+   */
+  public Path getTaskAttemptPath(TaskAttemptContext context) {
+    return getMagicTaskAttemptPath(context, getOutputPath());
+  }
+
+  /**
+   * Get a temporary directory for data. When a task is aborted/cleaned
+   * up, the contents of this directory are all deleted.
+   * @param context task context
+   * @return a path for temporary data.
+   */
+  public Path getTempTaskAttemptPath(TaskAttemptContext context) {
+    return CommitUtils.getTempTaskAttemptPath(context, getOutputPath());
+  }
 }

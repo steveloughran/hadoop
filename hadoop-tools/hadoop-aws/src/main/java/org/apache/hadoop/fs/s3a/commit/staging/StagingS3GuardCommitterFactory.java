@@ -21,7 +21,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.S3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -29,7 +29,7 @@ import java.io.IOException;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link S3GuardCommitter}; for other filesystems
+ * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
 public class StagingS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {

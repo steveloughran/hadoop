@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.fs.s3a.S3AUtils.deleteWithWarning;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -138,9 +140,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @param appAttemptId the ID of the application attempt for this job.
    * @return the path to store job attempt data.
    */
-  protected Path getJobAttemptPath(int appAttemptId) {
-    return CommitUtils.getJobAttemptPath(appAttemptId, getOutputPath());
-  }
+  protected abstract Path getJobAttemptPath(int appAttemptId);
 
   /**
    * Compute the path where the output of a task attempt is stored until
@@ -149,9 +149,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @param context the context of the task attempt.
    * @return the path where a task attempt should be stored.
    */
-  public Path getTaskAttemptPath(TaskAttemptContext context) {
-    return CommitUtils.getTaskAttemptPath(context, getOutputPath());
-  }
+  protected abstract Path getTaskAttemptPath(TaskAttemptContext context);
 
   /**
    * Get a temporary directory for data. When a task is aborted/cleaned
@@ -159,9 +157,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @param context task context
    * @return a path for temporary data.
    */
-  public Path getTempTaskAttemptPath(TaskAttemptContext context) {
-    return CommitUtils.getTempTaskAttemptPath(context, getOutputPath());
-  }
+  public abstract Path getTempTaskAttemptPath(TaskAttemptContext context);
 
   @Override
   public String toString() {
@@ -203,4 +199,15 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     throw new IOException(String.format("Unable to recover task %s",
         taskContext.getTaskAttemptID()));
   }
+
+  @Override
+  public void setupTask(TaskAttemptContext context) throws IOException {
+    try (DurationInfo d = new DurationInfo("Setup Task %s",
+        context.getTaskAttemptID())) {
+      Path taskAttemptPath = getTaskAttemptPath(context);
+      FileSystem fs = taskAttemptPath.getFileSystem(getConf());
+      fs.mkdirs(taskAttemptPath);
+    }
+  }
+
 }

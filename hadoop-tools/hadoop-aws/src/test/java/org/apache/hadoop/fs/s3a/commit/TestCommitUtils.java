@@ -37,16 +37,16 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  */
 public class TestCommitUtils extends Assert {
 
-  private static final List<String> PENDING_AT_ROOT = list(PENDING_PATH);
+  private static final List<String> PENDING_AT_ROOT = list(MAGIC_DIR_NAME);
   private static final List<String> PENDING_AT_ROOT_WITH_CHILD =
-      list(PENDING_PATH, "child");
+      list(MAGIC_DIR_NAME, "child");
   private static final List<String> PENDING_WITH_CHILD =
-      list("parent", PENDING_PATH, "child");
+      list("parent", MAGIC_DIR_NAME, "child");
   private static final List<String> PENDING_AT_WITHOUT_CHILD =
-      list("parent", PENDING_PATH);
+      list("parent", MAGIC_DIR_NAME);
 
   private static final List<String> DEEP_PENDING =
-      list("parent1", "parent2", PENDING_PATH, "child1", "child2");
+      list("parent1", "parent2", MAGIC_DIR_NAME, "child1", "child2");
 
   public static final String[] EMPTY = {};
 
@@ -160,41 +160,41 @@ public class TestCommitUtils extends Assert {
   @Test
   public void testFinalDestinationPending1() throws Throwable {
     assertEquals(l("first", "2"),
-        finalDestination(l("first", PENDING_PATH, "2")));
+        finalDestination(l("first", MAGIC_DIR_NAME, "2")));
   }
 
   @Test
   public void testFinalDestinationPending2() throws Throwable {
     assertEquals(l("first", "3.txt"),
-        finalDestination(l("first", PENDING_PATH, "2", "3.txt")));
+        finalDestination(l("first", MAGIC_DIR_NAME, "2", "3.txt")));
   }
 
   @Test
   public void testFinalDestinationRootPending2() throws Throwable {
     assertEquals(l("3.txt"),
-        finalDestination(l(PENDING_PATH, "2", "3.txt")));
+        finalDestination(l(MAGIC_DIR_NAME, "2", "3.txt")));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testFinalDestinationPendingNoChild() throws Throwable {
-    finalDestination(l(PENDING_PATH));
+    finalDestination(l(MAGIC_DIR_NAME));
   }
 
   @Test
   public void testFinalDestinationBaseDirectChild() throws Throwable {
-    finalDestination(l(PENDING_PATH, BASE_PATH, "3.txt"));
+    finalDestination(l(MAGIC_DIR_NAME, BASE_PATH, "3.txt"));
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testFinalDestinationBaseNoChild() throws Throwable {
     assertEquals(l(),
-        finalDestination(l(PENDING_PATH, BASE_PATH)));
+        finalDestination(l(MAGIC_DIR_NAME, BASE_PATH)));
   }
 
   @Test
   public void testFinalDestinationBaseSubdirsChild() throws Throwable {
     assertEquals(l("2", "3.txt"),
-        finalDestination(l(PENDING_PATH, "4", BASE_PATH, "2", "3.txt")));
+        finalDestination(l(MAGIC_DIR_NAME, "4", BASE_PATH, "2", "3.txt")));
   }
 
   /**
@@ -203,7 +203,7 @@ public class TestCommitUtils extends Assert {
   @Test
   public void testFinalDestinationIgnoresBaseBeforePending() throws Throwable {
     assertEquals(l(BASE_PATH, "home", "3.txt"),
-        finalDestination(l(BASE_PATH, "home", PENDING_PATH, "2", "3.txt")));
+        finalDestination(l(BASE_PATH, "home", MAGIC_DIR_NAME, "2", "3.txt")));
   }
 
   /** varargs to array. */
