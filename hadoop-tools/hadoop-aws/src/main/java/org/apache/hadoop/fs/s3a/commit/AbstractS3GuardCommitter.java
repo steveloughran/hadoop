@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.fs.s3a.S3AUtils.deleteWithWarning;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**

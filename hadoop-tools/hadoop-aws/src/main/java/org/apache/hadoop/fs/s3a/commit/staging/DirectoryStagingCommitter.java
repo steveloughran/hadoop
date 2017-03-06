@@ -28,15 +28,15 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 
-public class S3DirectoryOutputCommitter extends StagingS3GuardCommitter {
+public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
-      S3DirectoryOutputCommitter.class);
+      DirectoryStagingCommitter.class);
 
-  public S3DirectoryOutputCommitter(Path outputPath, JobContext context) throws IOException {
+  public DirectoryStagingCommitter(Path outputPath, JobContext context) throws IOException {
     super(outputPath, context);
   }
 
-  public S3DirectoryOutputCommitter(Path outputPath, TaskAttemptContext context)
+  public DirectoryStagingCommitter(Path outputPath, TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
   }
