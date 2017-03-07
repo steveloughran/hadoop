@@ -39,6 +39,7 @@ import org.apache.hadoop.security.ProviderUtils;
 
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -64,8 +65,7 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
 @InterfaceStability.Evolving
 public final class S3AUtils {
 
-  /** Reuse the S3AFileSystem log. */
-  private static final Logger LOG = S3AFileSystem.LOG;
+  private static final Logger LOG = LoggerFactory.getLogger(S3AUtils.class);
   static final String CONSTRUCTOR_EXCEPTION = "constructor exception";
   static final String INSTANTIATION_EXCEPTION
       = "instantiation exception";
