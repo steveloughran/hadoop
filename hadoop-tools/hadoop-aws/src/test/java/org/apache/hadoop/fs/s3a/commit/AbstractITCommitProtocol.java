@@ -19,8 +19,6 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -126,7 +124,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    disableFilesystemCaching(conf);
+//    disableFilesystemCaching(conf);
     return conf;
   }
 
@@ -166,7 +164,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("write output");
     try (DurationInfo d = new DurationInfo("Writing Text output for task %s",
         context.getTaskAttemptID())) {
-      writeOutput(new TextOutputFormat().getRecordWriter(context), context);
+      writeOutput(new LoggingTextOutputFormat().getRecordWriter(context), context);
     }
   }
 
@@ -252,7 +250,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         () -> committer2.recoverTask(tContext2));
 
     committer2.commitJob(jContext2);
-    validateContent(outDir, true);
+    validateContent(outDir, shouldExpectSuccessMarker());
   }
 
   @Test
@@ -351,7 +349,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("4. Validating content");
 
     // validate output
-    validateContent(outDir, true);
+    validateContent(outDir, shouldExpectSuccessMarker());
     assertNoMultipartUploadsPending();
   }
 
@@ -388,12 +386,16 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     commit(committer, jContext, tContext);
 
     // validate output
-    validateContent(outDir, true);
+    validateContent(outDir, shouldExpectSuccessMarker());
 
     assertNoMultipartUploadsPending();
 
     // commit task to fail on retry
     expectFNFEonTaskCommit(committer, tContext);
+  }
+
+  protected boolean shouldExpectSuccessMarker() {
+    return true;
   }
 
   /**
@@ -424,7 +426,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     expectSimulatedFailureOnJobCommit(jContext, committer);
 
     // but the data got there, due to the order of operations.
-    validateContent(outDir, true);
+    validateContent(outDir, shouldExpectSuccessMarker());
 
     // next attempt will fail as there is no longer a directory to commit
     expectFNFEonJobCommit(committer, jContext);
@@ -619,8 +621,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected void commit(AbstractS3GuardCommitter committer,
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
-    describe("\ncommitting");
+    describe("\ncommitting task");
     committer.commitTask(tContext);
+    describe("\ncommitting job");
     committer.commitJob(jContext);
     describe("commit complete\n");
   }
@@ -799,6 +802,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         new Path(outSubDir, SUB_DIR));
 
     // validate output
+    // TODO: why false here?
     validateContent(outSubDir, false);
   }
 

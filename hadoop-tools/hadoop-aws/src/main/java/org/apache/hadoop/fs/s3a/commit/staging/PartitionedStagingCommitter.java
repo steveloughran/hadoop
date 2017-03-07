@@ -64,7 +64,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   @Override
   protected List<FileStatus> getTaskOutput(TaskAttemptContext context)
       throws IOException {
-    PathFilter filter = HiddenPathFilter.get();
+    PathFilter filter = Paths.HiddenPathFilter.get();
 
     // get files on the local FS in the attempt path
     Path attemptPath = getTaskAttemptPath(context);

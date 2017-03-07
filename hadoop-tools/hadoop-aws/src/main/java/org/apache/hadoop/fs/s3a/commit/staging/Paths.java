@@ -20,6 +20,7 @@ import com.google.common.base.Objects;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 
 import java.io.IOException;
 import java.net.URI;
@@ -29,6 +30,8 @@ import java.util.Random;
  * Origin: netflix.
  */
 public class Paths {
+
+  public static final String COMMIT_FILENAME = "commitData";
 
   public static String addUUID(String path, String uuid) {
     // In some cases, Spark will add the UUID to the filename itself.
@@ -151,4 +154,39 @@ public class Paths {
 
     return path.substring(start, end);
   }
+
+  public static class HiddenPathFilter implements PathFilter {
+    private static final HiddenPathFilter INSTANCE = new HiddenPathFilter();
+  
+    public static HiddenPathFilter get() {
+      return INSTANCE;
+    }
+  
+    private HiddenPathFilter() {
+    }
+  
+    @Override
+    public boolean accept(Path path) {
+      return (
+          !path.getName().startsWith(".") &&
+              !path.getName().startsWith("_")
+      );
+    }
+  }
+  public static class CommitFileFilter implements PathFilter {
+    private static final CommitFileFilter INSTANCE = new CommitFileFilter();
+  
+    public static CommitFileFilter get() {
+      return INSTANCE;
+    }
+  
+    private CommitFileFilter() {
+    }
+  
+    @Override
+    public boolean accept(Path path) {
+      return path.getName().equals(COMMIT_FILENAME);
+    }
+  }
+
 }

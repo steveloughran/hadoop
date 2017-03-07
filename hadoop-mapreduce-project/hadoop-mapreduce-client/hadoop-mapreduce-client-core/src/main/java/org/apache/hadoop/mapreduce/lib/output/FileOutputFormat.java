@@ -304,7 +304,7 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
         "Null workPath returned by committer %s", c);
     Path workFile = new Path(workPath,
         getUniqueFile(context, getOutputName(context), extension));
-    LOG.debug("Work file for {} extension {} is {}", context, extension,
+    LOG.debug("Work file for {} extension '{}' is {}", context, extension,
         workFile);
     return workFile;
   }

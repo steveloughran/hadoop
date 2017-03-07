@@ -312,7 +312,7 @@ public final class S3ATestUtils {
    * @param conf configuration to patch
    */
   public static void disableFilesystemCaching(Configuration conf) {
-    conf.setBoolean("fs.s3a.impl.disable.cache", true);
+    conf.setBoolean(FS_S3A_IMPL_DISABLE_CACHE, true);
   }
 
   /**

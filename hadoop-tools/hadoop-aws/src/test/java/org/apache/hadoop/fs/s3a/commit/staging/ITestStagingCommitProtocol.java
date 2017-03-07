@@ -94,4 +94,9 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   protected int countMultipartUploads() {
     return 0;
   }
+
+  @Override
+  protected boolean shouldExpectSuccessMarker() {
+    return false;
+  }
 }
