@@ -24,7 +24,9 @@ import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -43,7 +45,10 @@ import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +58,7 @@ import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.UPLOAD_SIZE;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.UPLOAD_UUID;
+import static org.mockito.Mockito.mock;
 
 
 @RunWith(Parameterized.class)
@@ -71,21 +77,28 @@ public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
   private String uuid = null;
   private TaskAttemptContext tac = null;
   private Configuration conf = null;
-  private MockedS3Committer jobCommitter = null;
-  private MockedS3Committer committer = null;
+  private MockedStagingCommitter jobCommitter = null;
+  private MockedStagingCommitter committer = null;
 
   @BeforeClass
-  public static void setupS3() {
-    getConfiguration().set("fs.s3a.impl", MockS3AFileSystem.class.getName());
+  public static void setupS3() throws IOException {
     S3_OUTPUT_PATH = new Path("s3a://" + BUCKET + "/" + KEY_PREFIX);
+    MockS3AFileSystem fs = new MockS3AFileSystem();
+    Configuration conf = getConfiguration();
+    FileSystem mockFS = mock(S3AFileSystem.class);
+    fs.setMock(mockFS);
+    URI uri = S3_OUTPUT_PATH.toUri();
+    fs.initialize(uri, conf);
+    FileSystemTestHelper.addFileSystemForTesting(uri, conf, fs);
   }
 
   @Parameterized.Parameters
-  public static Object[][] params() {
-    return new Object[][] {
-        new Object[] { 0 },
-        new Object[] { 1 },
-        new Object[] { 3 } };
+  public static Collection<Object[]> params() {
+    return Arrays.asList(new Object[][] {
+        { 0 },
+        { 1 },
+        { 3 },
+    });
   }
 
   public TestStagingS3GuardCommitter(int numThreads) {
@@ -98,7 +111,7 @@ public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
         "s3.multipart.committer.num-threads", String.valueOf(numThreads));
     getConfiguration().set(UPLOAD_UUID, UUID.randomUUID().toString());
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
-    this.jobCommitter = new MockedS3Committer(S3_OUTPUT_PATH, job);
+    this.jobCommitter = new MockedStagingCommitter(S3_OUTPUT_PATH, job);
     jobCommitter.setupJob(job);
 
     this.uuid = job.getConfiguration().get(UPLOAD_UUID);
@@ -111,7 +124,7 @@ public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
     conf.set("mapred.local.dir", "/tmp/local-0,/tmp/local-1");
     conf.setInt(UPLOAD_SIZE, 100);
 
-    this.committer = new MockedS3Committer(S3_OUTPUT_PATH, tac);
+    this.committer = new MockedStagingCommitter(S3_OUTPUT_PATH, tac);
   }
 
   @Test
@@ -541,7 +554,7 @@ public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
           (taskId * 37) % numTasks);
       TaskAttemptContext attempt = new TaskAttemptContextImpl(
           new Configuration(job.getConfiguration()), attemptID);
-      MockedS3Committer taskCommitter = new MockedS3Committer(
+      MockedStagingCommitter taskCommitter = new MockedStagingCommitter(
           S3_OUTPUT_PATH, attempt);
       commitTask(taskCommitter, attempt, numFiles);
       uploads.addAll(taskCommitter.results.getUploads());

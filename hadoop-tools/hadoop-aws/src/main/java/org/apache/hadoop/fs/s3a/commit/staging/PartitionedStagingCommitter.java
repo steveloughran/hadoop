@@ -53,6 +53,15 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "PartitionedStagingCommitter{");
+    sb.append(super.toString());
+    sb.append('}');
+    return sb.toString();
+  }
+
+  @Override
   protected List<FileStatus> getTaskOutput(TaskAttemptContext context)
       throws IOException {
     PathFilter filter = HiddenPathFilter.get();

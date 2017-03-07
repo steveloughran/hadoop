@@ -47,7 +47,6 @@ import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -109,11 +108,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private final Path constructorOutputPath;
   private final long uploadPartSize;
   private final String uuid;
-  private final Path workPath;
 
   // lazy variables
   private AmazonS3 client = null;
-  private ConflictResolution mode = null;
+  private ConflictResolution conflictResolution = null;
   private ExecutorService threadPool = null;
   private Path finalOutputPath = null;
   private String bucket = null;
@@ -125,12 +123,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
     Configuration conf = getConf();
-    uploadPartSize = conf.getLong(
-        UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
+    uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     uuid = getUploadUUID(conf, context.getJobID().toString());
-    workPath = buildWorkPath(context);
+    Path path = buildWorkPath(context);
+    setWorkPath(path);
   }
 
 
@@ -139,19 +137,36 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
     Configuration conf = getConf();
-    uploadPartSize = conf.getLong(
-        UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
+    uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     uuid = getUploadUUID(conf, context.getJobID().toString());
-    workPath = buildWorkPath(context);
+    setWorkPath(buildWorkPath(context));
   }
 
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "StagingS3GuardCommitter{");
+    sb.append("constructorOutputPath=").append(constructorOutputPath);
+    sb.append(", conflictResolution=").append(conflictResolution);
+    sb.append(", finalOutputPath=").append(finalOutputPath);
+    sb.append(' ');
+    sb.append(super.toString());
+    sb.append('}');
+    return sb.toString();
+  }
 
-  private static String getUploadUUID(Configuration conf, String jobId) {
-    return conf.get(UPLOAD_UUID, conf.get(
+  /**
+   * Get the UUID of an upload; may be the job ID.
+   * @param conf job/task configuration
+   * @param jobId Job ID
+   * @return an ID for use in paths.
+   */
+  public static String getUploadUUID(Configuration conf, String jobId) {
+    return conf.getTrimmed(UPLOAD_UUID, conf.get(
         SPARK_WRITE_UUID,
-        conf.get(SPARK_APP_ID, jobId)));
+        conf.getTrimmed(SPARK_APP_ID, jobId)));
   }
 
   private Path buildWorkPath(JobContext context) throws IOException {
@@ -163,7 +178,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   private static Path taskAttemptPath(TaskAttemptContext context, String uuid)
-  throws IOException {
+      throws IOException {
     return getTaskAttemptPath(context, Paths.getLocalTaskAttemptTempDir(
         context.getConfiguration(), uuid,
         getTaskId(context), getAttemptId(context)));
@@ -435,13 +450,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
           context.getConfiguration(), false);
       this.bucket = fs.getBucket();
       this.s3KeyPrefix = fs.pathToKey(finalOutputPath);
+      LOG.debug("Final output path is {}", finalOutputPath);
     }
     return finalOutputPath;
   }
 
   @Override
   public void setupJob(JobContext context) throws IOException {
-    context.getConfiguration().set(UPLOAD_UUID, uuid);
+    LOG.debug("Setting up job {}", context.getJobID());
+     context.getConfiguration().set(UPLOAD_UUID, uuid);
   }
 
   protected List<S3Util.PendingUpload> getPendingUploads(JobContext context)
@@ -484,12 +501,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public void commitJob(JobContext context) throws IOException {
-    commitJobInternal(context, getPendingUploads(context));
+    try (DurationInfo d = new DurationInfo("Commit Job %s", context.getJobID())) {
+      commitJobInternal(context, getPendingUploads(context));
+    }
   }
 
   protected void commitJobInternal(JobContext context,
-      List<S3Util.PendingUpload> pending)
-      throws IOException {
+      List<S3Util.PendingUpload> pending) throws IOException {
     final AmazonS3 client = getClient(
         getOutputPath(context), context.getConfiguration());
 
@@ -733,7 +751,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Path attemptPath = getTaskAttemptPath(context);
       FileSystem taskFS = getTaskAttemptFilesystem(context);
       deleteQuietly(taskFS, attemptPath, true);
-      deleteQuietly(taskFS, getTempTaskAttemptPath(context), true);
+      // TODO
+//      deleteQuietly(taskFS, getTempTaskAttemptPath(context), true);
     }
   }
   /**
@@ -814,12 +833,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return the ConflictResolution mode
    */
   protected final ConflictResolution getMode(JobContext context) {
-    if (mode == null) {
-      this.mode = ConflictResolution.valueOf(context
+    if (conflictResolution == null) {
+      this.conflictResolution = ConflictResolution.valueOf(context
           .getConfiguration()
           .get(CONFLICT_MODE, "fail")
           .toUpperCase(Locale.ENGLISH));
     }
-    return mode;
+    return conflictResolution;
   }
 }

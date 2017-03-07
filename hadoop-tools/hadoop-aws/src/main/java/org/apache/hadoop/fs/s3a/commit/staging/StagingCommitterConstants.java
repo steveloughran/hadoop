@@ -27,4 +27,6 @@ public class StagingCommitterConstants {
   // Spark configuration keys
   public static final String SPARK_WRITE_UUID = "spark.sql.sources.writeJobUUID";
   public static final String SPARK_APP_ID = "spark.app.id";
+  public static final String MAPREDUCE_CLUSTER_LOCAL_DIR
+      = "mapreduce.cluster.local.dir";
 }

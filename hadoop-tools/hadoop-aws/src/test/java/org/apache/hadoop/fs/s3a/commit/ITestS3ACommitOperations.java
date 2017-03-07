@@ -48,7 +48,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  * Test the various commit operations
  * {@link S3AFileSystem#getFileStatus(Path)}.
  */
-public class ITestS3ACommitOperations extends AbstractS3ACommitTestCase {
+public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestS3ACommitOperations.class);

@@ -32,6 +32,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
@@ -135,14 +136,10 @@ public class TestUtil {
 
     @Before
     public void setupJob() throws Exception {
-      this.mockFS = mock(FileSystem.class);
+      this.mockFS = mock(S3AFileSystem.class);
       FileSystem s3 = new Path("s3a://" + MockS3AFileSystem.BUCKET + "/")
           .getFileSystem(CONF);
-      if (s3 instanceof MockS3AFileSystem) {
-        ((MockS3AFileSystem) s3).setMock(mockFS);
-      } else {
-        throw new RuntimeException("Cannot continue: S3 not mocked");
-      }
+      ((MockS3AFileSystem) s3).setMock(mockFS);
 
       this.job = new JobContextImpl(CONF, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID, UUID.randomUUID().toString());

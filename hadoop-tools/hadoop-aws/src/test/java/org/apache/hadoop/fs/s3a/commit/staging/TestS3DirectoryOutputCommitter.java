@@ -28,7 +28,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-public class TestS3DirectoryOutputCommitter extends TestUtil.JobCommitterTest<DirectoryStagingCommitter> {
+public class TestS3DirectoryOutputCommitter
+    extends TestUtil.JobCommitterTest<DirectoryStagingCommitter> {
   @Override
   DirectoryStagingCommitter newJobCommitter() throws Exception {
     return new DirectoryStagingCommitter(OUTPUT_PATH, getJob());

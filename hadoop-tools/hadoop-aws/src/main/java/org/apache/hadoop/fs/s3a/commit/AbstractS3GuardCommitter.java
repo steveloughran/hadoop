@@ -50,7 +50,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private Path outputPath;
   private Path workPath;
   private Configuration conf;
-  private S3AFileSystem destFS;
+  private FileSystem destFS;
 
   /**
    * Create a committer.
@@ -61,13 +61,19 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   protected AbstractS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
     Preconditions.checkArgument(outputPath != null);
-      setConf(context.getConfiguration());
-      setDestFS(getDestination(outputPath, getConf()));
-      this.setOutputPath(getDestFS()
-          .makeQualified(outputPath));
+    setConf(context.getConfiguration());
+    initOutput(outputPath);
     LOG.debug("Committer instantiated for job \"{}\" ID {} with destination {}",
         context.getJobName(), context.getJobID(), outputPath);
   }
+
+  /** TESTING ONLY; allows mock FS to cheat. */
+  protected void initOutput(Path outputPath) throws IOException {
+    setDestFS(getDestination(outputPath, getConf()));
+    this.setOutputPath(getDestFS()
+        .makeQualified(outputPath));
+  }
+
 
   /**
    * Create a committer.
@@ -99,12 +105,18 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     this.outputPath = outputPath;
   }
 
+  /**
+   * This is the critical method for {@code FileOutputFormat}; it declares
+   * the path for work
+   * @return the working path.
+   */
   @Override
   public Path getWorkPath() {
     return workPath;
   }
 
   protected void setWorkPath(Path workPath) {
+    LOG.debug("Setting work path to {}", workPath);
     this.workPath = workPath;
   }
 
@@ -116,11 +128,30 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     this.conf = conf;
   }
 
-  protected S3AFileSystem getDestFS() {
+  /**
+   * Get the destination FS, on demand if it is not already set
+   * @return the filesystem; requires the output path to be set up
+   * @throws IOException if the FS cannot be instantiated.
+   */
+
+  protected FileSystem getDestFS() throws IOException {
+    if (destFS == null) {
+      FileSystem fs = getDestination(outputPath, getConf());
+      setDestFS(fs);
+    }
     return destFS;
   }
 
-  protected void setDestFS(S3AFileSystem destFS) {
+  /**
+   * Get the destination as an S3A Filesystem; casting it.
+   * @return the dest S3A FS.
+   * @throws IOException if the FS cannot be instantiated.
+   */
+  protected S3AFileSystem getDestS3AFS() throws IOException {
+    return (S3AFileSystem)getDestFS();
+  }
+
+  protected void setDestFS(FileSystem destFS) {
     this.destFS = destFS;
   }
 
@@ -176,7 +207,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @throws PathCommitException output path isn't to an S3A FS instance.
    * @throws IOException failure to instantiate the FS.
    */
-  protected S3AFileSystem getDestination(Path out, Configuration conf)
+  protected FileSystem getDestination(Path out, Configuration conf)
       throws IOException {
     return getS3AFileSystem(out, conf, isDelayedCommitRequired());
   }
@@ -195,6 +226,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   @Override
   public void recoverTask(TaskAttemptContext taskContext) throws IOException {
+    LOG.warn("Cannot recover task {}", taskContext.getTaskAttemptID());
     throw new IOException(String.format("Unable to recover task %s",
         taskContext.getTaskAttemptID()));
   }

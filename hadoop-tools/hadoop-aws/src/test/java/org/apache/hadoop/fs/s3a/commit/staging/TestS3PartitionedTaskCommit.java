@@ -16,15 +16,12 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -42,12 +39,17 @@ import static org.mockito.Mockito.when;
 public class TestS3PartitionedTaskCommit extends TestUtil.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedStagingCommitter(OUTPUT_PATH, getJob());
+    return new PartitionedCommitterForTesting(OUTPUT_PATH,
+        getJob(),
+        getMockClient());
   }
 
   @Override
   PartitionedStagingCommitter newTaskCommitter() throws Exception {
-    return new TestPartitionedCommitter(getTAC(), getMockClient());
+    return new PartitionedCommitterForTesting(
+        OUTPUT_PATH,
+        getTAC(),
+        getMockClient());
   }
 
   // The set of files used by this test
@@ -61,23 +63,6 @@ public class TestS3PartitionedTaskCommit extends TestUtil.TaskCommitterTest<Part
             "/" + UUID.randomUUID().toString() + ".parquet";
         relativeFiles.add(relative);
       }
-    }
-  }
-
-  private static class TestPartitionedCommitter extends
-      PartitionedStagingCommitter {
-    private final AmazonS3 mockClient;
-
-    public TestPartitionedCommitter(TaskAttemptContext context,
-                                    AmazonS3 mockClient) throws IOException {
-      super(OUTPUT_PATH, context);
-      this.mockClient = mockClient;
-    }
-
-
-    @Override
-    protected AmazonS3 getClient(Path path, Configuration conf) {
-      return mockClient;
     }
   }
 

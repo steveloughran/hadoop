@@ -29,6 +29,7 @@ import java.util.Random;
  * Origin: netflix.
  */
 public class Paths {
+
   public static String addUUID(String path, String uuid) {
     // In some cases, Spark will add the UUID to the filename itself.
     if (path.contains(uuid)) {
@@ -111,9 +112,7 @@ public class Paths {
   }
 
   public static Path getLocalTaskAttemptTempDir(Configuration conf,
-                                                String uuid, int taskId,
-                                                int attemptId)
-      throws IOException {
+      String uuid, int taskId, int attemptId) throws IOException {
     return new Path(localTemp(conf, taskId, attemptId), uuid);
   }
 
@@ -131,7 +130,8 @@ public class Paths {
   // TODO: verify this is correct, it comes from dse-storage
   private static Path localTemp(Configuration conf, int taskId, int attemptId)
       throws IOException {
-    String[] dirs = conf.getStrings("mapreduce.cluster.local.dir");
+    String[] dirs = conf.getStrings(
+        StagingCommitterConstants.MAPREDUCE_CLUSTER_LOCAL_DIR);
     Random rand = new Random(Objects.hashCode(taskId, attemptId));
     String dir = dirs[rand.nextInt(dirs.length)];
 

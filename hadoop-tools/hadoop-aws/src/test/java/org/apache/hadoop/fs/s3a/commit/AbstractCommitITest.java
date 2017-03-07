@@ -31,7 +31,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  * Test case for committer operations; sets up the config for delayed commit
  * and the S3 committer.
  */
-public class AbstractS3ACommitTestCase extends AbstractS3ATestBase {
+public abstract class AbstractCommitITest extends AbstractS3ATestBase {
 
   /**
    * Creates a configuration for commit operations: commit is enabled in the FS
@@ -42,7 +42,6 @@ public class AbstractS3ACommitTestCase extends AbstractS3ATestBase {
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
     enableMultipartPurge(conf, PURGE_DELAY_SECONDS);
-    conf.setBoolean(COMMITTER_ENABLED, true);
     conf.setLong(MIN_MULTIPART_THRESHOLD, MULTIPART_MIN_SIZE);
     conf.setInt(MULTIPART_SIZE, MULTIPART_MIN_SIZE);
     conf.setBoolean(FAST_UPLOAD, true);
@@ -50,7 +49,6 @@ public class AbstractS3ACommitTestCase extends AbstractS3ATestBase {
     conf.setBoolean(COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.NAME);
-
     return conf;
   }
 }

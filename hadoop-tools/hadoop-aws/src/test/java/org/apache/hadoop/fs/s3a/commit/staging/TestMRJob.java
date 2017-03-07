@@ -71,13 +71,13 @@ public class TestMRJob extends TestUtil.MiniDFSTest {
   }
 
   public static class S3TextOutputFormat<K, V> extends TextOutputFormat<K, V> {
-    private MockedS3Committer committer = null;
+    private MockedStagingCommitter committer = null;
 
     @Override
     public synchronized OutputCommitter getOutputCommitter(
         TaskAttemptContext context) throws IOException {
       if (committer == null) {
-        committer = new MockedS3Committer(
+        committer = new MockedStagingCommitter(
             getOutputPath(context), context);
       }
       return committer;
@@ -99,11 +99,6 @@ public class TestMRJob extends TestUtil.MiniDFSTest {
   public void testMRJob() throws Exception {
     FileSystem mockS3 = mock(FileSystem.class);
     FileSystem s3 = S3_OUTPUT_PATH.getFileSystem(getConfiguration());
-    if (s3 instanceof MockS3AFileSystem) {
-      ((MockS3AFileSystem) s3).setMock(mockS3);
-    } else {
-      throw new RuntimeException("Cannot continue: S3 not mocked");
-    }
 
     String commitUUID = UUID.randomUUID().toString();
 

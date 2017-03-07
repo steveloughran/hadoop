@@ -66,30 +66,30 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
- * Test the job/task commit actions of the S3A Committer, including trying to
+ * Test the job/task commit actions of an S3A Committer, including trying to
  * simulate some failure and retry conditions.
  * Derived from
  * {@code org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter}.
  */
 @SuppressWarnings("unchecked")
-public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
-  private Path outDir;
+public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
+  protected Path outDir;
 
   private String SUB_DIR = "SUB_DIR";
 
   protected static final Logger LOG =
-      LoggerFactory.getLogger(ITestMagicCommitResilience.class);
+      LoggerFactory.getLogger(AbstractITCommitProtocol.class);
 
   // A random task attempt id for testing.
-  private static final String ATTEMPT_0 =
+  protected static final String ATTEMPT_0 =
       "attempt_200707121733_0001_m_000000_0";
-  private static final String PART_00000 = "part-m-00000";
-  private static final TaskAttemptID TASK_ATTEMPT_0 =
+  protected static final String PART_00000 = "part-m-00000";
+  protected static final TaskAttemptID TASK_ATTEMPT_0 =
       TaskAttemptID.forName(ATTEMPT_0);
 
-  private static final String ATTEMPT_1 =
+  protected static final String ATTEMPT_1 =
       "attempt_200707121733_0001_m_000001_0";
-  private static final TaskAttemptID TASK_ATTEMPT_1 =
+  protected static final TaskAttemptID TASK_ATTEMPT_1 =
       TaskAttemptID.forName(ATTEMPT_1);
 
   private Text key1 = new Text("key1");
@@ -97,11 +97,14 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
   private Text val1 = new Text("val1");
   private Text val2 = new Text("val2");
 
-  private void cleanup() throws IOException {
-    describe("deleting %s", outDir);
-    Configuration conf = new Configuration();
-    FileSystem fs = outDir.getFileSystem(conf);
-    fs.delete(outDir, true);
+  private void cleanupDestDir() throws IOException {
+    rmdir(this.outDir, new Configuration());
+  }
+
+  public void rmdir(Path dir, Configuration conf) throws IOException {
+    describe("deleting %s", dir);
+    FileSystem fs = dir.getFileSystem(conf);
+    fs.delete(dir, true);
   }
 
   @Override
@@ -110,12 +113,12 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
     outDir = path(getMethodName());
     S3AFileSystem fileSystem = getFileSystem();
     bindFileSystem(fileSystem, outDir, fileSystem.getConf());
-//    cleanup();
+    cleanupDestDir();
   }
 
   @Override
   public void teardown() throws Exception {
-    cleanup();
+    cleanupDestDir();
   }
 
   @Override
@@ -132,7 +135,7 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
    * @param conf configuration
    * @throws IOException any problem
    */
-  private void bindFileSystem(S3AFileSystem fs, Path path, Configuration conf)
+  private void bindFileSystem(FileSystem fs, Path path, Configuration conf)
       throws IOException {
     FileSystemTestHelper.addFileSystemForTesting(path.toUri(), conf, fs);
   }
@@ -144,10 +147,8 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
    * @throws IOException failure
    */
 
-  protected MagicS3GuardCommitter createCommitter(TaskAttemptContext context)
-      throws IOException {
-    return new MagicS3GuardCommitter(outDir, context);
-  }
+  protected abstract AbstractS3GuardCommitter
+    createCommitter(TaskAttemptContext context) throws IOException;
 
   /**
    * Create a committer for a job.
@@ -155,15 +156,16 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
    * @return new committer
    * @throws IOException failure
    */
-  public MagicS3GuardCommitter createCommitter(JobContext context)
-      throws IOException {
-    return new MagicS3GuardCommitter(outDir, context);
-  }
+  public abstract AbstractS3GuardCommitter
+    createCommitter(JobContext context) throws IOException;
 
-  protected void writeTextOutput(TaskAttemptContext tContext)
+  protected void writeTextOutput(TaskAttemptContext context)
       throws IOException, InterruptedException {
     describe("write output");
-    writeOutput(new TextOutputFormat().getRecordWriter(tContext), tContext);
+    try (DurationInfo d = new DurationInfo("Writing Text output for task %s",
+        context.getTaskAttemptID())) {
+      writeOutput(new TextOutputFormat().getRecordWriter(context), context);
+    }
   }
 
   private void writeOutput(RecordWriter theRecordWriter,
@@ -187,7 +189,8 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
   private void writeMapFileOutput(RecordWriter theRecordWriter,
       TaskAttemptContext context) throws IOException, InterruptedException {
     describe("\nWrite map output");
-    try {
+    try (DurationInfo d = new DurationInfo("Writing Text output for task %s",
+        context.getTaskAttemptID())) {
       for (int i = 0; i < 10; ++i) {
         Text val = ((i & 1) == 1) ? val1 : val2;
         theRecordWriter.write(new LongWritable(i), val);
@@ -238,7 +241,7 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
     JobContext jContext2 = new JobContextImpl(conf2, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext2 = new TaskAttemptContextImpl(conf2,
         TASK_ATTEMPT_0);
-    MagicS3GuardCommitter committer2 = createCommitter(tContext2);
+    AbstractS3GuardCommitter committer2 = createCommitter(tContext2);
     committer2.setupJob(tContext2);
 
     assertFalse("recoverySupported in " + committer2,
@@ -618,8 +621,7 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
     AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup
@@ -647,8 +649,7 @@ public class ITestMagicCommitResilience extends AbstractS3ACommitTestCase {
     Configuration conf = job.getConfiguration();
     FileOutputFormat.setOutputPath(job, outDir);
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
     AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup

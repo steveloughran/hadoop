@@ -56,22 +56,28 @@ public class S3Util {
 
   public static void revertCommit(AmazonS3 client,
                                   PendingUpload commit) {
+    LOG.debug("Revert {}", commit);
     client.deleteObject(commit.newDeleteRequest());
   }
 
   public static void finishCommit(AmazonS3 client,
                                   PendingUpload commit) {
+    LOG.debug("Finish {}", commit);
     client.completeMultipartUpload(commit.newCompleteRequest());
   }
 
   public static void abortCommit(AmazonS3 client,
                                  PendingUpload commit) {
+    LOG.debug("Abort {}", commit);
     client.abortMultipartUpload(commit.newAbortRequest());
   }
 
   public static PendingUpload multipartUpload(
       AmazonS3 client, File localFile, String partition,
       String bucket, String key, long uploadPartSize) {
+
+    LOG.debug("Initiating multipart upload from {} to {}/{} partition={}",
+        localFile, key, bucket, partition);
 
     InitiateMultipartUploadResult initiate = client.initiateMultipartUpload(
         new InitiateMultipartUploadRequest(bucket, key));
@@ -267,6 +273,17 @@ public class S3Util {
 
     public String getLocation() {
       return Paths.getParent(key);
+    }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder(
+          "PendingUpload{");
+      sb.append(" to \'s3a://").append(bucket).append('/');
+      sb.append(key).append('\'');
+      sb.append(" , uploadId='").append(uploadId).append('\'');
+      sb.append('}');
+      return sb.toString();
     }
   }
 }

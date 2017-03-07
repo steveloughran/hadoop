@@ -69,7 +69,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public MagicS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
     super(outputPath, context);
-    commitActions = new FileCommitActions(getDestFS());
+    commitActions = new FileCommitActions(getDestS3AFS());
   }
 
   /**
@@ -81,9 +81,9 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public MagicS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
-    commitActions = new FileCommitActions(getDestFS());
+    commitActions = new FileCommitActions(getDestS3AFS());
     setWorkPath(getTaskAttemptPath(context));
-    verifyIsDelayedCommitPath(getDestFS(), getWorkPath());
+    verifyIsDelayedCommitPath(getDestS3AFS(), getWorkPath());
     LOG.debug("Task attempt {} has work path {}",
         context.getTaskAttemptID(),
         getWorkPath());
@@ -103,7 +103,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d =
              new DurationInfo("Setup Job %s", context.getJobID())) {
       Path jobAttemptPath = getJobAttemptPath(context);
-      S3AFileSystem fs = getDestination(jobAttemptPath,
+      FileSystem fs = getDestination(jobAttemptPath,
           context.getConfiguration());
       if (!fs.mkdirs(jobAttemptPath)) {
         throw new PathCommitException(jobAttemptPath,

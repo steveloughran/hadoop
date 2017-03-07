@@ -28,23 +28,24 @@ import java.io.IOException;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link StagingS3GuardCommitter}; for other filesystems
+ * For S3A output, uses the {@link PartitionedStagingCommitter}; for other filesystems
  * use the classic committer.
  */
-public class StagingS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
+public class PartitonedStagingCommitterFactory
+    extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitterFactory";
+      = "org.apache.hadoop.fs.s3a.commit.staging.PartitonedStagingCommitterFactory";
 
   protected AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new PartitionedStagingCommitter(outputPath, context);
   }
 
   protected AbstractS3GuardCommitter createJobCommitter(Path outputPath,
       JobContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new PartitionedStagingCommitter(outputPath, context);
   }
 }

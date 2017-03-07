@@ -17,6 +17,7 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.staging.TestUtil.ClientErrors;
 import org.apache.hadoop.fs.s3a.commit.staging.TestUtil.ClientResults;
 import org.apache.hadoop.conf.Configuration;
@@ -31,21 +32,43 @@ import java.io.ObjectOutputStream;
 /**
  * Committer subclass that uses a mocked AmazonS3Client for testing.
  */
-class MockedS3Committer extends StagingS3GuardCommitter {
+class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   public final ClientResults results = new ClientResults();
   public final ClientErrors errors = new ClientErrors();
   private final AmazonS3 mockClient = TestUtil.newMockClient(results, errors);
 
-  public MockedS3Committer(Path outputPath, JobContext context)
+  public MockedStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
     super(outputPath, context);
   }
 
-  public MockedS3Committer(Path outputPath, TaskAttemptContext context)
+  public MockedStagingCommitter(Path outputPath, TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
   }
+
+  /**
+   * Returns the mock FS without checking FS type.
+   * @param out output path
+   * @param conf job/task config
+   * @return a filesystem.
+   * @throws IOException
+   */
+  @Override
+  protected FileSystem getDestination(Path out, Configuration conf)
+      throws IOException {
+    return out.getFileSystem(conf);
+  }
+
+  /*
+
+  @Override
+  protected void initOutput(Path outputPath) throws IOException {
+
+    setOutputPath(outputPath);
+  }
+*/
 
   @Override
   protected AmazonS3 getClient(Path path, Configuration conf) {
