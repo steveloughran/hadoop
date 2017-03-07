@@ -603,6 +603,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         context.getJobID())) {
       deleteWithWarning(getJobAttemptFileSystem(context),
           getJobAttemptPath(context), true);
+      getOutputPath(context);
+      // delete the __temporary directory. This will cause problems
+      // if there is >1 task targeting the same dest dir
+      deleteWithWarning(getDestFS(),
+          new Path(getOutputPath(context), CommitConstants.PENDING_DIR_NAME),
+          true);
 /*
       deleteWithWarning(getDestFS(),
           getTempJobAttemptPath(getAppAttemptId(context),
@@ -615,10 +621,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public void setupTask(TaskAttemptContext context) throws IOException {
-    try (DurationInfo d = new DurationInfo("Setup Task %s",
+    Path taskAttemptPath = getTaskAttemptPath(context);
+    FileSystem fs = taskAttemptPath.getFileSystem(getConf());
+    try (DurationInfo d = new
+        DurationInfo("task %s: creating task attempt path %s ",
+        taskAttemptPath,
         context.getTaskAttemptID())) {
-      Path taskAttemptPath = getTaskAttemptPath(context);
-      FileSystem fs = taskAttemptPath.getFileSystem(getConf());
       fs.mkdirs(taskAttemptPath);
     }
   }
@@ -654,6 +662,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     }
   }
 
+  /**
+   * Commit the task by uploading all created files and then
+   * writing a pending entry for them.
+   * @param context task context
+   * @param taskOutput list of files from the output
+   * @throws IOException
+   */
   protected void commitTaskInternal(final TaskAttemptContext context,
       Iterable<FileStatus> taskOutput)
       throws IOException {
@@ -662,8 +677,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     final Path attemptPath = getTaskAttemptPath(context);
     FileSystem attemptFS = attemptPath.getFileSystem(conf);
+    LOG.debug("Attempt path is {}", attemptPath);
 
-    // add the commits file to the wrapped commiter's task attempt location.
+    // add the commits file to the wrapped committer's task attempt location.
     // this complete file will be committed by the wrapped committer at the end
     // of this method.
     Path commitsAttemptPath = getTaskAttemptPath(context);
@@ -673,29 +689,37 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // we will try to abort the ones that had already succeeded.
     final List<S3Util.PendingUpload> commits = Lists.newArrayList();
 
+    LOG.info("Uploading from staging directory to destination filesystem");
+    LOG.info("Saving pending data information to {}", commitsAttemptPath);
 
     boolean threw = true;
+
+    // although overwrite=false, there's still a risk of > 1 entry being
+    // committed if the FS doesn't have create-no-overwrite consistency.
     ObjectOutputStream completeUploadRequests = new ObjectOutputStream(
         commitsFS.create(commitsAttemptPath, false));
     try {
       Tasks.foreach(taskOutput)
-          .stopOnFailure().throwFailureWhenFinished()
+          .stopOnFailure()
+          .throwFailureWhenFinished()
           .executeWith(threadPool)
           .run(new Tasks.Task<FileStatus, IOException>() {
             @Override
             public void run(FileStatus stat) throws IOException {
               File localFile = new File(
                   URI.create(stat.getPath().toString()).getPath());
+/* 0 byte files are still PUTtable
               if (localFile.length() <= 0) {
                 return;
               }
-              String relative = Paths.getRelativePath(
-                  attemptPath, stat.getPath());
+*/
+              String relative = Paths.getRelativePath(attemptPath, stat.getPath());
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
               S3Util.PendingUpload commit = S3Util.multipartUpload(client,
                   localFile, partition, getBucket(context), key,
                   uploadPartSize);
+              LOG.debug("Adding pending commit {}", commit);
               commits.add(commit);
             }
           });
@@ -708,6 +732,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     } finally {
       if (threw) {
+        LOG.error("Exception during commit process, aborting {} commit(s)",
+          commits.size());
         Tasks.foreach(commits)
             .run(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
               @Override
@@ -715,16 +741,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
                 S3Util.abortCommit(client, commit);
               }
             });
-        try {
-          attemptFS.delete(attemptPath, true);
-        } catch (Exception e) {
-          LOG.error("Failed while cleaning up failed task commit: ", e);
-        }
+        deleteTaskAttemptPathQuietly(context);
       }
       Closeables.close(completeUploadRequests, threw);
     }
 
-    // TODO
+    // TODO: what else is needed here?
     //  wrappedCommitter.commitTask(context);
 
     attemptFS.delete(attemptPath, true);
@@ -748,13 +770,21 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // no uploads that need to be cancelled. just delete files on the local FS.
     try (DurationInfo d =
              new DurationInfo("Abort task %s", context.getTaskAttemptID())) {
+      deleteTaskAttemptPathQuietly(context);
+    }
+  }
+
+  protected void deleteTaskAttemptPathQuietly(TaskAttemptContext context)
+      throws IOException {
+    try {
       Path attemptPath = getTaskAttemptPath(context);
       FileSystem taskFS = getTaskAttemptFilesystem(context);
       deleteQuietly(taskFS, attemptPath, true);
-      // TODO
-//      deleteQuietly(taskFS, getTempTaskAttemptPath(context), true);
+    } catch (IOException e) {
+      LOG.debug("Failed to delete task attempt path");
     }
   }
+
   /**
    * Returns the partition of a relative file path, or null if the path is a
    * file name with no relative directory.

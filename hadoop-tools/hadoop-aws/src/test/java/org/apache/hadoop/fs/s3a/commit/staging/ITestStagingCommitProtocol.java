@@ -76,4 +76,22 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     ContractTestUtils.skip("TODO");
     return null;
   }
+
+  @Override
+  protected void dumpMultipartUploads() {
+
+  }
+
+  @Override
+  protected void assertMultipartUploadsPending() {
+  }
+
+  @Override
+  protected void assertNoMultipartUploadsPending() {
+  }
+
+  @Override
+  protected int countMultipartUploads() {
+    return 0;
+  }
 }

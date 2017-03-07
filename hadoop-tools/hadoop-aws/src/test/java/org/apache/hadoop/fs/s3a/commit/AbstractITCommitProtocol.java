@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -98,7 +100,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   private Text val2 = new Text("val2");
 
   private void cleanupDestDir() throws IOException {
-    rmdir(this.outDir, new Configuration());
+    rmdir(this.outDir, getConfiguration());
   }
 
   public void rmdir(Path dir, Configuration conf) throws IOException {
@@ -300,23 +302,22 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Dump all uploads.
-   */
-  private void dumpMultipartUploads() {
+   * Dump all uploads.   */
+  protected void dumpMultipartUploads() {
     countMultipartUploads();
   }
 
-  private void assertMultipartUploadsPending() {
+  protected void assertMultipartUploadsPending() {
     int count = countMultipartUploads();
     assertTrue("No multipart uploads in progress", count > 0);
   }
 
-  private void assertNoMultipartUploadsPending() {
+  protected void assertNoMultipartUploadsPending() {
     int count = countMultipartUploads();
     assertEquals("No multipart uploads in progress", 0, count);
   }
 
-  private int countMultipartUploads() {
+  protected int countMultipartUploads() {
     int count = 0;
     for (MultipartUpload upload : getFileSystem().listMultipartUploads()) {
       count++;
@@ -324,6 +325,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
     return count;
   }
+
 
   @Test
   public void testCommitter() throws Exception {
@@ -338,15 +340,15 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     setup(committer, jContext, tContext);
 
     // write output
-    describe("Writing output");
+    describe("1. Writing output");
     writeTextOutput(tContext);
 
     dumpMultipartUploads();
-    describe("Committing task");
+    describe("2. Committing task");
     committer.commitTask(tContext);
-    describe("Committing job");
+    describe("3. Committing job");
     committer.commitJob(jContext);
-    describe("Validating content");
+    describe("4. Validating content");
 
     // validate output
     validateContent(outDir, true);
@@ -593,10 +595,18 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected void setup(AbstractS3GuardCommitter committer,
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
-    describe("\nsetup");
-    committer.setupJob(jContext);
-    committer.setupTask(tContext);
+    describe("\nsetup job");
+    try(DurationInfo d = new DurationInfo("setup job %s",
+        jContext.getJobID())) {
+      committer.setupJob(jContext);
+    }
+    try(DurationInfo d = new DurationInfo("setup task %s",
+        tContext.getTaskAttemptID())) {
+      committer.setupTask(tContext);
+    }
     describe("setup complete\n");
+
+    // also: clean the test dir
   }
 
   /**
@@ -616,7 +626,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   @Test
-  public void testAbort() throws IOException, InterruptedException {
+  public void testAbort() throws Exception {
     Job job = newJob();
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
@@ -638,7 +648,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer.abortJob(jContext, JobStatus.State.FAILED);
     Path pendingDir = new Path(outDir, MAGIC_DIR_NAME);
     assertPathDoesNotExist("job temp dir still exists", pendingDir);
-    FileStatus[] children = listChildren(getFileSystem(), outDir);
+    S3AFileSystem fs = getFileSystem();
+    FileStatus[] children = listChildren(fs, outDir);
+    if (children.length != 0) {
+      lsR(fs, outDir, true);
+    }
     assertArrayEquals("Output directory not empty " + ls(outDir),
         new FileStatus[0], children);
   }
