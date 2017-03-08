@@ -822,3 +822,154 @@ with a path relative to the base dir.
 
 More formally: the last parent element of a path which is `__base` sets the
 base for relative paths created underneath it.
+
+
+## Alternate Design, the Netflix "Staging" Committer
+
+Ryan Blue, of Netflix, Submitted an alternate committer, one which has a
+number of appealing features
+
+* Doesn't have any requirements of the destination object store, not even
+a need for a consistency layer.
+* Overall a simpler design.
+* Known to work.
+
+The final point is not to be underestimated, especially given the need to
+be resilient to the various failure modes which may arise.
+
+It works by writing all data to the local filesystem, uploading as multipart
+PUT requests at the end of each task, finalizing the PUT in the job commit.
+
+The core algorithm is as follows:
+
+1. The destination directory for output (e.g. `FileOutputFormat` and subclasses)
+is a local file:// reference.
+1. Task commit initiates the multipart PUT to the destination object store.
+1. A list of every pending PUT for task is persisted to a single file
+within a consistent, cluster-wide filesystem. For Netflix, that is HDFS.
+1. The job committer reads the pending file list for every committed task, and
+finalizes the commits.
+
+
+### Performance
+
+Compared to the previous proposal, henceforth the "magic" committer, this
+committer, the "staging committer", adds the extra overhead of uploading
+each file at the end of every task. This is an `O(data)` operation; it can be
+parallelized, but is bounded by the bandwidth from compute node to S3, as
+well as the write/IOP capacity of the destination shard of S3. If many tasks
+complete at or near the same time, there may be a peak of bandwidth load
+slowing down the upload.
+
+Time to commit will be the same, and, given the Netflix committer has already
+implemented the paralellization logic here, a time of `O(files/threads)`.
+
+### Resilience
+
+There's already a lot of code in the task and job commits to handle failure.
+
+Any failure in a commit triggers a best-effort abort/revert of the commit
+actions for a task/job.
+
+As far as the original code is concerned. the failures which can arise are
+
+#### Failure during task execution
+
+All data is written to local temporary files;
+these need to be cleaned up.
+
+#### Failure during task commit
+
+A task failure during the upload process will result in the 
+list of pending multipart PUTs to *not#### be persisted to the cluster filesystem.
+This window is smaller than the entire task execution, but still potentially
+significant, at least for large uploads. If the data for each pending PUT
+were to be saved to a separate file, then they would be discoverable and more
+easily cancelled. This would still leave the incompleted uploads still in
+progress at the time of the PUT.
+
+#### Explicit Task abort
+
+Task will delete all local data, rather than upload to the object store.
+
+#### Failure to communicate with S3 during data upload
+
+If the upload to S3 fails for one or more files, and retries do not succeed,
+then a best-effor cleanup could ber attempted for any successful S3 PUTs; 
+all local data call be deleted. It's hard to envisage a failure in PUTs which
+do not also translate into a failure of DELETE operations.
+
+#### Explicit Job Abort
+
+All in-progress tasks are aborted and cleaned up. The pending commit data
+of all completed tasks can be loaded, the PUT requests aborted.
+
+#### Executor failure before Job Commit
+
+Consider entire job lost; rerun required. All pending requests for the job
+will need to be identified and cancelled; 
+
+#### Executor failure during Job Commit
+
+PUT requests which have been finalized will be persisted, those which
+have not been finalized will remain outstanding. As the data for all the
+commits will be in the cluster FS, it will be possible for a cleanup to
+load these and abort them.
+
+#### Job failure prior to commit
+
+
+* Consider the entire job lost. 
+* Executing tasks will not complete, and in aborting, delete local data.
+* Tasks which have completed will have pending commits. These will need
+to be identified and cancelled.
+
+
+#### Overall Resilience
+
+1. The only time that incomplete work will appear in the destination directory
+is if the job commit operation fails partway through.
+1. There's a risk of leakage of local filesystem data; this will need to
+be managed in the response to a task failure.
+1. There's a risk of uncommitted multipart PUT operations remaining outstanding,
+operations which will run up bills until cancelled. (as indeed, so does the Magic Committer).
+
+For cleaning up PUT commits, as well as scheduled GC of uncommitted writes, we
+may want to consider having job setup list and cancel all pending commits
+to the destination directory, on the assumption that these are from a previous
+incomplete operation. (It may seem pessimistic to assume a previous failure, but
+this is why PCs always turn their fan on on booting: they assume they crashed
+and need to cool the CPUs down).
+
+
+### Integration
+
+
+The initial import will retain access to the Amazon S3 client which can be
+obtained from an instance of `S3AFileSystem`, so will share authentication
+and other configuration options.
+ 
+Full integration must use an instance of `S3AFileSystem.WriteOperationHelper`,
+which supports the operations needed for multipart uploads. This is critical
+to keep ensure S3Guard is included in the operation path, alongside our logging
+and metrics.
+
+The committer should be able to persist data via an array'd version of the
+single file JSON data structure `org.apache.hadoop.fs.s3a.commit.PersistentCommitData`.
+Serialized object data has too many vulnerabilities to be trusted when someone
+party could potentially create a malicious object stream read by the job committer.
+
+
+### Testing
+
+The code contribution already has a set of mock tests which simulate failure conditions,
+as well as one using the MiniMR cluster. This puts it ahead of the "Magic Committer"
+in terms of test coverage.
+
+We can extend the protocol integration test lifted from `org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter`
+to test various state transitions of the commit mechanism.
+
+No doubt we will need to implement some more integration tests; as usual a focus
+on execution time and cost and cost will be constraints.
+
+ 

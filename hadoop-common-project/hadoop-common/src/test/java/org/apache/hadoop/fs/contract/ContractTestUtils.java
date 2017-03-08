@@ -800,7 +800,8 @@ public class ContractTestUtils extends Assert {
       return fileSystem.getFileStatus(path);
     } catch (FileNotFoundException e) {
       //failure, report it
-      ls(fileSystem, path.getParent());
+      LOG.error("{}: not found {}; parent listing is:\n{}",
+          message, path, ls(fileSystem, path.getParent()));
       throw (IOException)new FileNotFoundException(
           message + ": not found " + path + " in " + path.getParent())
           .initCause(e);

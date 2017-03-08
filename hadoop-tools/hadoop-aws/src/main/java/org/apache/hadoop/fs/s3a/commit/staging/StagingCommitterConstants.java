@@ -14,12 +14,16 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+/**
+ * Constants for the committer. All committer-specific options
+ * MUST use the "fs.s3a." prefix so as to support per-bucket configuration.
+ */
 public class StagingCommitterConstants {
-  public static final String UPLOAD_SIZE = "s3.multipart.committer.upload.size";
+  public static final String UPLOAD_SIZE = "fs.s3a.staging.committer.upload.size";
   public static final long DEFAULT_UPLOAD_SIZE = 10485760L; // 10 MB
-  public static final String UPLOAD_UUID = "s3.multipart.committer.uuid";
-  public static final String CONFLICT_MODE = "s3.multipart.committer.conflict-mode";
-  public static final String NUM_THREADS = "s3.multipart.committer.num-threads";
+  public static final String UPLOAD_UUID = "fs.s3a.staging.committer.uuid";
+  public static final String CONFLICT_MODE = "fs.s3a.staging.committer.conflict-mode";
+  public static final String NUM_THREADS = "fs.s3a.staging.committer.num-threads";
   public static final int DEFAULT_NUM_THREADS = 8;
 
   // Spark configuration keys
@@ -27,4 +31,15 @@ public class StagingCommitterConstants {
   public static final String SPARK_APP_ID = "spark.app.id";
   public static final String MAPREDUCE_CLUSTER_LOCAL_DIR
       = "mapreduce.cluster.local.dir";
+
+  /**
+   * Path for pending data in the cluster FS.
+   */
+  public static final String COMMITTER_PENDING_DATA_PATH =
+      "fs.s3a.staging.committer.pending.path";
+  /**
+   * Filename of the commit data for a task: {@value}.
+   * Bin suffix to make clear this is not any form of text file.
+   */
+  public static final String COMMIT_FILENAME = "task-commit-data.bin";
 }

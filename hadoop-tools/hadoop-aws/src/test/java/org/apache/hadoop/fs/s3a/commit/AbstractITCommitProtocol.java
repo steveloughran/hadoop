@@ -343,6 +343,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     dumpMultipartUploads();
     describe("2. Committing task");
+    assertTrue("No files to commit were found by " + committer,
+        committer.needsTaskCommit(tContext));
     committer.commitTask(tContext);
     describe("3. Committing job");
     committer.commitJob(jContext);

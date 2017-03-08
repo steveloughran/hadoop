@@ -29,8 +29,6 @@ import java.util.Random;
  */
 public class Paths {
 
-  public static final String COMMIT_FILENAME = "commitData";
-
   public static String addUUID(String path, String uuid) {
     // In some cases, Spark will add the UUID to the filename itself.
     if (path.contains(uuid)) {
@@ -171,6 +169,7 @@ public class Paths {
       );
     }
   }
+
   public static class CommitFileFilter implements PathFilter {
     private static final CommitFileFilter INSTANCE = new CommitFileFilter();
   
@@ -183,7 +182,7 @@ public class Paths {
   
     @Override
     public boolean accept(Path path) {
-      return path.getName().equals(COMMIT_FILENAME);
+      return path.getName().equals(StagingCommitterConstants.COMMIT_FILENAME);
     }
   }
 

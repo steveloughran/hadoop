@@ -194,7 +194,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     final StringBuilder sb = new StringBuilder(
         "AbstractS3GuardCommitter{");
     sb.append("outputPath=").append(getOutputPath());
-    sb.append(", workPath=").append(getWorkPath());
+    sb.append(", workPath=").append(workPath);
     sb.append('}');
     return sb.toString();
   }
