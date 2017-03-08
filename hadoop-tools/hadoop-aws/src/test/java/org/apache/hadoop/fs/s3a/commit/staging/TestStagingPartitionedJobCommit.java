@@ -40,7 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-public class TestS3PartitionedJobCommit extends TestUtil.JobCommitterTest<PartitionedStagingCommitter> {
+public class TestStagingPartitionedJobCommit extends TestUtil.JobCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new TestPartitionedStagingCommitter(getJob(), mock(AmazonS3.class));

@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 
-public class TestS3PartitionedFileListing
+public class TestStagingPartitionedFileListing
     extends TestUtil.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {

@@ -337,22 +337,26 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // setup
     setup(committer, jContext, tContext);
 
-    // write output
-    describe("1. Writing output");
-    writeTextOutput(tContext);
+    try {
+      // write output
+      describe("1. Writing output");
+      writeTextOutput(tContext);
 
-    dumpMultipartUploads();
-    describe("2. Committing task");
-    assertTrue("No files to commit were found by " + committer,
-        committer.needsTaskCommit(tContext));
-    committer.commitTask(tContext);
-    describe("3. Committing job");
-    committer.commitJob(jContext);
-    describe("4. Validating content");
+      dumpMultipartUploads();
+      describe("2. Committing task");
+      assertTrue("No files to commit were found by " + committer,
+          committer.needsTaskCommit(tContext));
+      committer.commitTask(tContext);
+      describe("3. Committing job");
+      committer.commitJob(jContext);
+      describe("4. Validating content");
 
-    // validate output
-    validateContent(outDir, shouldExpectSuccessMarker());
-    assertNoMultipartUploadsPending();
+      // validate output
+      validateContent(outDir, shouldExpectSuccessMarker());
+      assertNoMultipartUploadsPending();
+    } finally {
+      abort(committer, jContext, tContext);
+    }
   }
 
   /**
@@ -613,6 +617,23 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // also: clean the test dir
   }
 
+  protected void abort(AbstractS3GuardCommitter committer,
+      JobContext jContext,
+      TaskAttemptContext tContext) throws IOException {
+    describe("\naborting task");
+    try {
+      committer.abortTask(tContext);
+    } catch (IOException e) {
+      LOG.warn("Exception aborting task:", e);
+    }
+    describe("\naborting job");
+    try {
+      committer.abortJob(jContext, JobStatus.State.KILLED);
+    } catch (IOException e) {
+      LOG.warn("Exception aborting job", e);
+    }
+  }
+
   /**
    * Set up the task and then the job.
    * @param committer committer
@@ -648,18 +669,30 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // do abort
     committer.abortTask(tContext);
     Path expectedPath = new Path(committer.getWorkPath(), PART_00000);
-    assertPathDoesNotExist("task temp dir still exists", expectedPath);
+    assertPathNotFound(conf, expectedPath, "task temp dir ");
+
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
     Path pendingDir = new Path(outDir, MAGIC_DIR_NAME);
-    assertPathDoesNotExist("job temp dir still exists", pendingDir);
+    assertPathNotFound(conf, pendingDir, "job temp dir ");
     S3AFileSystem fs = getFileSystem();
-    FileStatus[] children = listChildren(fs, outDir);
-    if (children.length != 0) {
-      lsR(fs, outDir, true);
+    try {
+      FileStatus[] children = listChildren(fs, outDir);
+      if (children.length != 0) {
+        lsR(fs, outDir, true);
+      }
+      assertArrayEquals("Output directory not empty " + ls(outDir),
+          new FileStatus[0], children);
+    } catch (FileNotFoundException e) {
+      // this is a valid failure mode; it means the dest dir doesn't exist yet.
     }
-    assertArrayEquals("Output directory not empty " + ls(outDir),
-        new FileStatus[0], children);
+  }
+
+  protected void assertPathNotFound(Configuration conf,
+      Path expectedPath,
+      String message) throws IOException {
+    ContractTestUtils.assertPathDoesNotExist(expectedPath.getFileSystem(conf),
+        message, expectedPath);
   }
 
   @Test
@@ -683,7 +716,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     Path jtd = committer.getJobAttemptPath(jContext);
     Path ttd = committer.getTaskAttemptPath(tContext);
     Path expectedFile = new Path(outDir, PART_00000);
-    assertPathExists("expected output dir", outDir);
     assertPathDoesNotExist("expected output file", expectedFile);
     assertSuccessMarkerDoesNotExist(outDir);
 

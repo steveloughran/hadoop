@@ -110,10 +110,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID().toString());
     setWorkPath(buildWorkPath(context, uuid));
-    // explictly choose commit algorithm
-    initFileOutputCommitterOptions(context);
-    this.wrappedCommitter = new FileOutputCommitter(
-        Paths.getMultipartUploadCommitsDirectory(conf, uuid), context);
+    this.wrappedCommitter = createWrappedCommitter(context, conf);
   }
 
   public StagingS3GuardCommitter(Path outputPath,
@@ -126,9 +123,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // To avoid collisions, use the YARN application ID for Spark.
     uuid = getUploadUUID(conf, context.getJobID().toString());
     setWorkPath(buildWorkPath(context, uuid));
+    wrappedCommitter = createWrappedCommitter(context, conf);
+  }
+
+  /**
+   * Create the wrapped committer.
+   * This includes customizing its options, and setting up the destination
+   * directory.
+   * @param context job/task context.
+   * @param conf
+   * @return
+   * @throws IOException
+   */
+  protected FileOutputCommitter createWrappedCommitter(JobContext context,
+      Configuration conf) throws IOException {
+
+    // explicitly choose commit algorithm
     initFileOutputCommitterOptions(context);
-    wrappedCommitter = new FileOutputCommitter(
-        Paths.getMultipartUploadCommitsDirectory(conf, uuid), context);
+    Path dest = Paths.getMultipartUploadCommitsDirectory(conf, uuid);
+    return new FileOutputCommitter(dest, context);
   }
 
   /**
@@ -389,7 +402,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected String getFinalKey(String relative, JobContext context)
       throws IOException {
-    return getS3KeyPrefix(context) + "/" + Paths.addUUID(relative, uuid);
+//    return getS3KeyPrefix(context) + "/" + Paths.addUUID(relative, uuid);
+    return getS3KeyPrefix(context) + "/" + relative;
   }
 
   /**
@@ -803,8 +817,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       String uuid) throws IOException {
     return getTaskAttemptPath(context,
         Paths.getLocalTaskAttemptTempDir(
-            context.getConfiguration(), uuid,
-            getTaskId(context), getAttemptId(context)));
+            context.getConfiguration(),
+            uuid,
+            getTaskId(context),
+            getAttemptId(context)));
   }
 
   private static int getTaskId(TaskAttemptContext context) {
@@ -895,7 +911,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   protected final ExecutorService getThreadPool(JobContext context) {
     if (threadPool == null) {
       int numThreads = context.getConfiguration().getInt(
-          NUM_THREADS, DEFAULT_NUM_THREADS);
+          COMMITTER_THREADS, DEFAULT_COMMITTER_THREADS);
       LOG.debug("Creating thread pool of size {}", numThreads);
       if (numThreads > 0) {
         this.threadPool = Executors.newFixedThreadPool(numThreads,

@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-public class TestS3DirectoryOutputCommitter
+public class TestStagingDirectoryOutputCommitter
     extends TestUtil.JobCommitterTest<DirectoryStagingCommitter> {
   @Override
   DirectoryStagingCommitter newJobCommitter() throws Exception {

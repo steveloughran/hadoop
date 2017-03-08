@@ -64,7 +64,7 @@ import static org.mockito.Mockito.mock;
 
 
 @RunWith(Parameterized.class)
-public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
+public class TestStagingCommitter extends TestUtil.MiniDFSTest {
 
   private static final JobID JOB_ID = new JobID("job", 1);
   private static final TaskAttemptID AID = new TaskAttemptID(
@@ -103,7 +103,7 @@ public class TestStagingS3GuardCommitter extends TestUtil.MiniDFSTest {
     });
   }
 
-  public TestStagingS3GuardCommitter(int numThreads) {
+  public TestStagingCommitter(int numThreads) {
     this.numThreads = numThreads;
   }
 

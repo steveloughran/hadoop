@@ -38,7 +38,7 @@ import java.util.concurrent.Callable;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
-public class TestS3PartitionedTaskCommit extends TestUtil.TaskCommitterTest<PartitionedStagingCommitter> {
+public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedCommitterForTesting(OUTPUT_PATH,

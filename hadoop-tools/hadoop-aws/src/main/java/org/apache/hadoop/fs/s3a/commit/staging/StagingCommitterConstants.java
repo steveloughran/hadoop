@@ -23,8 +23,8 @@ public class StagingCommitterConstants {
   public static final long DEFAULT_UPLOAD_SIZE = 10485760L; // 10 MB
   public static final String UPLOAD_UUID = "fs.s3a.staging.committer.uuid";
   public static final String CONFLICT_MODE = "fs.s3a.staging.committer.conflict-mode";
-  public static final String NUM_THREADS = "fs.s3a.staging.committer.num-threads";
-  public static final int DEFAULT_NUM_THREADS = 8;
+  public static final String COMMITTER_THREADS = "fs.s3a.staging.committer.threads";
+  public static final int DEFAULT_COMMITTER_THREADS = 8;
 
   // Spark configuration keys
   public static final String SPARK_WRITE_UUID = "spark.sql.sources.writeJobUUID";

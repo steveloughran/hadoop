@@ -49,7 +49,7 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.mock;
 
-public class TestMRJob extends TestUtil.MiniDFSTest {
+public class TestStagingMRJob extends TestUtil.MiniDFSTest {
 
   private static Path S3_OUTPUT_PATH = null;
   private static MiniMRYarnCluster MR_CLUSTER = null;

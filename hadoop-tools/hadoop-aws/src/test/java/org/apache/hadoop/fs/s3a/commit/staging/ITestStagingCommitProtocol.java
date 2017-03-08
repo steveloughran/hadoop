@@ -31,6 +31,7 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
@@ -39,6 +40,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
     conf.setBoolean(COMMITTER_ENABLED, false);
+    conf.setInt(COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         StagingS3GuardCommitterFactory.NAME);
     return conf;

@@ -19,6 +19,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 import java.net.URI;
@@ -115,14 +116,44 @@ public class Paths {
     return new Path(localTemp(conf, taskId, attemptId), uuid);
   }
 
-  // if/when this is used. need to support cross-FS temp dirs
+  /**
+   * Try to come up with a good temp diretory for different filesystems.
+   * @param fs filesystem
+   * @return a path under which temporary work can go.
+   */
+  public static Path tempDirForFileSystem(FileSystem fs) {
+    Path temp;
+    switch( fs.getScheme()) {
+      case "file":
+        temp = fs.makeQualified(new Path(System.getProperty("java.io.tmpdir")));
+        break;
+      case "s3a":
+        temp = new Path(fs.getHomeDirectory(),  "tmp");
+        break;
+
+        // here assume that /tmp is valid
+      case "hdfs":
+      default:
+        temp = fs.makeQualified(new Path("/tmp"));
+    }
+    return temp;
+  }
+
+
+  /**
+   * Build a temporary path for the multipart upload commit information
+   * in the filesystem
+   * @param conf configuration defining default FS.
+   * @param uuid uuid of job
+   * @return a path which can be used for temporary work
+   * @throws IOException on an IO failure.
+   */
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
                                                         String uuid)
       throws IOException {
-    // no need to use localTemp, this is HDFS in production
-
-    Path work = FileSystem.get(conf).makeQualified(
-        new Path("/tmp", uuid));
+    Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf)),
+        UserGroupInformation.getCurrentUser().getShortUserName());
+    Path work = new Path(userTmp, uuid);
     return new Path(work, "pending-uploads");
   }
 
