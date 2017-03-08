@@ -1,6 +1,4 @@
 /*
- * Copyright 2017 Netflix, Inc.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,11 +9,12 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.
+ * limitations under the License. See accompanying LICENSE file.
  */
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
@@ -25,8 +24,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
-
 
 public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -67,7 +66,9 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
       Path outputPath = getOutputPath(context);
       // use the FS implementation because it will check for _$folder$
       FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
-      if (fs.exists(outputPath)) {
+      try {
+        FileStatus status = fs.getFileStatus(outputPath);
+        LOG.info("Conflict committing work, destination exists: {}", status);
         switch (getMode(context)) {
           case FAIL:
             // this was checked in setupJob, but this avoids some cases where
@@ -82,8 +83,16 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
             break;
           default:
             throw new IOException(
-                "Unknown conflict resolution mode: " + getMode(context));
+                "Unknown conflict resolution mode: "
+                      + getConfictModeOption(context));
         }
+      } catch (FileNotFoundException ignored) {
+        /* Nothing to see here, move along */
+      } catch (IllegalArgumentException e) {
+        // raised when unable to map from confict mode to an enum value.
+        throw new IOException(
+            "Unknown conflict resolution mode: "
+                + getConfictModeOption(context), e);
       }
     }
 
