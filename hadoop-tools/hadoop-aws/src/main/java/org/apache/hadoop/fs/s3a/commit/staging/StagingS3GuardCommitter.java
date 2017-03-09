@@ -1,4 +1,22 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -236,7 +254,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   protected Path getJobAttemptPath(int appAttemptId) {
-    return null;
+    //TODO Is this valid?
+    return new Path(getPendingJobAttemptsPath(getOutputPath()),
+        String.valueOf(appAttemptId));
   }
 
   /**
@@ -319,6 +339,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return getCommittedTaskPath(getAppAttemptId(context), context, out);
   }
 
+  private static void validateContext(TaskAttemptContext context) {
+    Preconditions.checkNotNull(context, "null context");
+    Preconditions.checkNotNull(context.getTaskAttemptID(),
+        "null task attempt ID");
+    Preconditions.checkNotNull(context.getTaskAttemptID().getTaskID(),
+        "null task ID");
+    Preconditions.checkNotNull(context.getTaskAttemptID().getJobID(),
+        "null job ID");
+  }
   /**
    * Compute the path where the output of a committed task is stored until the
    * entire job is committed for a specific application attempt.
@@ -328,6 +357,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected Path getCommittedTaskPath(int appAttemptId,
       TaskAttemptContext context) {
+    validateContext(context);
     return new Path(getJobAttemptPath(appAttemptId),
         String.valueOf(context.getTaskAttemptID().getTaskID()));
   }
@@ -335,6 +365,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private static Path getCommittedTaskPath(int appAttemptId,
       TaskAttemptContext context,
       Path out) {
+    validateContext(context);
     return new Path(getJobAttemptPath(appAttemptId, out),
         String.valueOf(context.getTaskAttemptID().getTaskID()));
   }

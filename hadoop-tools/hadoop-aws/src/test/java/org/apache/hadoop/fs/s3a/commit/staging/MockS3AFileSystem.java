@@ -18,28 +18,30 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.s3a.S3AFileStatus;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.util.Progressable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 
-public class MockS3AFileSystem extends FileSystem {
+public class MockS3AFileSystem extends S3AFileSystem {
   public static final String BUCKET = "bucket-name";
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
 
-  private FileSystem mock = null;
+  private S3AFileSystem mock = null;
 
   public MockS3AFileSystem() {
   }
 
-  @Override
+    @Override
   public String getScheme() {
     return FS_URI.getScheme();
   }
@@ -54,8 +56,14 @@ public class MockS3AFileSystem extends FileSystem {
     return new Path("s3a://" + BUCKET + "/work");
   }
 
-  public void setMock(FileSystem mock) {
+  public void setMock(S3AFileSystem mock) {
     this.mock = mock;
+  }
+
+  @Override
+  public void initialize(URI name, Configuration originalConf)
+      throws IOException {
+    mock.initialize(name, originalConf);
   }
 
   @Override
@@ -104,7 +112,17 @@ public class MockS3AFileSystem extends FileSystem {
   }
 
   @Override
-  public FileStatus getFileStatus(Path f) throws IOException {
+  public S3AFileStatus getFileStatus(Path f) throws IOException {
     return mock.getFileStatus(f);
+  }
+
+  @Override
+  public long getDefaultBlockSize(Path f) {
+    return mock.getDefaultBlockSize(f);
+  }
+
+  @Override
+  public long getDefaultBlockSize() {
+    return mock.getDefaultBlockSize();
   }
 }

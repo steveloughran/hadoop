@@ -49,7 +49,7 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.mock;
 
-public class TestStagingMRJob extends StagingTests.MiniDFSTest {
+public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
   private static Path S3_OUTPUT_PATH = null;
   private static MiniMRYarnCluster MR_CLUSTER = null;
@@ -137,10 +137,10 @@ public class TestStagingMRJob extends StagingTests.MiniDFSTest {
     mrJob.submit();
     Assert.assertTrue("MR job should succeed", mrJob.waitForCompletion(true));
 
-    StagingTests.ClientResults results;
+    StagingTestBase.ClientResults results;
     try (ObjectInputStream in = new ObjectInputStream(
         FileSystem.getLocal(conf).open(new Path(committerPath)))) {
-      results = (StagingTests.ClientResults) in.readObject();
+      results = (StagingTestBase.ClientResults) in.readObject();
     }
 
     Assert.assertEquals("Should not delete files",

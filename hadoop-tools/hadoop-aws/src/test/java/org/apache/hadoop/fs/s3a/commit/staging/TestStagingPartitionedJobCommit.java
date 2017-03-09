@@ -40,7 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-public class TestStagingPartitionedJobCommit extends StagingTests.JobCommitterTest<PartitionedStagingCommitter> {
+public class TestStagingPartitionedJobCommit extends StagingTestBase.JobCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new TestPartitionedStagingCommitter(getJob(), mock(AmazonS3.class));
@@ -224,7 +224,7 @@ public class TestStagingPartitionedJobCommit extends StagingTests.JobCommitterTe
     when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14")))
         .thenThrow(new IOException("Fake IOException for exists"));
 
-    StagingTests.assertThrows("Should throw the fake IOException",
+    StagingTestBase.assertThrows("Should throw the fake IOException",
         IOException.class, new Callable<Void>() {
       @Override
       public Void call() throws IOException {
@@ -259,7 +259,7 @@ public class TestStagingPartitionedJobCommit extends StagingTests.JobCommitterTe
             true /* recursive */ ))
         .thenThrow(new IOException("Fake IOException for delete"));
 
-    StagingTests.assertThrows("Should throw the fake IOException",
+    StagingTestBase.assertThrows("Should throw the fake IOException",
         IOException.class, new Callable<Void>() {
           @Override
           public Void call() throws IOException {
@@ -296,7 +296,7 @@ public class TestStagingPartitionedJobCommit extends StagingTests.JobCommitterTe
             true /* recursive */ ))
         .thenReturn(false);
 
-    StagingTests.assertThrows("Should throw an IOException",
+    StagingTestBase.assertThrows("Should throw an IOException",
         IOException.class, new Callable<Void>() {
           @Override
           public Void call() throws IOException {

@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.OutputCommitter;
@@ -45,6 +46,7 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -65,17 +67,17 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class StagingTests {
+public class StagingTestBase {
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
   public static class MiniDFSTest {
-    private static Configuration conf = null;
+    private static JobConf conf = null;
     private static MiniDFSCluster cluster = null;
     private static FileSystem dfs = null;
     private static FileSystem lfs = null;
 
-    protected static Configuration getConfiguration() {
+    protected static JobConf getConfiguration() {
       return conf;
     }
 
@@ -91,13 +93,13 @@ public class StagingTests {
     @SuppressWarnings("deprecation")
     public static void setupFS() throws IOException {
       if (cluster == null) {
-        Configuration c = new Configuration();
+        Configuration c = new JobConf();
         c.setBoolean("dfs.webhdfs.enabled", true);
         // if this fails with "The directory is already locked" set umask to 0022
         cluster = new MiniDFSCluster(c, 1, true, null);
         //cluster = new MiniDFSCluster.Builder(new Configuration()).build();
         dfs = cluster.getFileSystem();
-        conf = new Configuration(dfs.getConf());
+        conf = new JobConf(dfs.getConf());
         lfs = FileSystem.getLocal(conf);
       }
     }
@@ -123,12 +125,12 @@ public class StagingTests {
         new Path("s3a://" + MockS3AFileSystem.BUCKET + "/" + OUTPUT_PREFIX);
 
     // created in BeforeClass
-    private FileSystem mockFS = null;
+    private S3AFileSystem mockFS = null;
     private JobContext job = null;
 
     // created in Before
-    private StagingTests.ClientResults results = null;
-    private StagingTests.ClientErrors errors = null;
+    private StagingTestBase.ClientResults results = null;
+    private StagingTestBase.ClientErrors errors = null;
     private AmazonS3 mockClient = null;
 
     @BeforeClass
@@ -146,9 +148,9 @@ public class StagingTests {
       this.job = new JobContextImpl(CONF, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID, UUID.randomUUID().toString());
 
-      this.results = new StagingTests.ClientResults();
-      this.errors = new StagingTests.ClientErrors();
-      this.mockClient = StagingTests.newMockClient(results, errors);
+      this.results = new StagingTestBase.ClientResults();
+      this.errors = new StagingTestBase.ClientErrors();
+      this.mockClient = StagingTestBase.newMockClient(results, errors);
     }
 
     public FileSystem getMockS3() {
@@ -159,11 +161,11 @@ public class StagingTests {
       return job;
     }
 
-    protected StagingTests.ClientResults getMockResults() {
+    protected StagingTestBase.ClientResults getMockResults() {
       return results;
     }
 
-    protected StagingTests.ClientErrors getMockErrors() {
+    protected StagingTestBase.ClientErrors getMockErrors() {
       return errors;
     }
 
@@ -191,8 +193,9 @@ public class StagingTests {
           new Configuration(getJob().getConfiguration()), AID);
 
       // get the task's configuration copy so modifications take effect
-      tac.getConfiguration()
-          .set("mapred.local.dir", "/tmp/local-0,/tmp/local-1");
+      // TODO: This is a different property than that used in the committer
+      tac.getConfiguration().set("mapred.local.dir",
+              System.getProperty(StagingCommitterConstants.JAVA_IO_TMPDIR));
     }
 
     protected C getJobCommitter() {
@@ -436,7 +439,8 @@ public class StagingTests {
    * @param callable A Callable that is expected to throw the exception
    */
   public static void assertThrows(
-      String message, Class<? extends Exception> expected, Callable<?> callable) {
+      String message, Class<? extends Exception> expected, Callable<?> callable)
+      throws Exception {
     assertThrows(message, expected, null, callable);
   }
 
@@ -448,17 +452,17 @@ public class StagingTests {
    */
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
-      Callable<?> callable) {
+      Callable<?> callable) throws Exception {
     try {
       callable.call();
       Assert.fail("No exception was thrown (" + message + "), expected: " +
           expected.getName());
     } catch (Exception actual) {
-      Assert.assertEquals(message, expected, actual.getClass());
+      if (expected != actual.getClass()) {
+        throw actual;
+      }
       if (expectedMsg != null) {
-        Assert.assertTrue("Exception message should contain \"" + expectedMsg +
-            "\", but was: " + actual.getMessage(),
-            actual.getMessage().contains(expectedMsg));
+        GenericTestUtils.assertExceptionContains(expectedMsg, actual);
       }
     }
   }
@@ -470,7 +474,8 @@ public class StagingTests {
    * @param runnable A Runnable that is expected to throw the exception
    */
   public static void assertThrows(
-      String message, Class<? extends Exception> expected, Runnable runnable) {
+      String message, Class<? extends Exception> expected, Runnable runnable)
+      throws Exception {
     assertThrows(message, expected, null, runnable);
   }
 
@@ -482,18 +487,16 @@ public class StagingTests {
    */
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
-      Runnable runnable) {
+      Runnable runnable) throws Exception {
     try {
       runnable.run();
       Assert.fail("No exception was thrown (" + message + "), expected: " +
           expected.getName());
     } catch (Exception actual) {
-      Assert.assertEquals(message, expected, actual.getClass());
-      if (expectedMsg != null) {
-        Assert.assertTrue("Exception message should contain \"" + expectedMsg +
-                "\", but was: " + actual.getMessage(),
-            actual.getMessage().contains(expectedMsg));
+      if (expected != actual.getClass()) {
+        throw actual;
       }
+      GenericTestUtils.assertExceptionContains(expectedMsg, actual);
     }
   }
 }

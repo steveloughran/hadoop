@@ -1,4 +1,22 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -61,14 +79,12 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   // TODO: handle aborting commits if delete or exists throws an exception
   @Override
   public void commitJob(JobContext context) throws IOException {
-    try(DurationInfo d = new DurationInfo("Commit Job %s",
+    try (DurationInfo d = new DurationInfo("Commit Job %s",
         context.getJobID())) {
       Path outputPath = getOutputPath(context);
       // use the FS implementation because it will check for _$folder$
       FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
-      try {
-        FileStatus status = fs.getFileStatus(outputPath);
-        LOG.info("Conflict committing work, destination exists: {}", status);
+      if (fs.exists(outputPath)) {
         switch (getMode(context)) {
           case FAIL:
             // this was checked in setupJob, but this avoids some cases where
@@ -84,18 +100,16 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
           default:
             throw new IOException(
                 "Unknown conflict resolution mode: "
-                      + getConfictModeOption(context));
+                    + getConfictModeOption(context));
         }
-      } catch (FileNotFoundException ignored) {
-        /* Nothing to see here, move along */
-      } catch (IllegalArgumentException e) {
-        // raised when unable to map from confict mode to an enum value.
-        throw new IOException(
-            "Unknown conflict resolution mode: "
-                + getConfictModeOption(context), e);
       }
+    } catch (IllegalArgumentException e) {
+      // raised when unable to map from confict mode to an enum value.
+      throw new IOException(
+          "Unknown conflict resolution mode: "
+              + getConfictModeOption(context), e);
     }
 
-    super.commitJob(context);
+      super.commitJob(context);
   }
 }

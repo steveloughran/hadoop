@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.PathExistsException;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.io.FileNotFoundException;
 import java.util.concurrent.Callable;
 
 import static org.mockito.Mockito.reset;
@@ -31,7 +32,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 public class TestStagingDirectoryOutputCommitter
-    extends StagingTests.JobCommitterTest<DirectoryStagingCommitter> {
+    extends StagingTestBase.JobCommitterTest<DirectoryStagingCommitter> {
   @Override
   DirectoryStagingCommitter newJobCommitter() throws Exception {
     return new DirectoryStagingCommitter(OUTPUT_PATH, getJob());
@@ -45,7 +46,7 @@ public class TestStagingDirectoryOutputCommitter
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
-    StagingTests.assertThrows("Should throw an exception because the path exists",
+    StagingTestBase.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -54,7 +55,7 @@ public class TestStagingDirectoryOutputCommitter
           }
         });
 
-    StagingTests.assertThrows("Should throw an exception because the path exists",
+    StagingTestBase.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -72,6 +73,8 @@ public class TestStagingDirectoryOutputCommitter
 
     reset(mockS3);
     when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
+    when(mockS3.getFileStatus(OUTPUT_PATH))
+        .thenThrow(FileNotFoundException.class);
 
     committer.commitJob(getJob());
     verify(mockS3).exists(OUTPUT_PATH);
@@ -88,7 +91,7 @@ public class TestStagingDirectoryOutputCommitter
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
-    StagingTests.assertThrows("Should throw an exception because the path exists",
+    StagingTestBase.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -97,7 +100,7 @@ public class TestStagingDirectoryOutputCommitter
           }
         });
 
-    StagingTests.assertThrows("Should throw an exception because the path exists",
+    StagingTestBase.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -114,7 +117,9 @@ public class TestStagingDirectoryOutputCommitter
     verifyNoMoreInteractions(mockS3);
 
     reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
+//    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
+    when(mockS3.getFileStatus(OUTPUT_PATH))
+        .thenThrow(FileNotFoundException.class);
 
     committer.commitJob(getJob());
     verify(mockS3).exists(OUTPUT_PATH);

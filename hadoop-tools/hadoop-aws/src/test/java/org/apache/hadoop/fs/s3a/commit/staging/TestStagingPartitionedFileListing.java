@@ -32,7 +32,7 @@ import java.util.UUID;
 
 
 public class TestStagingPartitionedFileListing
-    extends StagingTests.TaskCommitterTest<PartitionedStagingCommitter> {
+    extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedStagingCommitter(OUTPUT_PATH, getJob());

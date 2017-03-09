@@ -19,8 +19,8 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingTests.ClientErrors;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingTests.ClientResults;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientErrors;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientResults;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -37,7 +37,7 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   public final ClientResults results = new ClientResults();
   public final ClientErrors errors = new ClientErrors();
-  private final AmazonS3 mockClient = StagingTests.newMockClient(results, errors);
+  private final AmazonS3 mockClient = StagingTestBase.newMockClient(results, errors);
 
   public MockedStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
