@@ -39,6 +39,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -380,13 +381,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // get files on the local FS in the attempt path
     Path workPath = getWorkPath();
     Preconditions.checkNotNull(workPath, "No work path in {}", this);
-    Path attemptPath = workPath; //getTaskAttemptPath(context);
-    FileSystem attemptFS = attemptPath.getFileSystem(
-        context.getConfiguration());
-    LOG.debug("Scanning {} for files to commit", attemptPath);
-    FileStatus[] stats = attemptFS.listStatus(attemptPath, Paths.HiddenPathFilter
-        .get());
-    return Arrays.asList(stats);
+    FileSystem attemptFS = workPath.getFileSystem(context.getConfiguration());
+    LOG.debug("Scanning {} for files to commit", workPath);
+    try {
+      FileStatus[] stats = attemptFS.listStatus(workPath,
+          Paths.HiddenPathFilter.get());
+      return Arrays.asList(stats);
+    } catch (FileNotFoundException e) {
+      LOG.debug("No output generated in task");
+      return new ArrayList<>(0);
+    }
   }
 
   /**

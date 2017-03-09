@@ -20,15 +20,14 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
@@ -73,37 +72,34 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
   public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
       throws IOException {
-    ContractTestUtils.skip("TODO");
-    return null;
+    return new CommitterWithFailedThenSucceed(outDir, tContext);
   }
-/*
-  @Override
-  protected void dumpMultipartUploads() {
-
-  }
-  */
-/*
-
-  @Override
-  protected void assertMultipartUploadsPending() {
-  }
-*/
-
-/*
-  @Override
-  protected void assertNoMultipartUploadsPending() {
-  }
-*/
-
-/*
-  @Override
-  protected int countMultipartUploads() {
-    return 0;
-  }
-*/
 
   @Override
   protected boolean shouldExpectSuccessMarker() {
     return false;
+  }
+
+  /**
+   * The class provides a overridden implementation of commitJobInternal which
+   * causes the commit failed for the first time then succeed.
+   */
+
+  private static class CommitterWithFailedThenSucceed extends
+      StagingS3GuardCommitter {
+    private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
+
+    CommitterWithFailedThenSucceed(Path outputPath,
+        JobContext context) throws IOException {
+      super(outputPath, context);
+    }
+
+    @Override
+    public void commitJob(JobContext context) throws IOException {
+      super.commitJob(context);
+      if (firstTimeFail.getAndSet(false)) {
+        throw new IOException(MESSAGE);
+      }
+    }
   }
 }

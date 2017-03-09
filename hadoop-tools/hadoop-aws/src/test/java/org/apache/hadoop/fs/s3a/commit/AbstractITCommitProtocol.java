@@ -76,6 +76,7 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 @SuppressWarnings("unchecked")
 public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected Path outDir;
+  public static final String MESSAGE = "oops";
 
   private String SUB_DIR = "SUB_DIR";
 
@@ -476,10 +477,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   }
 
-  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
-      throws IOException {
-    return new CommitterWithFailedThenSucceed(outDir, tContext);
-  }
+  protected abstract AbstractS3GuardCommitter
+    createFailingCommitter(TaskAttemptContext tContext) throws IOException;
 
   protected void expectFNFEonJobCommit(AbstractS3GuardCommitter committer,
       JobContext jContext) throws Exception {
@@ -543,7 +542,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
       AbstractS3GuardCommitter committer) throws Exception {
-    intercept(IOException.class, CommitterWithFailedThenSucceed.MESSAGE,
+    intercept(IOException.class, MESSAGE,
         () -> committer.commitJob(jContext));
   }
 
@@ -886,28 +885,5 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return ContractTestUtils.readUTF8(getFileSystem(), f, -1);
   }
 
-  /**
-   * The class provides a overridden implementation of commitJobInternal which
-   * causes the commit failed for the first time then succeed.
-   */
-
-  private static class CommitterWithFailedThenSucceed extends
-      MagicS3GuardCommitter {
-    public static final String MESSAGE = "oops";
-    private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
-
-    CommitterWithFailedThenSucceed(Path outputPath,
-        JobContext context) throws IOException {
-      super(outputPath, context);
-    }
-
-    @Override
-    public void commitJob(JobContext context) throws IOException {
-      super.commitJob(context);
-      if (firstTimeFail.getAndSet(false)) {
-        throw new IOException(MESSAGE);
-      }
-    }
-  }
 
 }

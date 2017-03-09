@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.fs.s3a.commit.magic;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
@@ -38,5 +40,33 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
     return new MagicS3GuardCommitter(outDir, context);
+  }
+
+  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
+      throws IOException {
+    return new CommitterWithFailedThenSucceed(outDir, tContext);
+  }
+
+  /**
+   * The class provides a overridden implementation of commitJobInternal which
+   * causes the commit failed for the first time then succeed.
+   */
+
+  private static class CommitterWithFailedThenSucceed extends
+      MagicS3GuardCommitter {
+    private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
+
+    CommitterWithFailedThenSucceed(Path outputPath,
+        JobContext context) throws IOException {
+      super(outputPath, context);
+    }
+
+    @Override
+    public void commitJob(JobContext context) throws IOException {
+      super.commitJob(context);
+      if (firstTimeFail.getAndSet(false)) {
+        throw new IOException(MESSAGE);
+      }
+    }
   }
 }
