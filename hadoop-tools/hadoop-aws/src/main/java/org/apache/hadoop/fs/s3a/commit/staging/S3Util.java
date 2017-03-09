@@ -32,11 +32,13 @@ import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -53,29 +55,51 @@ public class S3Util {
   private static final Logger LOG = LoggerFactory.getLogger(S3Util.class);
 
   public static void revertCommit(AmazonS3 client,
-                                  PendingUpload commit) {
+      PendingUpload commit) throws IOException {
     LOG.debug("Revert {}", commit);
-    client.deleteObject(commit.newDeleteRequest());
+    try {
+      client.deleteObject(commit.newDeleteRequest());
+    } catch (AmazonClientException e) {
+      throw S3AUtils.translateException("revert commit", commit.getKey(), e);
+    }
   }
 
   public static void finishCommit(AmazonS3 client,
-                                  PendingUpload commit) {
+      PendingUpload commit) throws IOException {
     LOG.debug("Finish {}", commit);
-    client.completeMultipartUpload(commit.newCompleteRequest());
+    try {
+      client.completeMultipartUpload(commit.newCompleteRequest());
+    } catch (AmazonClientException e) {
+      throw S3AUtils.translateException("complete commit", commit.getKey(), e);
+    }
   }
 
   public static void abortCommit(AmazonS3 client,
-                                 PendingUpload commit) {
+      PendingUpload commit) throws IOException {
     LOG.debug("Abort {}", commit);
-    client.abortMultipartUpload(commit.newAbortRequest());
+    abort(client, commit.getKey(), commit.newAbortRequest());
+  }
+
+  protected static void abort(AmazonS3 client,
+      String key,
+      AbortMultipartUploadRequest request) throws IOException {
+    try {
+      client.abortMultipartUpload(request);
+    } catch (AmazonClientException e) {
+      throw S3AUtils.translateException("abort commit", key, e);
+    }
   }
 
   public static PendingUpload multipartUpload(
       AmazonS3 client, File localFile, String partition,
-      String bucket, String key, long uploadPartSize) {
+      String bucket, String key, long uploadPartSize)
+      throws IOException {
 
-    LOG.debug("Initiating multipart upload from {} to {}/{} partition={}",
-        localFile, key, bucket, partition);
+    LOG.debug("Initiating multipart upload from {} to s3a://{}/{} partition={}",
+        localFile, bucket, key, partition);
+    if (!localFile.exists()) {
+      throw new FileNotFoundException(localFile.toString());
+    }
 
     InitiateMultipartUploadResult initiate = client.initiateMultipartUpload(
         new InitiateMultipartUploadRequest(bucket, key));
@@ -89,8 +113,13 @@ public class S3Util {
       long numParts = (localFile.length() / uploadPartSize +
           ((localFile.length() % uploadPartSize) > 0 ? 1 : 0));
 
-      Preconditions.checkArgument(numParts >= 0,
+      LOG.debug("File size is {}, number of parts to upload = {}",
+          localFile.length(), numParts);
+/*
+      Preconditions.checkArgument(numParts > 0,
           "Cannot upload 0 byte file: " + localFile);
+*/
+
 
       for (int partNumber = 1; partNumber <= numParts; partNumber += 1) {
         long size = Math.min(localFile.length() - offset, uploadPartSize);
@@ -117,15 +146,13 @@ public class S3Util {
       threw = false;
 
       return pending;
+    } catch (AmazonClientException e) {
+      throw S3AUtils.translateException("multipart upload", key, e);
 
     } finally {
       if (threw) {
-        try {
-          client.abortMultipartUpload(
-              new AbortMultipartUploadRequest(bucket, key, uploadId));
-        } catch (AmazonClientException e) {
-          LOG.error("Failed to abort multi-part upload", e);
-        }
+        abort(client, key,
+            new AbortMultipartUploadRequest(bucket, key, uploadId));
       }
     }
   }

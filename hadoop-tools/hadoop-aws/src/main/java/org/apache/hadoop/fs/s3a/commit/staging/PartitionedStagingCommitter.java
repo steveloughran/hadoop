@@ -151,7 +151,11 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     } catch (IOException e) {
       throw new IOException(
           "Failed to enforce conflict resolution: " + e, e);
-
+    } catch (IllegalArgumentException e) {
+      // raised when unable to map from confict mode to an enum value.
+      throw new IOException(
+          "Unknown conflict resolution mode: "
+              + getConfictModeOption(context), e);
     } finally {
       if (threw) {
         abortJobInternal(context, pending, threw);

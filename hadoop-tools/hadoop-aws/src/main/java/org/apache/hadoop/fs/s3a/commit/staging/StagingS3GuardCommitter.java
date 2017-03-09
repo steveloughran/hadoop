@@ -557,28 +557,28 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Tasks.foreach(pending)
           .stopOnFailure().throwFailureWhenFinished()
           .executeWith(getThreadPool(context))
-          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, RuntimeException>() {
+          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit,
-                            Exception exception) {
+                            Exception exception) throws IOException {
               S3Util.abortCommit(client, commit);
             }
           })
-          .abortWith(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
+          .abortWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) {
+            public void run(S3Util.PendingUpload commit) throws IOException {
               S3Util.abortCommit(client, commit);
             }
           })
-          .revertWith(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
+          .revertWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) {
+            public void run(S3Util.PendingUpload commit) throws IOException {
               S3Util.revertCommit(client, commit);
             }
           })
-          .run(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
+          .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) {
+            public void run(S3Util.PendingUpload commit) throws IOException {
               S3Util.finishCommit(client, commit);
             }
           });
@@ -612,16 +612,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Tasks.foreach(pending)
           .throwFailureWhenFinished(!suppressExceptions)
           .executeWith(getThreadPool(context))
-          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, RuntimeException>() {
+          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit,
-                            Exception exception) {
+                            Exception exception) throws IOException {
               S3Util.abortCommit(client, commit);
             }
           })
-          .run(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
+          .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) {
+            public void run(S3Util.PendingUpload commit) throws IOException {
               S3Util.abortCommit(client, commit);
             }
           });
@@ -674,12 +674,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void setupTask(TaskAttemptContext context) throws IOException {
 // TODO
     Path taskAttemptPath = getTaskAttemptPath(context);
-    FileSystem fs = taskAttemptPath.getFileSystem(getConf());
     try (DurationInfo d = new
         DurationInfo("task %s: creating task attempt path %s ",
         taskAttemptPath,
         context.getTaskAttemptID())) {
-//      fs.mkdirs(taskAttemptPath);
+//      taskAttemptPath.getFileSystem(getConf()).mkdirs(taskAttemptPath);
       wrappedCommitter.setupTask(context);
     }
   }
@@ -745,7 +744,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     LOG.info("Uploading from staging directory to destination filesystem");
     LOG.info("Saving pending data information to {}", commitsAttemptPath);
     if (taskOutput.isEmpty()) {
-      // theree is nothing to write. needsTaskCommit() should have caught
+      // there is nothing to write. needsTaskCommit() should have caught
       // this, so warn that there is some kind of problem in the protocol.
       LOG.warn("No files to commit");
       return 0;
@@ -797,9 +796,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         LOG.error("Exception during commit process, aborting {} commit(s)",
           commits.size());
         Tasks.foreach(commits)
-            .run(new Tasks.Task<S3Util.PendingUpload, RuntimeException>() {
+            .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
               @Override
-              public void run(S3Util.PendingUpload commit) {
+              public void run(S3Util.PendingUpload commit) throws IOException {
                 S3Util.abortCommit(amazonS3, commit);
               }
             });

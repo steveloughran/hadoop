@@ -19,10 +19,6 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -33,6 +29,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -52,6 +49,10 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
@@ -61,9 +62,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
-import static org.apache.hadoop.test.LambdaTestUtils.*;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.FilterTempFiles;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.lsR;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
  * Test the job/task commit actions of an S3A Committer, including trying to
@@ -250,8 +252,14 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     intercept(IOException.class,
         () -> committer2.recoverTask(tContext2));
 
+    // at this point, task attempt 0 has failed to recover
+    // it should be abortable though.
+    committer2.abortTask(tContext2);
+/*
+
     committer2.commitJob(jContext2);
     validateContent(outDir, shouldExpectSuccessMarker());
+*/
   }
 
   private void validateContent(Path dir, boolean expectSuccessMarker)
@@ -301,14 +309,19 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     countMultipartUploads("");
   }
 
-  protected void assertMultipartUploadsPending(String prefix) throws IOException {
-    int count = countMultipartUploads(prefix);
-    assertTrue("No multipart uploads in progress", count > 0);
+  protected void assertMultipartUploadsPending(Path path) throws IOException {
+    int count = countMultipartUploads(path);
+    assertTrue("No multipart uploads in progress under " + path, count > 0);
   }
 
-  protected void assertNoMultipartUploadsPending(String prefix) throws IOException {
-    int count = countMultipartUploads(prefix);
-    assertEquals("No multipart uploads in progress", 0, count);
+  protected void assertNoMultipartUploadsPending(Path path) throws IOException {
+    int count = countMultipartUploads(path);
+    assertEquals("Multipart uploads in progress under " + path, 0, count);
+  }
+
+  protected int countMultipartUploads(Path path) throws IOException {
+    return countMultipartUploads(path == null ? "" :
+        getFileSystem().pathToKey(path));
   }
 
   protected int countMultipartUploads(String prefix) throws IOException {
@@ -336,7 +349,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       count++;
       LOG.info("Aborting upload {} to {}",
           upload.getUploadId(), upload.getKey());
-      writeOps.abortMultipartCommit(upload);
+      try {
+        writeOps.abortMultipartCommit(upload);
+      } catch (FileNotFoundException e) {
+        LOG.info("Already aborted: {}");
+
+      }
     }
     if (count > 0) {
       LOG.info("Multipart uploads deleted: {}", count);
@@ -373,7 +391,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
       // validate output
       validateContent(outDir, shouldExpectSuccessMarker());
-      assertNoMultipartUploadsPending("");
+      assertNoMultipartUploadsPending(outDir);
     } finally {
       abort(committer, jContext, tContext);
     }
@@ -407,14 +425,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // write output
     writeTextOutput(tContext);
-    assertMultipartUploadsPending("");
     // do commit
     commit(committer, jContext, tContext);
 
     // validate output
     validateContent(outDir, shouldExpectSuccessMarker());
 
-    assertNoMultipartUploadsPending("");
+    assertNoMultipartUploadsPending(outDir);
 
     // commit task to fail on retry
     expectFNFEonTaskCommit(committer, tContext);
@@ -746,8 +763,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
-    String key = getFileSystem().pathToKey(outDir);
-    assertNoMultipartUploadsPending(key);
+    assertNoMultipartUploadsPending(outDir);
 
   }
 
@@ -809,13 +825,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     taCtx[0] = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
     taCtx[1] = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_1);
 
-    final TextOutputFormat[] tof = new TextOutputFormat[2];
+    final TextOutputFormat[] tof = new LoggingTextOutputFormat[2];
     for (int i = 0; i < tof.length; i++) {
-      tof[i] = new TextOutputFormat() {
+      tof[i] = new LoggingTextOutputFormat() {
         @Override
         public Path getDefaultWorkFile(TaskAttemptContext context,
             String extension) throws IOException {
-          final MagicS3GuardCommitter foc = (MagicS3GuardCommitter)
+          final AbstractS3GuardCommitter foc = (AbstractS3GuardCommitter)
               getOutputCommitter(context);
           return new Path(new Path(foc.getWorkPath(), SUB_DIR),
               getUniqueFile(context, getOutputName(context), extension));
@@ -854,6 +870,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     describe("\nCommitting Job");
     amCommitter.commitJob(jContext);
+    assertPathExists("base output directory", outDir);
+    assertPathDoesNotExist("Output ended up in base directory",
+        new Path(outDir, PART_00000));
     Path outSubDir = new Path(outDir, SUB_DIR);
     assertPathDoesNotExist("Must not end up with sub_dir/sub_dir",
         new Path(outSubDir, SUB_DIR));

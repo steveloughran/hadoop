@@ -2951,16 +2951,17 @@ public class S3AFileSystem extends FileSystem {
 
     /**
      * Abort a multipart upload operation.
+     * @param key destination key of upload
      * @param uploadId multipart operation Id
      * @throws IOException on problems.
      */
-    public void abortMultipartCommit(String destination,
+    public void abortMultipartCommit(String key,
         String uploadId) throws IOException {
       try {
-        abortMultipartUpload(uploadId);
+        abortMultipartUpload(key, uploadId);
       } catch (AmazonClientException e) {
         throw translateException("aborting multipart commit",
-            destination, e);
+            keyToPath(key), e);
       }
     }
     /**
@@ -2969,7 +2970,8 @@ public class S3AFileSystem extends FileSystem {
      * @throws IOException on problems.
      */
     public void abortMultipartCommit(MultipartUpload upload) throws IOException {
-      abortMultipartCommit(keyToPath(upload.getKey()).toString(),
+      abortMultipartCommit(
+          upload.getKey(),
           upload.getUploadId());
     }
 
@@ -3044,11 +3046,11 @@ public class S3AFileSystem extends FileSystem {
      * @param uploadId multipart operation Id
      * @throws AmazonClientException on problems.
      */
-    public void abortMultipartUpload(String uploadId)
+    public void abortMultipartUpload(String uploadKey, String uploadId)
         throws AmazonClientException {
       LOG.debug("Aborting multipart upload {}", uploadId);
       s3.abortMultipartUpload(
-          new AbortMultipartUploadRequest(bucket, key, uploadId));
+          new AbortMultipartUploadRequest(bucket, uploadKey, uploadId));
     }
 
     /**
@@ -3116,7 +3118,7 @@ public class S3AFileSystem extends FileSystem {
     @Override
     public String toString() {
       final StringBuilder sb = new StringBuilder(
-          "{bucket=").append(bucket);
+          "WriteOperationHelper {bucket=").append(bucket);
       sb.append(", key='").append(key).append('\'');
       sb.append('}');
       return sb.toString();

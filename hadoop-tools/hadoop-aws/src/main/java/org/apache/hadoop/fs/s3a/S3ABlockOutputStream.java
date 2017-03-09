@@ -672,7 +672,7 @@ class S3ABlockOutputStream extends OutputStream {
       do {
         try {
           LOG.debug(operation);
-          writeOperationHelper.abortMultipartUpload(uploadId);
+          writeOperationHelper.abortMultipartUpload(key, uploadId);
           return;
         } catch (AmazonClientException e) {
           lastException = e;
