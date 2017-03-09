@@ -226,11 +226,11 @@ public class TestCommitUtils extends Assert {
   }
 
   public void assertParents(String[] expected, List<String> elements) {
-    assertListEquals(expected, pendingPathParents(elements));
+    assertListEquals(expected, magicPathParents(elements));
   }
 
   public void assertChildren(String[] expected, List<String> elements) {
-    assertListEquals(expected, pendingPathChildren(elements));
+    assertListEquals(expected, magicPathChildren(elements));
   }
 
   private void assertPathSplits(String pathString, String[] expected) {

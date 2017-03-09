@@ -47,7 +47,7 @@ public final class CommitUtils {
   public static final String E_WRONG_FS
       = "Output path is not on an S3A Filesystem";
 
-  public static final String E_NO_PENDING_PATH_ELEMENT
+  public static final String E_NO_MAGIC_PATH_ELEMENT
       = "No " + MAGIC_DIR_NAME + " element in path";
 
   private CommitUtils() {
@@ -111,36 +111,36 @@ public final class CommitUtils {
    * @return the index.
    * @throws IllegalArgumentException if there is no pending element
    */
-  public static int pendingElementIndex(List<String> elements) {
+  public static int magicElementIndex(List<String> elements) {
     return getElementIndex(MAGIC_DIR_NAME, elements);
   }
 
   protected static int getElementIndex(String name, List<String> elements) {
     int index = elements.indexOf(name);
-    checkArgument(index >= 0, E_NO_PENDING_PATH_ELEMENT);
+    checkArgument(index >= 0, E_NO_MAGIC_PATH_ELEMENT);
     return index;
   }
 
   /**
-   * Get the parent path elements the pending path.
+   * Get the parent path elements of the magic path.
    * The list may be immutable or may be a view of the underlying list.
    * Both the parameter list and the returned list MUST NOT be modified.
    * @param elements full path element list
    * @return the parent elements; may be empty
    */
-  public static List<String> pendingPathParents(List<String> elements) {
-    return elements.subList(0, pendingElementIndex(elements));
+  public static List<String> magicPathParents(List<String> elements) {
+    return elements.subList(0, magicElementIndex(elements));
   }
 
   /**
-   * Get the child path elements under the pending path.
+   * Get the child path elements under the magic path.
    * The list may be immutable or may be a view of the underlying list.
    * Both the parameter list and the returned list MUST NOT be modified.
    * @param elements full path element list
    * @return the child elements; may be empty
    */
-  public static List<String> pendingPathChildren(List<String> elements) {
-    int index = pendingElementIndex(elements);
+  public static List<String> magicPathChildren(List<String> elements) {
+    int index = magicElementIndex(elements);
     int len = elements.size();
     if (index == len - 1) {
       // empty index
@@ -220,8 +220,8 @@ public final class CommitUtils {
    */
   public static List<String> finalDestination(List<String> elements) {
     if (isMagicPath(elements)) {
-      List<String> destDir = pendingPathParents(elements);
-      List<String> children = pendingPathChildren(elements);
+      List<String> destDir = magicPathParents(elements);
+      List<String> children = magicPathChildren(elements);
       checkArgument(!children.isEmpty(), "No path found under " +
           MAGIC_DIR_NAME);
       ArrayList<String> dest = new ArrayList<>(destDir);
