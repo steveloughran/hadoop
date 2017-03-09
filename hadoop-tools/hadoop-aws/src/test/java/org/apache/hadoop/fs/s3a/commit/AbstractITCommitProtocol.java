@@ -118,6 +118,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   @Override
   public void teardown() throws Exception {
+    abortMultipartUploadsUnderPath(outDir);
     cleanupDestDir();
   }
 
@@ -200,8 +201,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
-  private void testRecoveryInternal()
-      throws Exception {
+  @Test
+  public void testRecovery() throws Exception {
     Job job = newJob();
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
@@ -253,11 +254,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     validateContent(outDir, shouldExpectSuccessMarker());
   }
 
-  @Test
-  public void testRecovery() throws Exception {
-    testRecoveryInternal();
-  }
-
   private void validateContent(Path dir, boolean expectSuccessMarker)
       throws IOException {
     if (expectSuccessMarker) {
@@ -301,25 +297,49 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Dump all uploads.   */
-  protected void dumpMultipartUploads() {
-    countMultipartUploads();
+  protected void dumpMultipartUploads() throws IOException {
+    countMultipartUploads("");
   }
 
-  protected void assertMultipartUploadsPending() {
-    int count = countMultipartUploads();
+  protected void assertMultipartUploadsPending(String prefix) throws IOException {
+    int count = countMultipartUploads(prefix);
     assertTrue("No multipart uploads in progress", count > 0);
   }
 
-  protected void assertNoMultipartUploadsPending() {
-    int count = countMultipartUploads();
+  protected void assertNoMultipartUploadsPending(String prefix) throws IOException {
+    int count = countMultipartUploads(prefix);
     assertEquals("No multipart uploads in progress", 0, count);
   }
 
-  protected int countMultipartUploads() {
+  protected int countMultipartUploads(String prefix) throws IOException {
     int count = 0;
-    for (MultipartUpload upload : getFileSystem().listMultipartUploads()) {
+    for (MultipartUpload upload : getFileSystem().listMultipartUploads(prefix)) {
       count++;
       LOG.info("Upload {} to {}", upload.getUploadId(), upload.getKey());
+    }
+    return count;
+  }
+
+  /**
+   * Abort all multipart uploads under a path.
+   * @param key key/prefix
+   * @return a count of aborts
+   * @throws IOException trouble.
+   */
+  protected int abortMultipartUploadsUnderPath(Path path) throws IOException {
+    int count = 0;
+    S3AFileSystem fs = getFileSystem();
+    String key = fs.pathToKey(path);
+    S3AFileSystem.WriteOperationHelper writeOps
+        = fs.createWriteOperationHelper(key);
+    for (MultipartUpload upload : fs.listMultipartUploads(key)) {
+      count++;
+      LOG.info("Aborting upload {} to {}",
+          upload.getUploadId(), upload.getKey());
+      writeOps.abortMultipartCommit(upload);
+    }
+    if (count > 0) {
+      LOG.info("Multipart uploads deleted: {}", count);
     }
     return count;
   }
@@ -353,7 +373,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
       // validate output
       validateContent(outDir, shouldExpectSuccessMarker());
-      assertNoMultipartUploadsPending();
+      assertNoMultipartUploadsPending("");
     } finally {
       abort(committer, jContext, tContext);
     }
@@ -387,14 +407,14 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // write output
     writeTextOutput(tContext);
-    assertMultipartUploadsPending();
+    assertMultipartUploadsPending("");
     // do commit
     commit(committer, jContext, tContext);
 
     // validate output
     validateContent(outDir, shouldExpectSuccessMarker());
 
-    assertNoMultipartUploadsPending();
+    assertNoMultipartUploadsPending("");
 
     // commit task to fail on retry
     expectFNFEonTaskCommit(committer, tContext);
@@ -462,12 +482,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected void assertSuccessMarkerExists(Path dir) throws IOException {
     assertPathExists("Success marker",
-        new Path(dir, SUCCEEDED_FILE_NAME));
+        new Path(dir, SUCCESS_FILE_NAME));
   }
 
   protected void assertSuccessMarkerDoesNotExist(Path dir) throws IOException {
     assertPathDoesNotExist("Success marker",
-        new Path(dir, SUCCEEDED_FILE_NAME));
+        new Path(dir, SUCCESS_FILE_NAME));
   }
 
   /**
@@ -718,6 +738,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     Path expectedFile = new Path(outDir, PART_00000);
     assertPathDoesNotExist("expected output file", expectedFile);
     assertSuccessMarkerDoesNotExist(outDir);
+    describe("Aborting job into %s", outDir);
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
 
@@ -725,6 +746,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
+    String key = getFileSystem().pathToKey(outDir);
+    assertNoMultipartUploadsPending(key);
 
   }
 

@@ -132,7 +132,7 @@ public class DelayedCommitFSIntegration {
   }
 
   private boolean isDelayedCommitPath(List<String> elements) {
-    return delayedCommitEnabled && isPendingPath(elements);
+    return delayedCommitEnabled && isMagicPath(elements);
   }
 
 }

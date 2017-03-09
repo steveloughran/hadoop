@@ -31,7 +31,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -136,7 +135,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d = new DurationInfo("Abort Job %s in state %s",
         context.getJobID(), state)) {
       if (commitActions != null) {
-        Path pending = pendingSubdir(getOutputPath());
+        Path pending = magicSubdir(getOutputPath());
         FileCommitActions.CommitAllFilesOutcome outcome
             = commitActions.abortAllPendingFilesInPath(pending, true);
         outcome.maybeRethrow();

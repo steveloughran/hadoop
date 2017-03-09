@@ -2809,12 +2809,21 @@ public class S3AFileSystem extends FileSystem {
   /**
    * Listing all multipart uploads; limited to the first few hundred.
    * @return a listing of multipart uploads.
+   * @param prefix prefix to scan for
    */
   @InterfaceAudience.Private
-  public List<MultipartUpload> listMultipartUploads() {
-    MultipartUploadListing l = s3.listMultipartUploads(
-        new ListMultipartUploadsRequest(bucket));
-    return l.getMultipartUploads();
+  public List<MultipartUpload> listMultipartUploads(String prefix)
+      throws IOException {
+    try {
+      MultipartUploadListing l = s3.listMultipartUploads(
+          new ListMultipartUploadsRequest(bucket));
+      if (!prefix.isEmpty()) {
+        l.setPrefix(prefix);
+      }
+      return l.getMultipartUploads();
+    } catch (AmazonClientException e) {
+      throw translateException("listMultipartUpoloads", prefix, e);
+    }
   }
 
   /**
@@ -2940,7 +2949,6 @@ public class S3AFileSystem extends FileSystem {
       }
     }
 
-
     /**
      * Abort a multipart upload operation.
      * @param uploadId multipart operation Id
@@ -2954,6 +2962,15 @@ public class S3AFileSystem extends FileSystem {
         throw translateException("aborting multipart commit",
             destination, e);
       }
+    }
+    /**
+     * Abort a multipart upload operation.
+     * @param uploadId multipart operation Id
+     * @throws IOException on problems.
+     */
+    public void abortMultipartCommit(MultipartUpload upload) throws IOException {
+      abortMultipartCommit(keyToPath(upload.getKey()).toString(),
+          upload.getUploadId());
     }
 
     /**

@@ -227,7 +227,7 @@ public class FileCommitActions {
    * @throws IOException IO problem
    */
   public void touchSuccessMarker(Path outputPath) throws IOException {
-    Path markerPath = new Path(outputPath, SUCCEEDED_FILE_NAME);
+    Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     fs.create(markerPath, true).close();
   }
 

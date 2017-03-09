@@ -37,9 +37,10 @@ public interface CommitConstants {
   boolean DEFAULT_COMMITTER_ENABLED = false;
 
   /**
-   * Path for "magic" pending writes: path and .pending files: {@value}.
+   * Path for "magic" pending writes: path and {@link #PENDING_SUFFIX} files:
+   * {@value}.
    */
-  String MAGIC_DIR_NAME = "__pending";
+  String MAGIC_DIR_NAME = "__magic";
 
   /**
    * This is the "Pending" directory of the FileOutputCommitter;
@@ -54,14 +55,6 @@ public interface CommitConstants {
    * the final path names: {@value}.
    */
   String BASE_PATH = "__base";
-
-
-  /**
-   * Temp data which is not auto-committed: {@value}.
-   * Uses a different name from normal just to make clear it is different.
-   */
-  String TEMPORAY_DIR_NAME = "__temp-data";
-
 
   /**
    * Temp data which is not auto-committed: {@value}.
@@ -84,6 +77,6 @@ public interface CommitConstants {
   /**
    * Marker file to create on success.
    */
-  String SUCCEEDED_FILE_NAME = "_SUCCESS";
+  String SUCCESS_FILE_NAME = "_SUCCESS";
 
 }

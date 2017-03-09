@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 public class TestStagingDirectoryOutputCommitter
-    extends TestUtil.JobCommitterTest<DirectoryStagingCommitter> {
+    extends StagingTests.JobCommitterTest<DirectoryStagingCommitter> {
   @Override
   DirectoryStagingCommitter newJobCommitter() throws Exception {
     return new DirectoryStagingCommitter(OUTPUT_PATH, getJob());
@@ -45,7 +45,7 @@ public class TestStagingDirectoryOutputCommitter
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
-    TestUtil.assertThrows("Should throw an exception because the path exists",
+    StagingTests.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -54,7 +54,7 @@ public class TestStagingDirectoryOutputCommitter
           }
         });
 
-    TestUtil.assertThrows("Should throw an exception because the path exists",
+    StagingTests.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -88,7 +88,7 @@ public class TestStagingDirectoryOutputCommitter
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
-    TestUtil.assertThrows("Should throw an exception because the path exists",
+    StagingTests.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -97,7 +97,7 @@ public class TestStagingDirectoryOutputCommitter
           }
         });
 
-    TestUtil.assertThrows("Should throw an exception because the path exists",
+    StagingTests.assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {

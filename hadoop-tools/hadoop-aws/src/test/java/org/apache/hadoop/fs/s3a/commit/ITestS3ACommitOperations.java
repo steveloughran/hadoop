@@ -56,7 +56,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   @Test
   public void testVerifyIsDelayedCompleteFS() throws Throwable {
-    verifyIsDelayedCommitFS(getFileSystem());
+    verifyIsMagicCommitFS(getFileSystem());
   }
 
   @Test

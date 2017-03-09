@@ -317,11 +317,11 @@ so returning the special new stream.
 For this we propose
 
 
-1. A "Special" temporary directory name, `__pending`, to indicate that all files
+1. A "Special" temporary directory name, `__magic`, to indicate that all files
 created under this path are that, "ending commits". Directories created under
 the path will still be created —this allows job and task specific directories to
 be created for individual job and task attempts.
-For example, the pattern `__pending/${jobID}/${taskId}` could be used to
+For example, the pattern `__magic/${jobID}/${taskId}` could be used to
 store pending commits to the final directory for that specific task. If that
 task is committed, all pending commit files stored in that path will be loaded
 and used to commit the final uploads.
@@ -330,24 +330,24 @@ In the latter example, consider a job with the final directory `/results/latest`
 
 1. The intermediate directory for the task 01 attempt 01 of job `job_400_1` would be
 
-        /results/latest/__pending/job_400_1/_task_01_01
+        /results/latest/__magic/job_400_1/_task_01_01
 
     This would be returned as the temp directory.
 
 1. When a client attempted to create the file
-`/results/latest/__pending/job_400_1/task_01_01/latest.orc.lzo` , the S3A FS would initiate
+`/results/latest/__magic/job_400_1/task_01_01/latest.orc.lzo` , the S3A FS would initiate
 a multipart request with the final destination of `/results/latest/latest.orc.lzo`.
 
 1. As data was written to the output stream, it would be incrementally uploaded as
 individual multipart PUT opreations
 
 1. On `close()`, summary data would be written to the file
-`/results/latest/__pending/job400_1/task_01_01/latest.orc.lzo.pending`.  This would list: upload Id
+`/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`.  This would list: upload Id
 and all the parts and etags of uploaded data.
 
 1. The task commit operation would do nothing.
 
-1. The job commit operation would identify all `__pending_` directories
+1. The job commit operation would identify all `__magic_` directories
 under the destination directory.
 
 1. Those directories of successful task attempts would have their contents
@@ -359,7 +359,7 @@ of the associated multipart puts and the pending data.
 
 It should also be possible to support a full directory tree of generated data.
 Paths would just be created under the temporary directory to match
-that of the final data; `/results/latest/__pending/job_400/task_01_01/2017/2017-01-01.orc.lzo.pending`
+that of the final data; `/results/latest/__magic/job_400/task_01_01/2017/2017-01-01.orc.lzo.pending`
 would be mapped to a final path of `/results/latest/2017/2017-01-01.orc.lzo`.
 
 (Why have a new suffix, `.pending` rather than just use the original filename?
@@ -402,16 +402,16 @@ Aborting a job is similar to aborting a task:
 
 One failure case is that the entire execution framework failed; a new process
 must identify outstanding jobs with pending work, and abort them, then delete
-the appropriate `__pending` directories.
+the appropriate `__magic` directories.
 
-This can be done either by scanning the directory tree for `__pending` directories
+This can be done either by scanning the directory tree for `__magic` directories
 and scanning underneath them, or by using the `listMultipartUploads()` call to
 list multipart uploads under a path, then cancel them. The most efficient solution
 may be to use `listMultipartUploads` to identify all outstanding request, and use that
-to identify which requests to cancel, and where to scan for `__pending` directories.
+to identify which requests to cancel, and where to scan for `__magic` directories.
 This strategy should address scalability problems when working with repositories
 with many millions of objects —rather than list all keys searching for those
-with `/__pending/**/*.pending` in their name, work backwards from the active uploads to
+with `/__magic/**/*.pending` in their name, work backwards from the active uploads to
 the directories with the data.
 
 We may also want to consider having a cleanup operationn in the S3 CLI to
@@ -491,10 +491,10 @@ the update has propagated to all replicas of the data.
 a directory, then it is not going to work: the existing data will not be cleaned
 up. A cleanup operation would need to be included in the job commit, deleting
 all files in the destination directory which where not being overwritten.
-1. It requires a path element, such as `__pending` which cannot be used
+1. It requires a path element, such as `__magic` which cannot be used
 for any purpose other than for the storage of pending commit data.
 1. Unless extra code is added to every FS operation, it will still be possible
-to manipulate files under the `__pending` tree. That's not necessarily bad.
+to manipulate files under the `__magic` tree. That's not necessarily bad.
 1. As written data is not materialized until the commit, it will not be possible
 for any process to read or manipulated a file which it has just created.
 1. As written data is not materialized until the commit, if a task
@@ -558,7 +558,7 @@ and failure resilience
 
 **`commitPendingFile(Path)`**
 
-1. Takes a working file path under `__pending`,
+1. Takes a working file path under `__magic`,
 1. verifies its referring to an MPU,
 1. lists and reads in all info on the MPU commit
 1. builds final commit, submits it,
@@ -582,7 +582,7 @@ known.
 
 Enumerate all entries in a directory/directory tree: commits them.
 
-Because of the risk of multiple job/task attempts in the `__pending` tree,
+Because of the risk of multiple job/task attempts in the `__magic` tree,
 this should no be called directly against that tree, only against
 those tasks known to have complete
 
@@ -736,7 +736,7 @@ scalablity tests.
 This is going to have to be treated similarly to the MRv2 version.
 
 Specifically, an MRv1 equivalent of `PathOutputCommitter` will be needed,
-with `getTaskOutputPath()` returning a path in the `__pending` directory,
+with `getTaskOutputPath()` returning a path in the `__magic` directory,
 and `mapred.FileOutputFormat` casting to that class to access.
 
 This will also need an S3a equivalent of `org.apache.hadoop.mapred.FileOutputCommitter`,
@@ -789,7 +789,7 @@ avoid that potentially-inconsistent list.
 
 **Name of pending directory**
 
-The design proposes the name `__pending` for the directory. HDFS and
+The design proposes the name `__magic` for the directory. HDFS and
 the various scanning routines always treat files and directories starting with `_`
 as temporary/excluded data.
 
@@ -805,14 +805,14 @@ It is legal to create subdirectories in a task work directory, which
 will then be moved into the destination directory, retaining that directory
 tree.
 
-That is, a if the task working dir is `dest/__pending/app1/task1/`, all files
-under `dest/__pending/app1/task1/part-0000/` must end up under the path
+That is, a if the task working dir is `dest/__magic/app1/task1/`, all files
+under `dest/__magic/app1/task1/part-0000/` must end up under the path
 `dest/part-0000/`.
 
 This behavior is relied upon for the writing of intermediate map data in an MR
 job.
 
-This means it is not simply enough to strip off all elements of under `__pending`,
+This means it is not simply enough to strip off all elements of under `__magic`,
 it is critical to determine the base path.
 
 Proposed: use the special name `__base` as a marker of the base element for

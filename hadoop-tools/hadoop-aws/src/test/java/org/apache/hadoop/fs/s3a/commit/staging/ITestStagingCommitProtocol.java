@@ -35,7 +35,6 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.
 
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
-
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
@@ -45,7 +44,6 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
         StagingS3GuardCommitterFactory.NAME);
     return conf;
   }
-
 
   @Override
   public void setup() throws Exception {
@@ -78,24 +76,31 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     ContractTestUtils.skip("TODO");
     return null;
   }
-
+/*
   @Override
   protected void dumpMultipartUploads() {
 
   }
+  */
+/*
 
   @Override
   protected void assertMultipartUploadsPending() {
   }
+*/
 
+/*
   @Override
   protected void assertNoMultipartUploadsPending() {
   }
+*/
 
+/*
   @Override
   protected int countMultipartUploads() {
     return 0;
   }
+*/
 
   @Override
   protected boolean shouldExpectSuccessMarker() {

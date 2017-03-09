@@ -38,7 +38,7 @@ import java.util.concurrent.Callable;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
-public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest<PartitionedStagingCommitter> {
+public class TestStagingPartitionedTaskCommit extends StagingTests.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedCommitterForTesting(OUTPUT_PATH,
@@ -75,7 +75,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
-    TestUtil.createTestOutputFiles(relativeFiles,
+    StagingTests.createTestOutputFiles(relativeFiles,
         committer.getTaskAttemptPath(getTAC()), getTAC().getConfiguration());
 
     // test failure when one partition already exists
@@ -84,7 +84,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
         .exists(new Path(OUTPUT_PATH, relativeFiles.get(0)).getParent()))
         .thenReturn(true);
 
-    TestUtil.assertThrows(
+    StagingTests.assertThrows(
         "Should complain because a partition already exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
@@ -125,7 +125,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
-    TestUtil.createTestOutputFiles(relativeFiles,
+    StagingTests.createTestOutputFiles(relativeFiles,
         committer.getTaskAttemptPath(getTAC()), getTAC().getConfiguration());
 
     // test failure when one partition already exists
@@ -134,7 +134,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
         .exists(new Path(OUTPUT_PATH, relativeFiles.get(1)).getParent()))
         .thenReturn(true);
 
-    TestUtil.assertThrows(
+    StagingTests.assertThrows(
         "Should complain because a partition already exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
@@ -175,7 +175,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
     PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
-    TestUtil.createTestOutputFiles(relativeFiles,
+    StagingTests.createTestOutputFiles(relativeFiles,
         committer.getTaskAttemptPath(getTAC()), getTAC().getConfiguration());
 
     // test success when one partition already exists
@@ -214,7 +214,7 @@ public class TestStagingPartitionedTaskCommit extends TestUtil.TaskCommitterTest
     PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
-    TestUtil.createTestOutputFiles(relativeFiles,
+    StagingTests.createTestOutputFiles(relativeFiles,
         committer.getTaskAttemptPath(getTAC()), getTAC().getConfiguration());
 
     // test success when one partition already exists

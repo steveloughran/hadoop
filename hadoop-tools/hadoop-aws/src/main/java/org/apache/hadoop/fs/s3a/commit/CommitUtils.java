@@ -43,12 +43,12 @@ import static com.google.common.base.Preconditions.*;
 public final class CommitUtils {
 
   public static final String E_BAD_PATH
-      = "Path does not represent a delayed-commit path";
+      = "Path does not represent a magic-commit path";
   public static final String E_WRONG_FS
       = "Output path is not on an S3A Filesystem";
 
   public static final String E_NO_PENDING_PATH_ELEMENT
-      = "No pending path element";
+      = "No " + MAGIC_DIR_NAME + " element in path";
 
   private CommitUtils() {
   }
@@ -87,11 +87,11 @@ public final class CommitUtils {
   }
 
   /**
-   * Is a path in the pending tree?
+   * Is a path in the magic tree?
    * @param elements element list
    * @return true if a path is considered pending
    */
-  public static boolean isPendingPath(List<String> elements) {
+  public static boolean isMagicPath(List<String> elements) {
     return elements.contains(MAGIC_DIR_NAME);
   }
 
@@ -197,11 +197,11 @@ public final class CommitUtils {
   }
 
   /**
-   * Get the pending subdirectory of a destination directory.
+   * Get the magic subdirectory of a destination directory.
    * @param destDir the destination directory
    * @return a new path.
    */
-  public static Path pendingSubdir(Path destDir) {
+  public static Path magicSubdir(Path destDir) {
     return new Path(destDir.getParent(), MAGIC_DIR_NAME);
   }
 
@@ -219,7 +219,7 @@ public final class CommitUtils {
    * @return the path
    */
   public static List<String> finalDestination(List<String> elements) {
-    if (isPendingPath(elements)) {
+    if (isMagicPath(elements)) {
       List<String> destDir = pendingPathParents(elements);
       List<String> children = pendingPathChildren(elements);
       checkArgument(!children.isEmpty(), "No path found under " +
@@ -261,7 +261,7 @@ public final class CommitUtils {
    */
   public static void verifyIsDelayedCommitPath(S3AFileSystem fs,
       Path path) throws PathCommitException {
-    verifyIsDelayedCommitFS(fs);
+    verifyIsMagicCommitFS(fs);
     if (!fs.isDelayedCompletePath(path)) {
       throw new PathCommitException(path, E_BAD_PATH);
     }
@@ -272,7 +272,7 @@ public final class CommitUtils {
    * @param fs filesystem
    * @throws PathCommitException if the FS isn't a delayed commit FS.
    */
-  public static void verifyIsDelayedCommitFS(S3AFileSystem fs)
+  public static void verifyIsMagicCommitFS(S3AFileSystem fs)
       throws PathCommitException {
     if (!fs.isDelayedCompleteEnabled()) {
       throw new PathCommitException(fs.pathToKey(new Path("/")),
@@ -297,20 +297,20 @@ public final class CommitUtils {
    * Get the S3A FS of a path.
    * @param path path to examine
    * @param conf config
-   * @param delayedCommitRequired is delayed complete requires of the FS
+   * @param magicCommitRequired is delayed complete requires of the FS
    * @throws PathCommitException output path isn't to an S3A FS instance, or
-   * if {code delayedCommitRequired} is set, if doesn't support delayed commits.
+   * if {@code magicCommitRequired} is set, if doesn't support these commits.
    * @throws IOException failure to instantiate the FS.
    */
   public static S3AFileSystem getS3AFileSystem(Path path,
       Configuration conf,
-      boolean delayedCommitRequired)
+      boolean magicCommitRequired)
       throws IOException, PathCommitException {
     FileSystem fs = path.getFileSystem(conf);
     verifyIsS3AFS(fs, path);
     S3AFileSystem s3a = (S3AFileSystem) fs;
-    if (delayedCommitRequired) {
-      verifyIsDelayedCommitFS(s3a);
+    if (magicCommitRequired) {
+      verifyIsMagicCommitFS(s3a);
     }
     return s3a;
   }
@@ -321,15 +321,6 @@ public final class CommitUtils {
    * @return the location of pending job attempts.
    */
   public static Path getMagicJobAttemptsPath(Path out) {
-    return new Path(out, MAGIC_DIR_NAME);
-  }
-
-  /**
-   * Get the location of pending job attempts.
-   * @param out the base output directory.
-   * @return the location of pending job attempts.
-   */
-  public static Path getPendingJobAttemptsPath(Path out) {
     return new Path(out, MAGIC_DIR_NAME);
   }
 
@@ -410,4 +401,5 @@ public final class CommitUtils {
     return new Path(getTempJobAttemptPath(getAppAttemptId(context), out),
         String.valueOf(context.getTaskAttemptID()));
   }
+
 }

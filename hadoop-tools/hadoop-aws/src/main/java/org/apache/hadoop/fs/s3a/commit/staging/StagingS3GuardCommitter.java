@@ -463,25 +463,58 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     wrappedCommitter.setupJob(context);
   }
 
+  /**
+   * Get the list of pending uploads for this job attempt
+   * @param context job context
+   * @return a list of pending uploads.
+   * @throws IOException Any IO failure
+   */
+
   protected List<S3Util.PendingUpload> getPendingUploads(JobContext context)
       throws IOException {
     return getPendingUploads(context, false);
   }
 
+  /**
+   * Get the list of pending uploads for this job attempt, swallowing
+   * exceptions.
+   * @param context job context
+   * @return a list of pending uploads. If an exception was swallowed,
+   * then this may not match the actual set of pending operations
+   * @throws IOException shouldn't be raised, but retained for compiler
+   */
   protected List<S3Util.PendingUpload> getPendingUploadsIgnoreErrors(
       JobContext context) throws IOException {
     return getPendingUploads(context, true);
   }
 
+  /**
+   * Get the list of pending uploads for this job attempt.
+   * @param context job context
+   * @param suppressExceptions should exceptions be swallowed?
+   * @return a list of pending uploads. If exceptions are being swallowed,
+   * then this may not match the actual set of pending operations
+   * @throws IOException Any IO failure which wasn't swallowed.
+   */
   private List<S3Util.PendingUpload> getPendingUploads(
       JobContext context, boolean suppressExceptions) throws IOException {
     Path jobAttemptPath = wrappedCommitter.getJobAttemptPath(context);
     final FileSystem attemptFS = jobAttemptPath.getFileSystem(
         context.getConfiguration());
-    FileStatus[] pendingCommitFiles = attemptFS.listStatus(
-        jobAttemptPath, Paths.HiddenPathFilter.get());
-
     final List<S3Util.PendingUpload> pending = Lists.newArrayList();
+    FileStatus[] pendingCommitFiles;
+    try {
+      pendingCommitFiles = attemptFS.listStatus(
+          jobAttemptPath, Paths.HiddenPathFilter.get());
+    } catch (IOException e) {
+      // unable to work with endpoint, if suppressing errors decide our actions
+      if (suppressExceptions) {
+        LOG.info("Failed to list pending upload dir", e);
+        return pending;
+      } else {
+        throw e;
+      }
+    }
 
     // try to read every pending file and add all results to pending.
     // in the case of a failure to read the file, exceptions are held until all

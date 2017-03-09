@@ -65,7 +65,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class TestUtil {
+public class StagingTests {
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
@@ -127,8 +127,8 @@ public class TestUtil {
     private JobContext job = null;
 
     // created in Before
-    private TestUtil.ClientResults results = null;
-    private TestUtil.ClientErrors errors = null;
+    private StagingTests.ClientResults results = null;
+    private StagingTests.ClientErrors errors = null;
     private AmazonS3 mockClient = null;
 
     @BeforeClass
@@ -146,9 +146,9 @@ public class TestUtil {
       this.job = new JobContextImpl(CONF, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID, UUID.randomUUID().toString());
 
-      this.results = new TestUtil.ClientResults();
-      this.errors = new TestUtil.ClientErrors();
-      this.mockClient = TestUtil.newMockClient(results, errors);
+      this.results = new StagingTests.ClientResults();
+      this.errors = new StagingTests.ClientErrors();
+      this.mockClient = StagingTests.newMockClient(results, errors);
     }
 
     public FileSystem getMockS3() {
@@ -159,11 +159,11 @@ public class TestUtil {
       return job;
     }
 
-    protected TestUtil.ClientResults getMockResults() {
+    protected StagingTests.ClientResults getMockResults() {
       return results;
     }
 
-    protected TestUtil.ClientErrors getMockErrors() {
+    protected StagingTests.ClientErrors getMockErrors() {
       return errors;
     }
 
