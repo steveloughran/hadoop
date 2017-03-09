@@ -100,6 +100,9 @@ public class S3Util {
     if (!localFile.exists()) {
       throw new FileNotFoundException(localFile.toString());
     }
+    if (!localFile.isFile()) {
+      throw new FileNotFoundException("Not a file" + localFile);
+    }
 
     InitiateMultipartUploadResult initiate = client.initiateMultipartUpload(
         new InitiateMultipartUploadRequest(bucket, key));
