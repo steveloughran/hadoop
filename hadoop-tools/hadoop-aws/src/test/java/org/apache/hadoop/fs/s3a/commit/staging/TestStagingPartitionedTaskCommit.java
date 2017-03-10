@@ -24,7 +24,6 @@ import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -100,10 +99,10 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      Assert.assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
-    Assert.assertEquals("Should have the right number of uploads",
+    assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
     Set<String> expected = Sets.newHashSet();
@@ -112,7 +111,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
           "/" + Paths.addUUID(relative, committer.getUUID()));
     }
 
-    Assert.assertEquals("Should have correct paths", expected, files);
+    assertEquals("Should have correct paths", expected, files);
   }
 
   @Test
@@ -150,10 +149,10 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      Assert.assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
-    Assert.assertEquals("Should have the right number of uploads",
+    assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
     Set<String> expected = Sets.newHashSet();
@@ -162,7 +161,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
           "/" + Paths.addUUID(relative, committer.getUUID()));
     }
 
-    Assert.assertEquals("Should have correct paths", expected, files);
+    assertEquals("Should have correct paths", expected, files);
   }
 
   @Test
@@ -187,10 +186,10 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      Assert.assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
-    Assert.assertEquals("Should have the right number of uploads",
+    assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
     Set<String> expected = Sets.newHashSet();
@@ -199,7 +198,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
           "/" + Paths.addUUID(relative, committer.getUUID()));
     }
 
-    Assert.assertEquals("Should have correct paths", expected, files);
+    assertEquals("Should have correct paths", expected, files);
   }
 
   @Test
@@ -226,10 +225,10 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      Assert.assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
-    Assert.assertEquals("Should have the right number of uploads",
+    assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
     Set<String> expected = Sets.newHashSet();
@@ -238,6 +237,6 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
           "/" + Paths.addUUID(relative, committer.getUUID()));
     }
 
-    Assert.assertEquals("Should have correct paths", expected, files);
+    assertEquals("Should have correct paths", expected, files);
   }
 }

@@ -25,7 +25,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -238,7 +237,7 @@ public class TestStagingPartitionedJobCommit extends StagingTestBase.JobCommitte
         new Path(OUTPUT_PATH, "dateint=20161115/hour=13"),
         true /* recursive */ );
     verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14"));
-    Assert.assertTrue("Should have aborted",
+    assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyNoMoreInteractions(mockS3);
   }
@@ -275,7 +274,7 @@ public class TestStagingPartitionedJobCommit extends StagingTestBase.JobCommitte
     verify(mockS3).delete(
         new Path(OUTPUT_PATH, "dateint=20161116/hour=14"),
         true /* recursive */ );
-    Assert.assertTrue("Should have aborted",
+    assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyNoMoreInteractions(mockS3);
   }
@@ -311,7 +310,7 @@ public class TestStagingPartitionedJobCommit extends StagingTestBase.JobCommitte
     verify(mockS3).delete(
         new Path(OUTPUT_PATH, "dateint=20161116/hour=13"),
         true /* recursive */ );
-    Assert.assertTrue("Should have aborted",
+    assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyNoMoreInteractions(mockS3);
   }

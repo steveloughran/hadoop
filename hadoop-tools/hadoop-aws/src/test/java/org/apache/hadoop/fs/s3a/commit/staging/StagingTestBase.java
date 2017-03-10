@@ -71,7 +71,7 @@ public class StagingTestBase {
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
-  public static class MiniDFSTest {
+  public static class MiniDFSTest extends Assert {
     private static JobConf conf = null;
     private static MiniDFSCluster cluster = null;
     private static FileSystem dfs = null;
@@ -116,7 +116,8 @@ public class StagingTestBase {
     }
   }
 
-  public abstract static class JobCommitterTest<C extends OutputCommitter> {
+  public abstract static class JobCommitterTest<C extends OutputCommitter>
+      extends Assert {
     private static final JobID JOB_ID = new JobID("job", 1);
     private static final Configuration CONF = new Configuration();
 

@@ -135,7 +135,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     mrJob.setNumReduceTasks(0);
 
     mrJob.submit();
-    Assert.assertTrue("MR job should succeed", mrJob.waitForCompletion(true));
+    assertTrue("MR job should succeed", mrJob.waitForCompletion(true));
 
     StagingTestBase.ClientResults results;
     try (ObjectInputStream in = new ObjectInputStream(
@@ -143,13 +143,13 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
       results = (StagingTestBase.ClientResults) in.readObject();
     }
 
-    Assert.assertEquals("Should not delete files",
+    assertEquals("Should not delete files",
         0, results.deletes.size());
 
-    Assert.assertEquals("Should not abort commits",
+    assertEquals("Should not abort commits",
         0, results.aborts.size());
 
-    Assert.assertEquals("Should commit task output files",
+    assertEquals("Should commit task output files",
         numFiles, results.commits.size());
 
     Set<String> actualFiles = Sets.newHashSet();
@@ -157,7 +157,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
       actualFiles.add("s3a://" + commit.getBucketName() + "/" + commit.getKey());
     }
 
-    Assert.assertEquals("Should commit the correct file paths",
+    assertEquals("Should commit the correct file paths",
         expectedFiles, actualFiles);
   }
 

@@ -133,11 +133,11 @@ with the restarted job driver only rerunning the incomplete tasks; the
 output of the completed tasks is recovered for commitment when the restarted
 job completes.
 
-The
 
 ### Hadoop MR Commit algorithm "2"
 
 
+TBD
 
 ### Requirements of an S3A Committer
 
@@ -837,19 +837,76 @@ a need for a consistency layer.
 The final point is not to be underestimated, especially given the need to
 be resilient to the various failure modes which may arise.
 
+
+These S3 committers work by writing task outputs to a temporary directory on the local FS.
+Task outputs are directed to the local FS by `getTaskAttemptPath` and `getWorkPath`.
+On task commit, the committers look for files in the task attempt directory (ignoring hidden files).
+Each file is uploaded to S3 using the [multi-part upload API][http://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html], 
+
 It works by writing all data to the local filesystem, uploading as multipart
 PUT requests at the end of each task, finalizing the PUT in the job commit.
+
+### Commit logic
 
 The core algorithm is as follows:
 
 1. The destination directory for output (e.g. `FileOutputFormat` and subclasses)
-is a local file:// reference.
+is a local `file://` reference.
 1. Task commit initiates the multipart PUT to the destination object store.
 1. A list of every pending PUT for task is persisted to a single file
 within a consistent, cluster-wide filesystem. For Netflix, that is HDFS.
-1. The job committer reads the pending file list for every committed task, and
-finalizes the commits.
+1. The Standard FileOutputCommitter (algorithm 1) is used to manage the commit/abort of these
+files. That is: it copies only those lists of files to commit from successful tasks
+into a (transient) job commmit directory.
+1. The S3 job committer reads the pending file list for every task committed
+in HDFS, and completes those put requests.
 
+By using FileOutputCommmitter to manage the propagation of the lists of files
+to commit, the existing commit algorithm implicitly becomes that defining which
+files will be committed at the end of the job. 
+
+
+This project has Hadoop OutputCommitter implementations for S3.
+
+There are 3 main classes:
+* `S3MultipartOutputCommitter` is a base committer class that handles commit logic. This should not be used directly.
+* `S3DirectoryOutputCommitter` for writing unpartitioned data to S3 with conflict resolution.
+* `S3PartitionedOutputCommitter` for writing partitioned data to S3 with conflict resolution.
+
+Callers should use `S3DirectoryOutputCommitter` for single-directory outputs,
+or `S3PartitionedOutputCommitter` for partitioned data.
+
+
+These S3 committers work by writing task outputs to a temporary directory on the local FS.
+Task outputs are directed to the local FS by `getTaskAttemptPath` and `getWorkPath`.
+
+
+### Conflict resolution
+
+The single-directory and partitioned committers handle conflict resolution by
+checking whether target paths exist in S3 before uploading any data. 
+There are 3 conflict resolution modes, controlled by setting `fs.s3a.staging.committer.conflict-mode`:
+
+* `fail`: Fail a task if an output directory or partition already exists. (Default)
+* `append`: Upload data files without checking whether directories or partitions already exist.
+* `replace`: If an output directory exists, delete it so the new data replaces the current content.
+
+The partitioned committer enforces the conflict mode when a conflict is detected with output data, not before the job runs.
+Conflict resolution differs from an output mode because it does not enforce the mode when there is no conflict.
+For example, overwriting a partition should remove all sub-partitions and data it contains, whether or not new output is created.
+Conflict resolution will only replace partitions that have output data.
+
+When the conflict mode is `replace`, conflicting directories are removed during
+job commit. Data is only deleted if all tasks have completed successfully.
+
+A UUID that identifies a write is added to filenames that are uploaded to S3.
+This allows rolling back data from jobs that fail during job commit (see failure cases below) and avoids
+file-level conflicts when appending data to existing directories.
+
+
+*Note* the checks for existence are made via `S3AFileSystem.getFileStatus()` requests of the destination paths.
+Unless the view of the S3 store is consistent, it may be that a newly-deleted object
+is still discovered in the probe, so a commit fail, even when there is no longer any actual conflict.
 
 ### Performance
 
@@ -871,33 +928,53 @@ There's already a lot of code in the task and job commits to handle failure.
 Any failure in a commit triggers a best-effort abort/revert of the commit
 actions for a task/job.
 
-As far as the original code is concerned. the failures which can arise are
+Task commits delegate to the `FileOutputCommitter` to ensure that only one task's
+output reaches the job commit.
+
+Similarly, if a task is aborted, temporary output on the local FS is removed.
+
+If a task dies while the committer is running, it is possible for data to be left on the local FS or as unfinished parts in S3. Unfinished upload parts in S3 are not visible to table readers and are cleaned up following the rules in the target bucket's life-cycle policy.
+
+Failures during job commit are handled by deleting any files that have already been completed and aborting the remaining uploads. Because uploads are completed individually, the files that are deleted were visible to readers.
+
+If the process dies while the job committer is running, there are two possible failures:
+
+1. Some directories that would be replaced have been deleted, but no new data is visible.
+2. Some new data is visible but is not complete, and all replaced directories have been removed. Only complete files are visible.
+
+If the process dies during job commit, cleaning up is a manual process. File names include a UUID for each write so that files can be identified and removed.
+
 
 #### Failure during task execution
 
-All data is written to local temporary files;
-these need to be cleaned up.
+All data is written to local temporary files; these need to be cleaned up.
+
+
+
 
 #### Failure during task commit
 
-A task failure during the upload process will result in the 
+
+A process failure during the upload process will result in the 
 list of pending multipart PUTs to *not#### be persisted to the cluster filesystem.
 This window is smaller than the entire task execution, but still potentially
-significant, at least for large uploads. If the data for each pending PUT
-were to be saved to a separate file, then they would be discoverable and more
-easily cancelled. This would still leave the incompleted uploads still in
-progress at the time of the PUT.
+significant, at least for large uploads.
+ 
+Per-file persistence, or incremental overwrites of the upload list may
+reduce the problems here, but there would still be a small risk of
+an outstanding multipart upload not being recorded
 
-#### Explicit Task abort
+#### Explicit Task abort before task commit.
 
-Task will delete all local data, rather than upload to the object store.
+Task will delete all local data; no uploads will be initiated.
 
 #### Failure to communicate with S3 during data upload
 
-If the upload to S3 fails for one or more files, and retries do not succeed,
-then a best-effor cleanup could ber attempted for any successful S3 PUTs; 
-all local data call be deleted. It's hard to envisage a failure in PUTs which
-do not also translate into a failure of DELETE operations.
+If an upload fails, tasks will
+ 
+* attempt to abort PUT requests already uploaded to S3
+* remove temporary files on the local FS.
+
 
 #### Explicit Job Abort
 
@@ -924,6 +1001,16 @@ load these and abort them.
 * Tasks which have completed will have pending commits. These will need
 to be identified and cancelled.
 
+#### Entire application failure before any task commit
+
+Data is left on local systems, in the temporary directories.
+
+#### Entire application failure after one or more task commits, before job commit
+
+* A multipart PUT request will be outstanding for every pending write.
+* A temporary directory in HDFS will list all known pending requests.
+
+
 
 #### Overall Resilience
 
@@ -934,13 +1021,31 @@ be managed in the response to a task failure.
 1. There's a risk of uncommitted multipart PUT operations remaining outstanding,
 operations which will run up bills until cancelled. (as indeed, so does the Magic Committer).
 
+
 For cleaning up PUT commits, as well as scheduled GC of uncommitted writes, we
 may want to consider having job setup list and cancel all pending commits
 to the destination directory, on the assumption that these are from a previous
-incomplete operation. (It may seem pessimistic to assume a previous failure, but
+incomplete operation. It may seem pessimistic to assume a previous failure, but
 this is why PCs always turn their fan on on booting: they assume they crashed
-and need to cool the CPUs down).
+and need to cool the CPUs down.
 
+We should adds command to the s3guard CLI to probe for, list and abort pending requests under
+a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <path>`. 
+
+
+### Configuration
+
+The initial option set:
+
+| option | meaning |
+--------------------
+| `fs.s3a.staging.committer.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`.
+|  `fs.s3a.staging.committer.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
+|  `fs.s3a.staging.committer.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. }
+|  `fs.s3a.staging.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. }
+
+
+(The upload side can be unified with the `fs.s3a.multipart.size` property.)
 
 ### Integration
 

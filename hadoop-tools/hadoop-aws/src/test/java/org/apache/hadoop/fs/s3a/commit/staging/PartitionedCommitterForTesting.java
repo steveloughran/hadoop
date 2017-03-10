@@ -31,8 +31,6 @@ class PartitionedCommitterForTesting extends
     PartitionedStagingCommitter {
   private final AmazonS3 mockClient;
 
-
-
   public PartitionedCommitterForTesting(Path outputPath,
       TaskAttemptContext context, AmazonS3 mockClient) throws IOException {
     super(outputPath, context);

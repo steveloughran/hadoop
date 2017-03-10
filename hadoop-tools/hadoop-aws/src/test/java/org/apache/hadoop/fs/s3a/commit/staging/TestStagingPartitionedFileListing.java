@@ -22,7 +22,6 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -69,7 +68,7 @@ public class TestStagingPartitionedFileListing
       actualFiles.add(relative);
     }
 
-    Assert.assertEquals("File sets should match", expectedFiles, actualFiles);
+    assertEquals("File sets should match", expectedFiles, actualFiles);
 
     attemptFS.delete(attemptPath, true);
   }
@@ -107,7 +106,7 @@ public class TestStagingPartitionedFileListing
       actualFiles.add(relative);
     }
 
-    Assert.assertEquals("File sets should match", expectedFiles, actualFiles);
+    assertEquals("File sets should match", expectedFiles, actualFiles);
 
     attemptFS.delete(attemptPath, true);
   }
