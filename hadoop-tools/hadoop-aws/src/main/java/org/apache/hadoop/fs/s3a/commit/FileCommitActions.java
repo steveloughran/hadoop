@@ -21,10 +21,10 @@ package org.apache.hadoop.fs.s3a.commit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.s3a.S3AFileStatus;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 import java.io.FileNotFoundException;
@@ -75,7 +75,7 @@ public class FileCommitActions {
       LOG.debug("Successfull commit");
       // now do a low level get to verify it is there
       Path destPath = fs.keyToQualifiedPath(destKey);
-      S3AFileStatus status = fs.getFileStatus(destPath);
+      FileStatus status = fs.getFileStatus(destPath);
       LOG.debug("Destination entry: {}", status);
       outcome = commitSuccess(pendingFile, destKey);
     } catch (IOException e) {
@@ -109,7 +109,7 @@ public class FileCommitActions {
       boolean recursive)
       throws IOException, FileNotFoundException {
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
-    S3AFileStatus fileStatus = fs.getFileStatus(pendingDir);
+    FileStatus fileStatus = fs.getFileStatus(pendingDir);
     if (!fileStatus.isDirectory()) {
       throw new PathCommitException(pendingDir,
           "Not a directory : " + fileStatus);

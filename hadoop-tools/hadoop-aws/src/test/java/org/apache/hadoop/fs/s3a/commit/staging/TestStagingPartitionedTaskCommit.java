@@ -21,11 +21,12 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -36,6 +37,8 @@ import java.util.concurrent.Callable;
 
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.OUTPUT_PREFIX;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.BUCKET;
 
 public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
@@ -99,7 +102,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
     assertEquals("Should have the right number of uploads",
@@ -107,7 +110,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
 
     Set<String> expected = Sets.newHashSet();
     for (String relative : relativeFiles) {
-      expected.add(OUTPUT_PREFIX +
+      expected.add(StagingTestBase.OUTPUT_PREFIX +
           "/" + Paths.addUUID(relative, committer.getUUID()));
     }
 
@@ -149,7 +152,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
     assertEquals("Should have the right number of uploads",
@@ -186,7 +189,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
     assertEquals("Should have the right number of uploads",
@@ -225,7 +228,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
     for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
-      assertEquals(MockS3AFileSystem.BUCKET, request.getBucketName());
+      assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
     assertEquals("Should have the right number of uploads",

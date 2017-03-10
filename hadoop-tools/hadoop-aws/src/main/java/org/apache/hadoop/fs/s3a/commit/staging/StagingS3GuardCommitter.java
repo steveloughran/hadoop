@@ -16,20 +16,6 @@
  * limitations under the License.
  */
 
-/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License. See accompanying LICENSE file.
- */
-
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
@@ -37,6 +23,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -49,8 +38,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -123,6 +110,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       throws IOException {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
+    Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
     this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
@@ -136,6 +124,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
+    Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
     uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
@@ -320,6 +309,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return the location of pending job attempts.
    */
   private static Path getPendingJobAttemptsPath(Path out) {
+    Preconditions.checkArgument(out != null, "Null 'out' path");
     return new Path(out, CommitConstants.PENDING_DIR_NAME);
   }
 

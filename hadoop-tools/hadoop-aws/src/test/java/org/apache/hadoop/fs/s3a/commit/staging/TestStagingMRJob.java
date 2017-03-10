@@ -20,9 +20,16 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.google.common.collect.Sets;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.LoggingTextOutputFormat;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -30,14 +37,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,16 +48,14 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.Mockito.mock;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 
 public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
-  private static Path S3_OUTPUT_PATH = null;
   private static MiniMRYarnCluster MR_CLUSTER = null;
 
   @BeforeClass
   public static void setupMiniMRCluster() {
-    getConfiguration().set("fs.s3a.impl", MockS3AFileSystem.class.getName());
-    S3_OUTPUT_PATH = new Path("s3a://bucket-name/output/path");
     MR_CLUSTER = new MiniMRYarnCluster(
         "test-s3-multipart-output-committer", 2);
     MR_CLUSTER.init(getConfiguration());
@@ -72,7 +70,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     MR_CLUSTER = null;
   }
 
-  public static class S3TextOutputFormat<K, V> extends TextOutputFormat<K, V> {
+  public static class S3TextOutputFormat<K, V> extends LoggingTextOutputFormat<K, V> {
     private MockedStagingCommitter committer = null;
 
     @Override
@@ -129,7 +127,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     TextInputFormat.addInputPath(mrJob,
-        new Path("file:" + temp.getRoot().toString()));
+        new Path(temp.getRoot().toURI()));
 
     mrJob.setMapperClass(M.class);
     mrJob.setNumReduceTasks(0);

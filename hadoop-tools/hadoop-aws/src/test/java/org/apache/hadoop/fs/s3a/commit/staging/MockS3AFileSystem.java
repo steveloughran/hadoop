@@ -112,7 +112,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public S3AFileStatus getFileStatus(Path f) throws IOException {
+  public FileStatus getFileStatus(Path f) throws IOException {
     return mock.getFileStatus(f);
   }
 

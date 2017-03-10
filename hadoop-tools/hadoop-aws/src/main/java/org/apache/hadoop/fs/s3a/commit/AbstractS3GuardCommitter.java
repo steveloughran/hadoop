@@ -74,7 +74,6 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         .makeQualified(outputPath));
   }
 
-
   /**
    * Create a committer.
    * This constructor binds the destination directory and configuration, but

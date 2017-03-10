@@ -21,11 +21,12 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.junit.Test;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -66,10 +67,10 @@ public class TestStagingPartitionedJobCommit extends StagingTestBase.JobCommitte
 
       for (String dateint : Arrays.asList("20161115", "20161116")) {
         for (String hour : Arrays.asList("13", "14")) {
-          String key = OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
+          String key = StagingTestBase.OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
               "/" + UUID.randomUUID().toString() + ".parquet";
           pending.add(new S3Util.PendingUpload(null,
-              MockS3AFileSystem.BUCKET, key, UUID.randomUUID().toString(),
+              StagingTestBase.BUCKET, key, UUID.randomUUID().toString(),
               Maps.newHashMap()));
         }
       }

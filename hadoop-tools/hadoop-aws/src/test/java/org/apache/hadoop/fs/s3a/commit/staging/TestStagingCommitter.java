@@ -74,6 +74,13 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private static final Path S3_OUTPUT_PATH = new Path(
       "s3a://" + BUCKET + "/" + KEY_PREFIX);
 
+  protected static S3AFileSystem bindMockFSInstance() throws IOException {
+    S3AFileSystem mockFS = mock(S3AFileSystem.class);
+    URI uri = S3_OUTPUT_PATH.toUri();
+    FileSystemTestHelper.addFileSystemForTesting(uri, getConfiguration(),
+        mockFS);
+    return mockFS;
+  }
   private final int numThreads;
   private JobContext job = null;
   private String uuid = null;
@@ -84,12 +91,10 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
   @BeforeClass
   public static void setupS3() throws IOException {
-    Configuration conf = getConfiguration();
-    S3AFileSystem mockFS = mock(S3AFileSystem.class);
-    URI uri = S3_OUTPUT_PATH.toUri();
-//    mockFS.initialize(uri, conf);
-    FileSystemTestHelper.addFileSystemForTesting(uri, conf, mockFS);
+    bindMockFSInstance();
   }
+
+
 
   // TODO: expand once the tests are working for "0"
   @Parameterized.Parameters

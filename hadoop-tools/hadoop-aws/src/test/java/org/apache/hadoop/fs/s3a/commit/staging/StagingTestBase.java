@@ -33,6 +33,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -57,6 +58,7 @@ import org.mockito.stubbing.Answer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,6 +70,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class StagingTestBase {
+
+  public static final String BUCKET = "bucket-name";
+  public static final String OUTPUT_PREFIX = "output/path";
+  public static final Path S3_OUTPUT_PATH = new Path(
+      "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
+  public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
+  public static final Path ROOT_PATH = new Path(FS_URI);
+
+  protected static S3AFileSystem bindMockFSInstance(Configuration conf)
+      throws IOException {
+    S3AFileSystem mockFS = mock(S3AFileSystem.class);
+    URI uri = S3_OUTPUT_PATH.toUri();
+    FileSystemTestHelper.addFileSystemForTesting(uri, conf, mockFS);
+    return mockFS;
+  }
+
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
@@ -119,11 +137,9 @@ public class StagingTestBase {
   public abstract static class JobCommitterTest<C extends OutputCommitter>
       extends Assert {
     private static final JobID JOB_ID = new JobID("job", 1);
-    private static final Configuration CONF = new Configuration();
+    private static final JobConf CONF = new JobConf();
 
-    protected static final String OUTPUT_PREFIX = "output/path";
-    protected static final Path OUTPUT_PATH =
-        new Path("s3a://" + MockS3AFileSystem.BUCKET + "/" + OUTPUT_PREFIX);
+    protected static final Path OUTPUT_PATH = S3_OUTPUT_PATH;
 
     // created in BeforeClass
     private S3AFileSystem mockFS = null;
@@ -141,13 +157,12 @@ public class StagingTestBase {
 
     @Before
     public void setupJob() throws Exception {
-      this.mockFS = mock(S3AFileSystem.class);
-      FileSystem s3 = new Path("s3a://" + MockS3AFileSystem.BUCKET + "/")
-          .getFileSystem(CONF);
-      ((MockS3AFileSystem) s3).setMock(mockFS);
+
+      this.mockFS = bindMockFSInstance(CONF);
 
       this.job = new JobContextImpl(CONF, JOB_ID);
-      job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID, UUID.randomUUID().toString());
+      job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID,
+          UUID.randomUUID().toString());
 
       this.results = new StagingTestBase.ClientResults();
       this.errors = new StagingTestBase.ClientErrors();

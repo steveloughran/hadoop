@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PathExistsException;
+
 import org.junit.Test;
 import org.mockito.Mockito;
 

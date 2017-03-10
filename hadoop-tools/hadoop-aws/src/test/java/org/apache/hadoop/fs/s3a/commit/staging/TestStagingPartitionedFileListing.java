@@ -19,10 +19,11 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.google.common.collect.Lists;
+import org.junit.Test;
+
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
