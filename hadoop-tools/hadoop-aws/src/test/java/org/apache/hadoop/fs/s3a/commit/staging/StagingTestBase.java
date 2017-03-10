@@ -64,10 +64,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.AdditionalAnswers .*;
 
 public class StagingTestBase {
 
@@ -78,12 +77,24 @@ public class StagingTestBase {
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
   public static final Path ROOT_PATH = new Path(FS_URI);
 
-  protected static S3AFileSystem bindMockFSInstance(Configuration conf)
+  /**
+   * Sets up the mock filesystem instance and binds it to the
+   * {@link FileSystem#get(URI, Configuration)} call for the supplied URI
+   * and config.
+   * All standard mocking setup MUST go here.
+   * @param conf config to use
+   * @return the filesystem created
+   * @throws IOException IO problems.
+   */
+  protected static S3AFileSystem createAndBindMockFSInstance(Configuration conf)
       throws IOException {
-    S3AFileSystem mockFS = mock(S3AFileSystem.class);
+    S3AFileSystem mockFs = mock(S3AFileSystem.class);
+    MockS3AFileSystem wrapperFS = new MockS3AFileSystem();
     URI uri = S3_OUTPUT_PATH.toUri();
-    FileSystemTestHelper.addFileSystemForTesting(uri, conf, mockFS);
-    return mockFS;
+    wrapperFS.setMock(mockFs);
+    wrapperFS.initialize(uri, conf);
+    FileSystemTestHelper.addFileSystemForTesting(uri, conf,  wrapperFS);
+    return mockFs;
   }
 
   /**
@@ -158,7 +169,7 @@ public class StagingTestBase {
     @Before
     public void setupJob() throws Exception {
 
-      this.mockFS = bindMockFSInstance(CONF);
+      this.mockFS = createAndBindMockFSInstance(CONF);
 
       this.job = new JobContextImpl(CONF, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID,

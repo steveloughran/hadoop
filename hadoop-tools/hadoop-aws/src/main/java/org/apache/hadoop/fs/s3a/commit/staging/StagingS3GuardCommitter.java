@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,6 +107,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private String s3KeyPrefix = null;
   private Path bucketRoot = null;
 
+  /** The directory in the cluster FS for commits to go to */
+  private Path commitsDirectory;
+
   public StagingS3GuardCommitter(Path outputPath, JobContext context)
       throws IOException {
     super(outputPath, context);
@@ -115,7 +119,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
-    this.uuid = getUploadUUID(conf, context.getJobID().toString());
+    this.uuid = getUploadUUID(conf, context.getJobID());
     setWorkPath(buildWorkPath(context, uuid));
     this.wrappedCommitter = createWrappedCommitter(context, conf);
   }
@@ -129,7 +133,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
-    uuid = getUploadUUID(conf, context.getJobID().toString());
+    uuid = getUploadUUID(conf, context.getJobID());
     setWorkPath(buildWorkPath(context, uuid));
     wrappedCommitter = createWrappedCommitter(context, conf);
   }
@@ -148,8 +152,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     // explicitly choose commit algorithm
     initFileOutputCommitterOptions(context);
-    Path dest = Paths.getMultipartUploadCommitsDirectory(conf, uuid);
-    return new FileOutputCommitter(dest, context);
+    commitsDirectory = Paths.getMultipartUploadCommitsDirectory(conf, uuid);
+    return new FileOutputCommitter(commitsDirectory, context);
   }
 
   /**
@@ -186,6 +190,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return conf.getTrimmed(UPLOAD_UUID,
         conf.get(SPARK_WRITE_UUID,
             conf.getTrimmed(SPARK_APP_ID, jobId)));
+  }
+  /**
+   * Get the UUID of an upload; may be the job ID.
+   * @param conf job/task configuration
+   * @param jobId Job ID
+   * @return an ID for use in paths.
+   */
+  public static String getUploadUUID(Configuration conf, JobID jobId) {
+    return getUploadUUID(conf, jobId.toString());
   }
 
   /**
@@ -244,7 +257,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   protected Path getJobAttemptPath(int appAttemptId) {
     //TODO Is this valid?
-    return new Path(getPendingJobAttemptsPath(getOutputPath()),
+    return new Path(getPendingJobAttemptsPath(commitsDirectory),
         String.valueOf(appAttemptId));
   }
 
@@ -309,7 +322,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return the location of pending job attempts.
    */
   private static Path getPendingJobAttemptsPath(Path out) {
-    Preconditions.checkArgument(out != null, "Null 'out' path");
+    Preconditions.checkNotNull(out, "Null 'out' path");
     return new Path(out, CommitConstants.PENDING_DIR_NAME);
   }
 
@@ -880,11 +893,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             getAttemptId(context)));
   }
 
-  private static int getTaskId(TaskAttemptContext context) {
+  static int getTaskId(TaskAttemptContext context) {
     return context.getTaskAttemptID().getTaskID().getId();
   }
 
-  private static int getAttemptId(TaskAttemptContext context) {
+  static int getAttemptId(TaskAttemptContext context) {
     return context.getTaskAttemptID().getId();
   }
 

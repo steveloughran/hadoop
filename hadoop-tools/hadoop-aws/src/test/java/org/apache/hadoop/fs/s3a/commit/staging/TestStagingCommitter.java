@@ -25,10 +25,8 @@ import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -46,7 +44,6 @@ import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collection;
@@ -58,9 +55,9 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
-import static org.mockito.Mockito.mock;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
-
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
+import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 @RunWith(Parameterized.class)
 public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
@@ -69,18 +66,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private static final TaskAttemptID AID = new TaskAttemptID(
       new TaskID(JOB_ID, TaskType.REDUCE, 2), 3);
 
-  private static final String BUCKET = "bucket-name";
-  private static final String KEY_PREFIX = "output/path";
-  private static final Path S3_OUTPUT_PATH = new Path(
-      "s3a://" + BUCKET + "/" + KEY_PREFIX);
-
-  protected static S3AFileSystem bindMockFSInstance() throws IOException {
-    S3AFileSystem mockFS = mock(S3AFileSystem.class);
-    URI uri = S3_OUTPUT_PATH.toUri();
-    FileSystemTestHelper.addFileSystemForTesting(uri, getConfiguration(),
-        mockFS);
-    return mockFS;
-  }
   private final int numThreads;
   private JobContext job = null;
   private String uuid = null;
@@ -91,10 +76,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
   @BeforeClass
   public static void setupS3() throws IOException {
-    bindMockFSInstance();
+    createAndBindMockFSInstance(getConfiguration());
   }
-
-
 
   // TODO: expand once the tests are working for "0"
   @Parameterized.Parameters
@@ -132,39 +115,49 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.committer = new MockedStagingCommitter(S3_OUTPUT_PATH, tac);
   }
 
+
   @Test
   public void testAttemptPathConstruction() throws Exception {
+    Configuration conf = new Configuration();
+
+    final int taskId = StagingS3GuardCommitter.getTaskId(tac);
+    final int attemptId = StagingS3GuardCommitter.getAttemptId(tac);
+    final String uuid = StagingS3GuardCommitter.getUploadUUID(conf, JOB_ID);
+
     // the temp directory is chosen based on a random seeded by the task and
     // attempt ids, so the result is deterministic if those ids are fixed.
-    conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/mr-local-0,/tmp/mr-local-1");
+    String dirs = "/tmp/mr-local-0,/tmp/mr-local-1";
+    conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, dirs);
 
-    assertEquals("Missing scheme should produce local file paths",
-        "file:/tmp/mr-local-1/" + uuid + "/_temporary/0/_temporary/attempt_job_0001_r_000002_3",
-        committer.getTaskAttemptPath(tac).toString());
+    String message = "Missing scheme should produce local file paths";
+    String expected = "file:/tmp/mr-local-1/" + this.uuid +
+        "/_temporary/0/_temporary/attempt_job_0001_r_000002_3";
+    assertEquals(message,
+        expected,
+        Paths.getLocalTaskAttemptTempDir(conf, uuid, tac.getTaskAttemptID()).toString());
 
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "file:/tmp/mr-local-0,file:/tmp/mr-local-1");
     assertEquals("Path should be the same with file scheme",
-        "file:/tmp/mr-local-1/" + uuid + "/_temporary/0/_temporary/attempt_job_0001_r_000002_3",
-        committer.getTaskAttemptPath(tac).toString());
+        expected,
+        Paths.getLocalTaskAttemptTempDir(conf, uuid, tac.getTaskAttemptID())
+            .toString());
 
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
         "hdfs://nn:8020/tmp/mr-local-0,hdfs://nn:8020/tmp/mr-local-1");
-    StagingTestBase.assertThrows("Should not allow temporary storage in HDFS",
-        IllegalArgumentException.class, "Wrong FS",
-        new Runnable() {
-          @Override
-          public void run() {
-            committer.getTaskAttemptPath(tac);
-          }
-        });
+    intercept(IllegalArgumentException.class, "Wrong FS",
+        () -> Paths.getLocalTaskAttemptTempDir(conf, uuid,
+            tac.getTaskAttemptID()));
   }
 
   @Test
   public void testCommitPathConstruction() throws Exception {
-    Path expected = getDFS().makeQualified(new Path(
-        "hdfs:/tmp/" + uuid + "/pending-uploads/_temporary/0/task_job_0001_r_000002"));
-    assertEquals("Path should be in HDFS",
-        expected, committer.getCommittedTaskPath(tac));
+    Path committedTaskPath = committer.getCommittedTaskPath(tac);
+    assertEquals("Path should be in HDFS: " + committedTaskPath,
+        "hdfs", committedTaskPath.toUri().getScheme());
+    String ending = "/pending-uploads/_temporary/0/task_job_0001_r_000002";
+    assertTrue("Did not end with \"" + ending +"\" :" + committedTaskPath,
+        committedTaskPath.toString().endsWith(
+        ending));
   }
 
   @Test
@@ -191,11 +184,15 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should write to the correct bucket",
         BUCKET, commit.getBucketName());
     assertEquals("Should write to the correct key",
-        KEY_PREFIX + "/" + file.getName(), commit.getKey());
+        OUTPUT_PREFIX + "/" + file.getName(), commit.getKey());
 
     assertValidUpload(committer.results.getTagsByUpload(), commit);
   }
 
+  /**
+   * This originally verified that empty files weren't PUT. They are now.
+   * @throws Exception
+   */
   @Test
   public void testSingleTaskEmptyFileCommit() throws Exception {
     committer.setupTask(tac);
@@ -208,13 +205,14 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     committer.commitTask(tac);
 
     List<String> uploads = committer.results.getUploads();
-    assertEquals("Should initiate one upload", 0, uploads.size());
+    assertEquals("Should initiate one upload", 1, uploads.size());
 
     Path committedPath = committer.getCommittedTaskPath(tac);
     FileSystem dfs = committedPath.getFileSystem(conf);
 
     assertEquals("Should commit to HDFS", getDFS(), dfs);
 
+    assertIsFile(dfs, committedPath);
     FileStatus[] stats = dfs.listStatus(committedPath);
     assertEquals("Should produce one commit file", 1, stats.length);
     assertEquals("Should name the commits file with the task ID",
@@ -222,7 +220,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     List<S3Util.PendingUpload> pending = S3Util.
         readPendingCommits(dfs, stats[0].getPath());
-    assertEquals("Should have no pending commits", 0, pending.size());
+    assertEquals("Should have one pending commit", 1, pending.size());
   }
 
   @Test
@@ -237,20 +235,19 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     FileSystem dfs = committedPath.getFileSystem(conf);
 
     assertEquals("Should commit to HDFS", getDFS(), dfs);
-
+    assertIsFile(dfs, committedPath);
     FileStatus[] stats = dfs.listStatus(committedPath);
     assertEquals("Should produce one commit file", 1, stats.length);
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    List<S3Util.PendingUpload> pending = S3Util.
-        readPendingCommits(dfs, stats[0].getPath());
+    List<S3Util.PendingUpload> pending = S3Util.readPendingCommits(dfs, stats[0].getPath());
     assertEquals("Should have correct number of pending commits",
         files.size(), pending.size());
 
     Set<String> keys = Sets.newHashSet();
     for (S3Util.PendingUpload commit : pending) {
-      assertEquals("Should write to the correct bucket",
+      assertEquals("Should write to the correct bucket: " + commit,
           BUCKET, commit.getBucketName());
       assertValidUpload(committer.results.getTagsByUpload(), commit);
       keys.add(commit.getKey());
@@ -320,8 +317,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should abort the upload",
         committer.results.getUploads().get(0),
         committer.results.getAborts().get(0).getUploadId());
-    assertFalse("Should remove the attempt path",
-        fs.exists(attemptPath));
+    assertPathDoesNotExist(fs, "Should remove the attempt path",
+        attemptPath);
   }
 
   @Test
@@ -353,8 +350,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should abort the upload",
         new HashSet<>(committer.results.getUploads()),
         getAbortedIds(committer.results.getAborts()));
-    assertFalse("Should remove the attempt path",
-        fs.exists(attemptPath));
+    assertPathDoesNotExist(fs, "Should remove the attempt path",
+        attemptPath);
   }
 
   @Test
@@ -596,7 +593,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
       Path outPath = writeOutputFile(
           tac.getTaskAttemptID(), attemptPath, UUID.randomUUID().toString(),
           10 * (i+1));
-      files.add(KEY_PREFIX +
+      files.add(OUTPUT_PREFIX +
           "/" + outPath.getName() + "-" + committer.getUUID());
     }
 

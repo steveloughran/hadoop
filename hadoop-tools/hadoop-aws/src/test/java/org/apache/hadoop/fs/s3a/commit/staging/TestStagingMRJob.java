@@ -55,14 +55,15 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
   private static MiniMRYarnCluster MR_CLUSTER = null;
 
   @BeforeClass
-  public static void setupMiniMRCluster() {
+  public static void setupMiniMRCluster() throws IOException {
+    createAndBindMockFSInstance(getConfiguration());
     MR_CLUSTER = new MiniMRYarnCluster(
         "test-s3-multipart-output-committer", 2);
     MR_CLUSTER.init(getConfiguration());
     MR_CLUSTER.start();
   }
 
-  @AfterClass
+    @AfterClass
   public static void stopMiniMRCluster() {
     if (MR_CLUSTER != null) {
       MR_CLUSTER.stop();
@@ -70,7 +71,8 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     MR_CLUSTER = null;
   }
 
-  public static class S3TextOutputFormat<K, V> extends LoggingTextOutputFormat<K, V> {
+  public static class S3TextOutputFormat<K, V>
+      extends LoggingTextOutputFormat<K, V> {
     private MockedStagingCommitter committer = null;
 
     @Override

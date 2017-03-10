@@ -41,7 +41,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   public MockS3AFileSystem() {
   }
 
-    @Override
+  @Override
   public String getScheme() {
     return FS_URI.getScheme();
   }
@@ -49,6 +49,11 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public URI getUri() {
     return FS_URI;
+  }
+
+  @Override
+  public String getBucket() {
+    return BUCKET;
   }
 
   @Override
@@ -77,12 +82,21 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public FSDataOutputStream create(Path f, FsPermission permission, boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progress) throws IOException {
-    return mock.create(f, permission, overwrite, bufferSize, replication, blockSize, progress);
+  public FSDataOutputStream create(Path f,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress) throws IOException {
+    return mock.create(f, permission, overwrite, bufferSize, replication,
+        blockSize, progress);
   }
 
   @Override
-  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws IOException {
+  public FSDataOutputStream append(Path f,
+      int bufferSize,
+      Progressable progress) throws IOException {
     return mock.append(f, bufferSize, progress);
   }
 
@@ -97,7 +111,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public FileStatus[] listStatus(Path f) throws FileNotFoundException, IOException {
+  public FileStatus[] listStatus(Path f)
+      throws FileNotFoundException, IOException {
     return mock.listStatus(f);
   }
 

@@ -173,8 +173,12 @@ public class S3Util {
 
     } finally {
       if (threw && uploadId != null) {
-        abort(client, key,
-            new AbortMultipartUploadRequest(bucket, key, uploadId));
+        try {
+          abort(client, key,
+              new AbortMultipartUploadRequest(bucket, key, uploadId));
+        } catch (IOException e) {
+          LOG.error("Failed to abort upload {} to {}", uploadId, key, e);
+        }
       }
     }
   }

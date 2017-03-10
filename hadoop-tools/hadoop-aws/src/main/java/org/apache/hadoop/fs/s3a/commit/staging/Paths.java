@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
@@ -120,6 +121,13 @@ public class Paths {
       String uuid, int taskId, int attemptId) throws IOException {
     return new Path(localTemp(conf, taskId, attemptId), uuid);
   }
+
+  public static Path getLocalTaskAttemptTempDir(Configuration conf,
+      String uuid, TaskAttemptID task) throws IOException {
+    return getLocalTaskAttemptTempDir(conf, uuid,
+        task.getTaskID().getId(), task.getId());
+  }
+
 
   /**
    * Try to come up with a good temp diretory for different filesystems.
