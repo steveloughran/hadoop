@@ -41,6 +41,9 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     conf.setInt(COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         StagingS3GuardCommitterFactory.NAME);
+    // disable unique filenames so that the protocol tests of FileOutputFormat
+    // and this test generate consistent names.
+    conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, false);
     return conf;
   }
 
@@ -97,7 +100,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
       if (firstTimeFail.getAndSet(false)) {
-        throw new IOException(MESSAGE);
+        throw new IOException(COMMIT_FAILURE_MESSAGE);
       }
     }
   }

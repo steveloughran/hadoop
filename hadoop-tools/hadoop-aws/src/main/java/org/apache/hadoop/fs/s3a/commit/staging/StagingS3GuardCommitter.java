@@ -96,6 +96,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private final Path constructorOutputPath;
   private final long uploadPartSize;
   private final String uuid;
+  private final Boolean uniqueFilenames;
   private final FileOutputCommitter wrappedCommitter;
 
   // lazy variables
@@ -120,6 +121,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
+    this.uniqueFilenames = conf.getBoolean(COMMITTER_UNIQUE_FILENAMES,
+        DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
     this.wrappedCommitter = createWrappedCommitter(context, conf);
   }
@@ -134,6 +137,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     uuid = getUploadUUID(conf, context.getJobID());
+    this.uniqueFilenames = conf.getBoolean(COMMITTER_UNIQUE_FILENAMES,
+        DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
     wrappedCommitter = createWrappedCommitter(context, conf);
   }
@@ -351,6 +356,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     Preconditions.checkNotNull(context.getTaskAttemptID().getJobID(),
         "null job ID");
   }
+
   /**
    * Compute the path where the output of a committed task is stored until the
    * entire job is committed for a specific application attempt.
@@ -423,7 +429,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       return Arrays.asList(stats);
     } catch (FileNotFoundException e) {
       LOG.debug("No output generated in task");
-      return new ArrayList<>(0);
+//      return new ArrayList<>(0);
+      throw (FileNotFoundException) new FileNotFoundException(
+          String.format("No local working directory %s for task %s",
+              workPath, context.getTaskAttemptID().toString())).initCause(e);
+
     }
   }
 
@@ -433,6 +443,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * <p>
    * This implementation concatenates the relative path with the key prefix
    * from the output path.
+   * If {@link StagingCommitterConstants#COMMITTER_UNIQUE_FILENAMES} is
+   * set, then the task UUID is also included in the calculation
    *
    * @param relative the path of a file relative to the task attempt path
    * @param context the JobContext or TaskAttemptContext for this job
@@ -440,8 +452,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected String getFinalKey(String relative, JobContext context)
       throws IOException {
-//    return getS3KeyPrefix(context) + "/" + Paths.addUUID(relative, uuid);
-    return getS3KeyPrefix(context) + "/" + relative;
+    if (uniqueFilenames) {
+      return getS3KeyPrefix(context) + "/" + Paths.addUUID(relative, uuid);
+    } else {
+      return getS3KeyPrefix(context) + "/" + relative;
+    }
   }
 
   /**
@@ -716,7 +731,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         DurationInfo("task %s: creating task attempt path %s ",
         taskAttemptPath,
         context.getTaskAttemptID())) {
-//      taskAttemptPath.getFileSystem(getConf()).mkdirs(taskAttemptPath);
+      // create the local FS
+      taskAttemptPath.getFileSystem(getConf()).mkdirs(taskAttemptPath);
       wrappedCommitter.setupTask(context);
     }
   }
@@ -737,6 +753,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       return stats.length > 0;
     } catch (FileNotFoundException e) {
       // list didn't find a directory, so nothing to commit
+      // TODO: throw this up as an error?
       LOG.info("No files to commit");
       return false;
     }
@@ -746,9 +763,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void commitTask(TaskAttemptContext context) throws IOException {
     try (DurationInfo d = new DurationInfo("Commit task %s",
         context.getTaskAttemptID())) {
-      List<FileStatus> stats = getTaskOutput(context);
-      int count = commitTaskInternal(context, stats);
-      LOG.info("Committed file count: {}", count);
+      try {
+        List<FileStatus> filesToCommit = getTaskOutput(context);
+        int count = commitTaskInternal(context, filesToCommit);
+        LOG.info("Committed file count: {}", count);
+      } catch (IOException e) {
+        LOG.error("Commit of task {} failed",
+            context.getTaskAttemptID(), e);
+        throw e;
+      }
     }
   }
 
@@ -765,7 +788,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     Configuration conf = context.getConfiguration();
 
     final Path attemptPath = getTaskAttemptPath(context);
-    FileSystem attemptFS = attemptPath.getFileSystem(conf);
+    FileSystem attemptFS = getTaskAttemptFilesystem(context);
     LOG.debug("Attempt path is {}", attemptPath);
 
 
@@ -852,18 +875,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return commits.size();
   }
 
-  /**
-   * Get the task attempt path filesystem. This may not be the same as the
-   * final destination FS, and so may not be an S3A FS.
-   * @param context task attempt
-   * @return the filesystem
-   * @throws IOException failure to instantiate
-   */
-  protected FileSystem getTaskAttemptFilesystem(TaskAttemptContext context)
-      throws IOException {
-    return getTaskAttemptPath(context).getFileSystem(context.getConfiguration());
-  }
-
   @Override
   public void abortTask(TaskAttemptContext context) throws IOException {
     // the API specifies that the task has not yet been committed, so there are
@@ -903,12 +914,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   protected void deleteTaskAttemptPathQuietly(TaskAttemptContext context)
       throws IOException {
+    Path attemptPath = getTaskAttemptPath(context);
     try {
-      Path attemptPath = getTaskAttemptPath(context);
       FileSystem taskFS = getTaskAttemptFilesystem(context);
       deleteQuietly(taskFS, attemptPath, true);
     } catch (IOException e) {
-      LOG.debug("Failed to delete task attempt path", e);
+      LOG.debug("Failed to delete task attempt path {}", attemptPath, e);
     }
   }
 

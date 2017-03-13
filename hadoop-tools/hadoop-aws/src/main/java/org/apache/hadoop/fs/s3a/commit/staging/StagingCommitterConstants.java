@@ -30,6 +30,20 @@ public class StagingCommitterConstants {
   public static final String COMMITTER_THREADS = "fs.s3a.staging.committer.threads";
   public static final int DEFAULT_COMMITTER_THREADS = 8;
 
+  /**
+   * Option for final files to have uniqueness through uuid or attempt info:
+   * {@value}.
+   * Can be used for conflict resolution, but it also means that the filenames
+   * of output may not always be predictable in advance.
+   */
+  public static final String COMMITTER_UNIQUE_FILENAMES =
+      "fs.s3a.staging.committer.unique-filenames";
+
+  /**
+   * Default value for {@link #COMMITTER_UNIQUE_FILENAMES}: {@value}
+   */
+  public static final boolean DEFAULT_COMMITTER_UNIQUE_FILENAMES = true;
+
   // Spark configuration keys
   public static final String SPARK_WRITE_UUID = "spark.sql.sources.writeJobUUID";
   public static final String SPARK_APP_ID = "spark.app.id";

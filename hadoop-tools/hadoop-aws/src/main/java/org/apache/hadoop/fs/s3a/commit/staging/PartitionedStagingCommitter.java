@@ -71,7 +71,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
     // get files on the local FS in the attempt path
     Path attemptPath = getTaskAttemptPath(context);
-    FileSystem attemptFS = attemptPath.getFileSystem(context.getConfiguration());
+    FileSystem attemptFS = getTaskAttemptFilesystem(context);
     RemoteIterator<LocatedFileStatus> iter = attemptFS
         .listFiles(attemptPath, true /* recursive */ );
 
@@ -92,8 +92,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     // this to throw failures.
     List<FileStatus> taskOutput = getTaskOutput(context);
     Path attemptPath = getTaskAttemptPath(context);
-    Configuration conf = context.getConfiguration();
-    FileSystem attemptFS = attemptPath.getFileSystem(conf);
+    FileSystem attemptFS = getTaskAttemptFilesystem(context);
     Set<String> partitions = getPartitions(attemptFS, attemptPath, taskOutput);
 
     // enforce conflict resolution, but only if the mode is FAIL. for APPEND,

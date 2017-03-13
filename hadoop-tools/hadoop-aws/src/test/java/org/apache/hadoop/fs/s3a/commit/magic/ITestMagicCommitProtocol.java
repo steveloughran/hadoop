@@ -65,7 +65,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
       if (firstTimeFail.getAndSet(false)) {
-        throw new IOException(MESSAGE);
+        throw new IOException(COMMIT_FAILURE_MESSAGE);
       }
     }
   }

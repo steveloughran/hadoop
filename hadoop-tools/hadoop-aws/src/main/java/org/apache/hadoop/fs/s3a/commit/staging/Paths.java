@@ -130,7 +130,7 @@ public class Paths {
 
 
   /**
-   * Try to come up with a good temp diretory for different filesystems.
+   * Try to come up with a good temp directory for different filesystems.
    * @param fs filesystem
    * @return a path under which temporary work can go.
    */

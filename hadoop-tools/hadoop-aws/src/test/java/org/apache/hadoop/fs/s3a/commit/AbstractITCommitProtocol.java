@@ -29,7 +29,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -59,7 +58,6 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.FilterTempFiles;
@@ -76,7 +74,7 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 @SuppressWarnings("unchecked")
 public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected Path outDir;
-  public static final String MESSAGE = "oops";
+  public static final String COMMIT_FAILURE_MESSAGE = "oops";
 
   private String SUB_DIR = "SUB_DIR";
 
@@ -542,7 +540,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
       AbstractS3GuardCommitter committer) throws Exception {
-    intercept(IOException.class, MESSAGE,
+    intercept(IOException.class, COMMIT_FAILURE_MESSAGE,
         () -> committer.commitJob(jContext));
   }
 

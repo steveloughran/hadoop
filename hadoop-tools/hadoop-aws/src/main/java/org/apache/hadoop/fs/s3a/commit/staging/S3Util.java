@@ -119,7 +119,7 @@ public class S3Util {
       throw new FileNotFoundException(localFile.toString());
     }
     if (!localFile.isFile()) {
-      throw new FileNotFoundException("Not a file: " + localFile);
+      throw new IOException("Not a file: " + localFile);
     }
 
     String uploadId = null;

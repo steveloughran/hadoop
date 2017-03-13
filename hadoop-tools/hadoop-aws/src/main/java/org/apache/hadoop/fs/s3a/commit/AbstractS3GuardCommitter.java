@@ -236,9 +236,24 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     try (DurationInfo d = new DurationInfo("Setup Task %s",
         context.getTaskAttemptID())) {
       Path taskAttemptPath = getTaskAttemptPath(context);
-      FileSystem fs = taskAttemptPath.getFileSystem(getConf());
+      FileSystem fs = getTaskAttemptFilesystem(context);
       fs.mkdirs(taskAttemptPath);
+
     }
+  }
+
+/**
+ * Get the task attempt path filesystem. This may not be the same as the
+ * final destination FS, and so may not be an S3A FS.
+ * @param context task attempt
+ * @return the filesystem
+ * @throws IOException failure to instantiate
+ */
+  protected FileSystem getTaskAttemptFilesystem(TaskAttemptContext context)
+      throws IOException {
+    Path taskAttemptPath = getTaskAttemptPath(context);
+    FileSystem fs = taskAttemptPath.getFileSystem(getConf());
+    return taskAttemptPath.getFileSystem(getConf());
   }
 
 }
