@@ -25,7 +25,6 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
@@ -54,7 +53,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
   private static class CommitterWithFailedThenSucceed extends
       MagicS3GuardCommitter {
-    private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
+    private final FailThenSucceed failure = new FailThenSucceed();
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
@@ -64,9 +63,8 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     @Override
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
-      if (firstTimeFail.getAndSet(false)) {
-        throw new IOException(COMMIT_FAILURE_MESSAGE);
-      }
+      failure.exec();
     }
   }
+
 }

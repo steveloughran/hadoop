@@ -23,7 +23,6 @@ import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -93,7 +92,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     List<FileStatus> taskOutput = getTaskOutput(context);
     Path attemptPath = getTaskAttemptPath(context);
     FileSystem attemptFS = getTaskAttemptFilesystem(context);
-    Set<String> partitions = getPartitions(attemptFS, attemptPath, taskOutput);
+    Set<String> partitions = getPartitions(attemptPath, taskOutput);
 
     // enforce conflict resolution, but only if the mode is FAIL. for APPEND,
     // it doesn't matter that the partitions are already there, and for REPLACE,
@@ -169,15 +168,15 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     commitJobInternal(context, pending);
   }
 
-  protected Set<String> getPartitions(FileSystem attemptFS, Path attemptPath,
-                                      List<FileStatus> taskOutput)
+  protected Set<String> getPartitions(Path attemptPath,
+      List<FileStatus> taskOutput)
       throws IOException {
     // get a list of partition directories
     Set<String> partitions = Sets.newLinkedHashSet();
-    for (FileStatus stat : taskOutput) {
+    for (FileStatus fileStatus : taskOutput) {
       // sanity check the output paths
-      Path outputFile = stat.getPath();
-      if (!attemptFS.isFile(outputFile)) {
+      Path outputFile = fileStatus.getPath();
+      if (!fileStatus.isFile()) {
         throw new RuntimeException(
             "Task output entry is not a file: " + outputFile);
       }

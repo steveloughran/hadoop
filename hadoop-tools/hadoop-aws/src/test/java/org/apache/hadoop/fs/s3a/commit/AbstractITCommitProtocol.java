@@ -58,6 +58,7 @@ import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.FilterTempFiles;
@@ -469,20 +470,48 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // but the data got there, due to the order of operations.
     validateContent(outDir, shouldExpectSuccessMarker());
-
-    // next attempt will fail as there is no longer a directory to commit
-    expectFNFEonJobCommit(committer, jContext);
+    expectSecondJobCommitToFail(jContext, committer);
 
   }
 
-  protected abstract AbstractS3GuardCommitter
-    createFailingCommitter(TaskAttemptContext tContext) throws IOException;
+  /**
+   * Override point: the failure expected on the attempt to commit a failed
+   * job.
+   * @param jContext job context
+   * @param committer committer
+   * @throws Exception any unexpected failure.
+   */
+  protected IOException expectSecondJobCommitToFail(JobContext jContext,
+      AbstractS3GuardCommitter committer) throws Exception {
+    // next attempt will fail as there is no longer a directory to commit
+    return expectJobCommitFailure(jContext, committer,
+        FileNotFoundException.class);
+  }
 
-  protected void expectFNFEonJobCommit(AbstractS3GuardCommitter committer,
-      JobContext jContext) throws Exception {
-    intercept(FileNotFoundException.class,
+  /**
+   * Expect a job commit operation to fail with a specific exception
+   * @param jContext job context
+   * @param committer committer
+   * @param clazz class of exception
+   * @return the caught exception
+   * @throws Exception any unexpected failure.
+   */
+  protected IOException expectJobCommitFailure(JobContext jContext,
+      AbstractS3GuardCommitter committer, Class<? extends IOException> clazz)
+      throws Exception {
+    return intercept(clazz,
         () -> committer.commitJob(jContext));
   }
+
+  /**
+   * Create a committer which fails; the class {@link FailThenSucceed}
+   * implements the logic
+   * @param tContext task context
+   * @return committer instance
+   * @throws IOException failure to instantiate
+   */
+  protected abstract AbstractS3GuardCommitter createFailingCommitter(
+      TaskAttemptContext tContext) throws IOException;
 
   protected void expectFNFEonTaskCommit(AbstractS3GuardCommitter committer,
       TaskAttemptContext tContext) throws Exception {
@@ -533,8 +562,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     assertPathDoesNotExist("job path", committer.getJobAttemptPath(jContext));
 
-    // next attempt will fail as there is no longer a directory to commit
-    expectFNFEonJobCommit(committer, jContext);
+    // next attempt will fail
+    expectSecondJobCommitToFail(jContext, committer);
 
   }
 
@@ -884,4 +913,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
 
+  public static class FailThenSucceed {
+    private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
+
+    public void exec() throws IOException {
+      if (firstTimeFail.getAndSet(false)) {
+        throw new IOException(COMMIT_FAILURE_MESSAGE);
+      }
+    }
+  }
 }

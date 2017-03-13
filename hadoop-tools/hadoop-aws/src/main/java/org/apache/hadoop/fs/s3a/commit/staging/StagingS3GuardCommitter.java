@@ -45,7 +45,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -148,8 +147,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * This includes customizing its options, and setting up the destination
    * directory.
    * @param context job/task context.
-   * @param conf
-   * @return
+   * @param conf config
+   * @return the inner committer
    * @throws IOException
    */
   protected FileOutputCommitter createWrappedCommitter(JobContext context,
@@ -271,34 +270,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context the context of the job with pending tasks.
    * @return the path where the output of pending task attempts are stored.
    */
-  private Path getPendingTaskAttemptsPath(JobContext context) {
-    return getPendingTaskAttemptsPath(context, getOutputPath());
-  }
-
-  /**
-   * Compute the path where the output of pending task attempts are stored.
-   * @param context the context of the job with pending tasks.
-   * @return the path where the output of pending task attempts are stored.
-   */
   private static Path getPendingTaskAttemptsPath(JobContext context, Path out) {
     return new Path(getJobAttemptPath(context, out),
         CommitConstants.PENDING_DIR_NAME);
   }
-
-  /**
-   * Compute the path where the output of a task attempt is stored until
-   * that task is committed.
-   * TODO
-   * @param context the context of the task attempt.
-   * @return the path where a task attempt should be stored.
-   */
-/*
-  @Override
-  public Path getTaskAttemptPath(TaskAttemptContext context) {
-    return new Path(getPendingTaskAttemptsPath(context),
-        String.valueOf(context.getTaskAttemptID()));
-  }
-*/
 
   /**
    * Compute the path where the output of a task attempt is stored until
@@ -311,14 +286,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public static Path getTaskAttemptPath(TaskAttemptContext context, Path out) {
     return new Path(getPendingTaskAttemptsPath(context, out),
         String.valueOf(context.getTaskAttemptID()));
-  }
-
-  /**
-   * @return the path where the output of pending job attempts are
-   * stored.
-   */
-  private Path getPendingJobAttemptsPath() {
-    return getPendingJobAttemptsPath(getOutputPath());
   }
 
   /**
@@ -342,11 +309,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return getCommittedTaskPath(getAppAttemptId(context), context);
   }
 
-  public static Path getCommittedTaskPath(TaskAttemptContext context,
-      Path out) {
-    return getCommittedTaskPath(getAppAttemptId(context), context, out);
-  }
-
   private static void validateContext(TaskAttemptContext context) {
     Preconditions.checkNotNull(context, "null context");
     Preconditions.checkNotNull(context.getTaskAttemptID(),
@@ -368,14 +330,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       TaskAttemptContext context) {
     validateContext(context);
     return new Path(getJobAttemptPath(appAttemptId),
-        String.valueOf(context.getTaskAttemptID().getTaskID()));
-  }
-
-  private static Path getCommittedTaskPath(int appAttemptId,
-      TaskAttemptContext context,
-      Path out) {
-    validateContext(context);
-    return new Path(getJobAttemptPath(appAttemptId, out),
         String.valueOf(context.getTaskAttemptID().getTaskID()));
   }
 
@@ -900,8 +854,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         Paths.getLocalTaskAttemptTempDir(
             context.getConfiguration(),
             uuid,
-            getTaskId(context),
-            getAttemptId(context)));
+            context.getTaskAttemptID()));
   }
 
   static int getTaskId(TaskAttemptContext context) {
@@ -951,7 +904,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       this.finalOutputPath = getFinalOutputPath(constructorOutputPath, context);
       Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
 
-      URI outputUri = URI.create(finalOutputPath.toString());
       S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
           context.getConfiguration(), false);
       this.bucket = fs.getBucket();

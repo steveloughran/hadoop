@@ -46,9 +46,9 @@ class PartitionedCommitterForTesting extends
   }
 
   @Override
-  protected void initOutput(Path outputPath) throws IOException {
-    super.initOutput(outputPath);
-    setOutputPath(outputPath);
+  protected void initOutput(Path out) throws IOException {
+    super.initOutput(out);
+    setOutputPath(out);
   }
 
   @Override

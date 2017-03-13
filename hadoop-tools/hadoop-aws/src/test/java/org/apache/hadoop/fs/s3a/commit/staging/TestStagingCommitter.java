@@ -115,14 +115,16 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.committer = new MockedStagingCommitter(S3_OUTPUT_PATH, tac);
   }
 
-
   @Test
   public void testAttemptPathConstruction() throws Exception {
     Configuration conf = new Configuration();
+    String jobUUID = UUID.randomUUID().toString();
+    conf.set(UPLOAD_UUID, jobUUID);
 
     final int taskId = StagingS3GuardCommitter.getTaskId(tac);
     final int attemptId = StagingS3GuardCommitter.getAttemptId(tac);
-    final String uuid = StagingS3GuardCommitter.getUploadUUID(conf, JOB_ID);
+    assertEquals("Upload UUID", jobUUID,
+        StagingS3GuardCommitter.getUploadUUID(conf, JOB_ID));
 
     // the temp directory is chosen based on a random seeded by the task and
     // attempt ids, so the result is deterministic if those ids are fixed.
@@ -130,22 +132,22 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, dirs);
 
     String message = "Missing scheme should produce local file paths";
-    String expected = "file:/tmp/mr-local-1/" + this.uuid +
-        "/_temporary/0/_temporary/attempt_job_0001_r_000002_3";
+    String expected = "file:/tmp/mr-local-1/" + jobUUID +
+        "/0/attempt_job_0001_r_000002_3";
     assertEquals(message,
         expected,
-        Paths.getLocalTaskAttemptTempDir(conf, uuid, tac.getTaskAttemptID()).toString());
+        Paths.getLocalTaskAttemptTempDir(conf, jobUUID, tac.getTaskAttemptID()).toString());
 
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "file:/tmp/mr-local-0,file:/tmp/mr-local-1");
     assertEquals("Path should be the same with file scheme",
         expected,
-        Paths.getLocalTaskAttemptTempDir(conf, uuid, tac.getTaskAttemptID())
+        Paths.getLocalTaskAttemptTempDir(conf, jobUUID, tac.getTaskAttemptID())
             .toString());
 
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
         "hdfs://nn:8020/tmp/mr-local-0,hdfs://nn:8020/tmp/mr-local-1");
     intercept(IllegalArgumentException.class, "Wrong FS",
-        () -> Paths.getLocalTaskAttemptTempDir(conf, uuid,
+        () -> Paths.getLocalTaskAttemptTempDir(conf, jobUUID,
             tac.getTaskAttemptID()));
   }
 

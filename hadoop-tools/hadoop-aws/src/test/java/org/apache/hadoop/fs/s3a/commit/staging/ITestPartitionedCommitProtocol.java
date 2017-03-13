@@ -18,78 +18,32 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathExistsException;
-import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
 
-public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
-
-  @Override
-  protected Configuration createConfiguration() {
-    Configuration conf = super.createConfiguration();
-    conf.setBoolean(COMMITTER_ENABLED, false);
-    conf.setInt(COMMITTER_THREADS, 1);
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        StagingS3GuardCommitterFactory.NAME);
-    // disable unique filenames so that the protocol tests of FileOutputFormat
-    // and this test generate consistent names.
-    conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, false);
-    return conf;
-  }
-
-  @Override
-  public void setup() throws Exception {
-    super.setup();
-
-    // identify working dir for staging and delete
-    Configuration conf = getConfiguration();
-    String uuid = StagingS3GuardCommitter.getUploadUUID(conf,
-        TASK_ATTEMPT_0.getJobID());
-    Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid, TASK_ATTEMPT_0);
-    rmdir(tempDir, conf);
-  }
 
   @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
-    return new StagingS3GuardCommitter(outDir, context);
+    return new PartitionedStagingCommitter(outDir, context);
   }
 
   @Override
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new StagingS3GuardCommitter(outDir, context);
+    return new PartitionedStagingCommitter(outDir, context);
   }
 
-
+  @Override
   public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
       throws IOException {
     return new CommitterWithFailedThenSucceed(outDir, tContext);
-  }
-
-  @Override
-  protected boolean shouldExpectSuccessMarker() {
-    return false;
-  }
-
-  @Override
-  protected IOException expectSecondJobCommitToFail(JobContext jContext,
-      AbstractS3GuardCommitter committer) throws Exception {
-    return expectJobCommitFailure(jContext, committer,
-        PathExistsException.class);
   }
 
   /**
@@ -98,7 +52,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
    */
 
   private static class CommitterWithFailedThenSucceed extends
-      StagingS3GuardCommitter {
+      DirectoryStagingCommitter {
     private final FailThenSucceed failure = new FailThenSucceed();
 
     CommitterWithFailedThenSucceed(Path outputPath,

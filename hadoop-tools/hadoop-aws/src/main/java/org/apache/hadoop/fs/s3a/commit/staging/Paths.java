@@ -24,6 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -117,15 +119,31 @@ public class Paths {
     return relative.getPath();
   }
 
-  public static Path getLocalTaskAttemptTempDir(Configuration conf,
-      String uuid, int taskId, int attemptId) throws IOException {
-    return new Path(localTemp(conf, taskId, attemptId), uuid);
+
+  /**
+   * Varags constructor of paths. Not very efficient.
+   * @param parent parent path
+   * @param child child entries. "" elements are skipped.
+   * @return the full child path.
+   */
+  public static Path path(Path parent, String ...child) {
+    Path p = parent;
+    for (String c : child) {
+      if (!c.isEmpty()) {
+        p = new Path(p, c);
+      }
+    }
+    return p;
   }
 
   public static Path getLocalTaskAttemptTempDir(Configuration conf,
-      String uuid, TaskAttemptID task) throws IOException {
-    return getLocalTaskAttemptTempDir(conf, uuid,
-        task.getTaskID().getId(), task.getId());
+      String uuid, TaskAttemptID attempt) throws IOException {
+    int taskId = attempt.getTaskID().getId();
+    int attemptId = attempt.getId();
+    return path(localTemp(conf, taskId, attemptId),
+        uuid,
+        Integer.toString(getAppAttemptId(conf)),
+        attempt.toString());
   }
 
 
@@ -153,6 +171,15 @@ public class Paths {
     return temp;
   }
 
+  /**
+   * Get the Application Attempt Id for this job
+   * @param context the context to look in
+   * @return the Application Attempt Id for a given job.
+   */
+  private static int getAppAttemptId(Configuration conf) {
+    return conf.getInt(
+        MRJobConfig.APPLICATION_ATTEMPT_ID, 0);
+  }
 
   /**
    * Build a temporary path for the multipart upload commit information

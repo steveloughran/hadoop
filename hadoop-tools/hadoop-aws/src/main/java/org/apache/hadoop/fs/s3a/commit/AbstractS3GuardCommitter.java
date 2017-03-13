@@ -68,10 +68,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /** TESTING ONLY; allows mock FS to cheat. */
-  protected void initOutput(Path outputPath) throws IOException {
-    FileSystem fs = getDestination(outputPath, getConf());
+  protected void initOutput(Path out) throws IOException {
+    FileSystem fs = getDestination(out, getConf());
     setDestFS(fs);
-    setOutputPath(fs.makeQualified(outputPath));
+    setOutputPath(fs.makeQualified(out));
   }
 
   /**
@@ -251,9 +251,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
  */
   protected FileSystem getTaskAttemptFilesystem(TaskAttemptContext context)
       throws IOException {
-    Path taskAttemptPath = getTaskAttemptPath(context);
-    FileSystem fs = taskAttemptPath.getFileSystem(getConf());
-    return taskAttemptPath.getFileSystem(getConf());
+    return getTaskAttemptPath(context).getFileSystem(getConf());
   }
 
 }

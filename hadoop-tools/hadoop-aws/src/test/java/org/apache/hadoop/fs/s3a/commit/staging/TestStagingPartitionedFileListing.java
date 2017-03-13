@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.google.common.collect.Lists;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.FileStatus;
@@ -52,26 +54,29 @@ public class TestStagingPartitionedFileListing
     FileSystem attemptFS = attemptPath.getFileSystem(getTAC().getConfiguration());
     attemptFS.delete(attemptPath, true);
 
-    List<String> expectedFiles = Lists.newArrayList();
-    for (String dateint : Arrays.asList("20161115", "20161116")) {
-      for (String hour : Arrays.asList("13", "14")) {
-        String relative = "dateint=" + dateint + "/hour=" + hour +
-            "/" + UUID.randomUUID().toString() + ".parquet";
-        expectedFiles.add(relative);
-        attemptFS.create(new Path(attemptPath, relative)).close();
+    try {
+      List<String> expectedFiles = Lists.newArrayList();
+      for (String dateint : Arrays.asList("20161115", "20161116")) {
+        for (String hour : Arrays.asList("13", "14")) {
+          String relative = "dateint=" + dateint + "/hour=" + hour +
+              "/" + UUID.randomUUID().toString() + ".parquet";
+          expectedFiles.add(relative);
+          attemptFS.create(new Path(attemptPath, relative)).close();
+        }
       }
+
+      List<FileStatus> attemptFiles = committer.getTaskOutput(getTAC());
+      List<String> actualFiles = Lists.newArrayList();
+      for (FileStatus stat : attemptFiles) {
+        String relative = Paths.getRelativePath(attemptPath, stat.getPath());
+        actualFiles.add(relative);
+      }
+
+      assertEquals("File sets should match", expectedFiles, actualFiles);
+    } finally {
+      attemptFS.delete(attemptPath, true);
     }
 
-    List<FileStatus> attemptFiles = committer.getTaskOutput(getTAC());
-    List<String> actualFiles = Lists.newArrayList();
-    for (FileStatus stat : attemptFiles) {
-      String relative = Paths.getRelativePath(attemptPath, stat.getPath());
-      actualFiles.add(relative);
-    }
-
-    assertEquals("File sets should match", expectedFiles, actualFiles);
-
-    attemptFS.delete(attemptPath, true);
   }
 
   @Test
@@ -83,32 +88,35 @@ public class TestStagingPartitionedFileListing
     FileSystem attemptFS = attemptPath.getFileSystem(getTAC().getConfiguration());
     attemptFS.delete(attemptPath, true);
 
-    List<String> expectedFiles = Lists.newArrayList();
-    for (String dateint : Arrays.asList("20161115", "20161116")) {
-      String metadata = "dateint=" + dateint + "/" + "_metadata";
-      attemptFS.create(new Path(attemptPath, metadata)).close();
+    try {
+      List<String> expectedFiles = Lists.newArrayList();
+      for (String dateint : Arrays.asList("20161115", "20161116")) {
+        String metadata = "dateint=" + dateint + "/" + "_metadata";
+        attemptFS.create(new Path(attemptPath, metadata)).close();
 
-      for (String hour : Arrays.asList("13", "14")) {
-        String relative = "dateint=" + dateint + "/hour=" + hour +
-            "/" + UUID.randomUUID().toString() + ".parquet";
-        expectedFiles.add(relative);
-        attemptFS.create(new Path(attemptPath, relative)).close();
+        for (String hour : Arrays.asList("13", "14")) {
+          String relative = "dateint=" + dateint + "/hour=" + hour +
+              "/" + UUID.randomUUID().toString() + ".parquet";
+          expectedFiles.add(relative);
+          attemptFS.create(new Path(attemptPath, relative)).close();
 
-        String partial = "dateint=" + dateint + "/hour=" + hour +
-            "/." + UUID.randomUUID().toString() + ".partial";
-        attemptFS.create(new Path(attemptPath, partial)).close();
+          String partial = "dateint=" + dateint + "/hour=" + hour +
+              "/." + UUID.randomUUID().toString() + ".partial";
+          attemptFS.create(new Path(attemptPath, partial)).close();
+        }
       }
+
+      List<FileStatus> attemptFiles = committer.getTaskOutput(getTAC());
+      List<String> actualFiles = Lists.newArrayList();
+      for (FileStatus stat : attemptFiles) {
+        String relative = Paths.getRelativePath(attemptPath, stat.getPath());
+        actualFiles.add(relative);
+      }
+
+      assertEquals("File sets should match", expectedFiles, actualFiles);
+    } finally {
+      attemptFS.delete(attemptPath, true);
     }
 
-    List<FileStatus> attemptFiles = committer.getTaskOutput(getTAC());
-    List<String> actualFiles = Lists.newArrayList();
-    for (FileStatus stat : attemptFiles) {
-      String relative = Paths.getRelativePath(attemptPath, stat.getPath());
-      actualFiles.add(relative);
-    }
-
-    assertEquals("File sets should match", expectedFiles, actualFiles);
-
-    attemptFS.delete(attemptPath, true);
   }
 }

@@ -68,7 +68,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public void initialize(URI name, Configuration originalConf)
       throws IOException {
-    mock.initialize(name, originalConf);
+//    mock.initialize(name, originalConf);
   }
 
   @Override

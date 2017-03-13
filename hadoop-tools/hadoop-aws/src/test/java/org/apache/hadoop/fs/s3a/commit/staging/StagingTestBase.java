@@ -47,7 +47,7 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
-import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -66,7 +66,6 @@ import java.util.concurrent.Callable;
 
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.AdditionalAnswers .*;
 
 public class StagingTestBase {
 
@@ -123,7 +122,7 @@ public class StagingTestBase {
     public static void setupFS() throws IOException {
       if (cluster == null) {
         Configuration c = new JobConf();
-        c.setBoolean("dfs.webhdfs.enabled", true);
+        c.setBoolean("dfs.webhdfs.enabled", false);
         // if this fails with "The directory is already locked" set umask to 0022
         cluster = new MiniDFSCluster(c, 1, true, null);
         //cluster = new MiniDFSCluster.Builder(new Configuration()).build();
@@ -161,10 +160,12 @@ public class StagingTestBase {
     private StagingTestBase.ClientErrors errors = null;
     private AmazonS3 mockClient = null;
 
+/*
     @BeforeClass
     public static void setupMockS3FileSystem() {
       CONF.set("fs.s3a.impl", MockS3AFileSystem.class.getName());
     }
+*/
 
     @Before
     public void setupJob() throws Exception {
@@ -480,18 +481,7 @@ public class StagingTestBase {
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
       Callable<?> callable) throws Exception {
-    try {
-      callable.call();
-      Assert.fail("No exception was thrown (" + message + "), expected: " +
-          expected.getName());
-    } catch (Exception actual) {
-      if (expected != actual.getClass()) {
-        throw actual;
-      }
-      if (expectedMsg != null) {
-        GenericTestUtils.assertExceptionContains(expectedMsg, actual);
-      }
-    }
+    LambdaTestUtils.intercept(expected, expectedMsg, message, callable);
   }
 
   /**
@@ -515,15 +505,12 @@ public class StagingTestBase {
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
       Runnable runnable) throws Exception {
-    try {
-      runnable.run();
-      Assert.fail("No exception was thrown (" + message + "), expected: " +
-          expected.getName());
-    } catch (Exception actual) {
-      if (expected != actual.getClass()) {
-        throw actual;
-      }
-      GenericTestUtils.assertExceptionContains(expectedMsg, actual);
-    }
+    LambdaTestUtils.intercept(expected, expectedMsg, message,
+        new LambdaTestUtils.VoidCallable() {
+          @Override
+          public void call() throws Exception {
+            runnable.run();
+          }
+        });
   }
 }
