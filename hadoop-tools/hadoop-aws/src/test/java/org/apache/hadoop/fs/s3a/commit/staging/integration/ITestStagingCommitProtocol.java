@@ -16,13 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging;
+package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.Paths;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
@@ -89,7 +92,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   protected IOException expectSecondJobCommitToFail(JobContext jContext,
       AbstractS3GuardCommitter committer) throws Exception {
     return expectJobCommitFailure(jContext, committer,
-        PathExistsException.class);
+        IOException.class);
   }
 
   /**

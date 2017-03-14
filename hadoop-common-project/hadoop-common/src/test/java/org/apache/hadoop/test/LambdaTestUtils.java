@@ -342,16 +342,11 @@ public final class LambdaTestUtils {
       Class<E> clazz,
       Callable<T> eval)
       throws Exception {
-    try {
-      T result = eval.call();
-      throw new AssertionError("Expected an exception, got "
-          + robustToString(result));
-    } catch (Throwable e) {
-      if (clazz.isAssignableFrom(e.getClass())) {
-        return (E)e;
-      }
-      throw e;
-    }
+    return intercept(clazz,
+        null,
+        "Expected a " + clazz.getName() + " to be thrown," +
+            " but got the result: ",
+        eval);
   }
 
   /**
@@ -458,7 +453,17 @@ public final class LambdaTestUtils {
       String message,
       Callable<T> eval)
       throws Exception {
-    E ex = intercept(clazz, eval);
+    E ex;
+    try {
+      T result = eval.call();
+      throw new AssertionError(message + ": " + robustToString(result));
+    } catch (Throwable e) {
+      if (!clazz.isAssignableFrom(e.getClass())) {
+        throw e;
+      } else {
+        ex = (E) e;
+      }
+    }
     GenericTestUtils.assertExceptionContains(contained, ex, message);
     return ex;
   }
@@ -481,7 +486,11 @@ public final class LambdaTestUtils {
       String contained,
       VoidCallable eval)
       throws Exception {
-    return intercept(clazz, contained, "", eval);
+    return intercept(clazz, contained,
+        "Expecting " + clazz.getName()
+        + (contained != null? (" with text " + contained) :"")
+        + " but got a result: ",
+        eval);
   }
 
   /**
@@ -504,9 +513,7 @@ public final class LambdaTestUtils {
       String message,
       VoidCallable eval)
       throws Exception {
-    E ex = intercept(clazz, eval);
-    GenericTestUtils.assertExceptionContains(contained, ex, message);
-    return ex;
+    return intercept(clazz, contained, message, () -> eval);
   }
 
   /**

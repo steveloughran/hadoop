@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -47,7 +48,6 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -64,6 +64,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import static org.apache.hadoop.test.LambdaTestUtils.*;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
@@ -73,6 +74,7 @@ public class StagingTestBase {
   public static final String OUTPUT_PREFIX = "output/path";
   public static final Path S3_OUTPUT_PATH = new Path(
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
+  public static final URI S3_OUTPUT_PATH_URI = S3_OUTPUT_PATH.toUri();
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
   public static final Path ROOT_PATH = new Path(FS_URI);
 
@@ -89,11 +91,36 @@ public class StagingTestBase {
       throws IOException {
     S3AFileSystem mockFs = mock(S3AFileSystem.class);
     MockS3AFileSystem wrapperFS = new MockS3AFileSystem();
-    URI uri = S3_OUTPUT_PATH.toUri();
+    URI uri = S3_OUTPUT_PATH_URI;
     wrapperFS.setMock(mockFs);
     wrapperFS.initialize(uri, conf);
     FileSystemTestHelper.addFileSystemForTesting(uri, conf,  wrapperFS);
     return mockFs;
+  }
+
+  /**
+   * The FS URI as a wrapper FS
+   * @param conf
+   * @return
+   * @throws IOException
+   */
+  public static MockS3AFileSystem lookupWrapperFS(Configuration conf)
+      throws IOException {
+    return (MockS3AFileSystem) FileSystem.get(S3_OUTPUT_PATH_URI, conf);
+  }
+
+  public static void verifyCompletion(FileSystem mockS3) throws IOException {
+    verifyCleanupTempFiles(mockS3);
+    verifyNoMoreInteractions(mockS3);
+  }
+
+  public static void verifyDeleted(FileSystem mockS3, Path path) throws IOException {
+    verify(mockS3).delete(path, true);
+  }
+
+  public static void verifyCleanupTempFiles(FileSystem mockS3) throws IOException {
+    verifyDeleted(mockS3,
+        new Path(S3_OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
   }
 
   /**
@@ -153,6 +180,7 @@ public class StagingTestBase {
 
     // created in BeforeClass
     private S3AFileSystem mockFS = null;
+    private MockS3AFileSystem wrapperFS = null;
     private JobContext job = null;
 
     // created in Before
@@ -171,6 +199,7 @@ public class StagingTestBase {
     public void setupJob() throws Exception {
 
       this.mockFS = createAndBindMockFSInstance(CONF);
+      this.wrapperFS = lookupWrapperFS(CONF);
 
       this.job = new JobContextImpl(CONF, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID,
@@ -183,6 +212,10 @@ public class StagingTestBase {
 
     public FileSystem getMockS3() {
       return mockFS;
+    }
+
+    public MockS3AFileSystem getWrapperFS() {
+      return wrapperFS;
     }
 
     public JobContext getJob() {
@@ -481,7 +514,7 @@ public class StagingTestBase {
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
       Callable<?> callable) throws Exception {
-    LambdaTestUtils.intercept(expected, expectedMsg, message, callable);
+    intercept(expected, expectedMsg, message, callable);
   }
 
   /**
@@ -505,8 +538,8 @@ public class StagingTestBase {
   public static void assertThrows(
       String message, Class<? extends Exception> expected, String expectedMsg,
       Runnable runnable) throws Exception {
-    LambdaTestUtils.intercept(expected, expectedMsg, message,
-        new LambdaTestUtils.VoidCallable() {
+    intercept(expected, expectedMsg, message,
+        new VoidCallable() {
           @Override
           public void call() throws Exception {
             runnable.run();

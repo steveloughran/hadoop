@@ -994,7 +994,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   protected final String getConfictModeOption(JobContext context) {
     return context
         .getConfiguration()
-        .getTrimmed(CONFLICT_MODE, "fail")
+        .getTrimmed(CONFLICT_MODE, DEFAULT_CONFLICT_MODE)
         .toUpperCase(Locale.ENGLISH);
   }
 }

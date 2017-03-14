@@ -112,6 +112,16 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     commitTaskInternal(context, taskOutput);
   }
 
+  /**
+   * The partition path conflict resolution assumes that:
+   * <o>
+   *   <li>FAIL checking has taken place earlier.</li>
+   *   <li>APPEND is allowed</li>
+   *   <li>REPLACE deletes all existing partitions</li>
+   * </o>
+   * @param context job context
+   * @throws IOException failure in an operation
+   */
   @Override
   public void commitJob(JobContext context) throws IOException {
     List<S3Util.PendingUpload> pending = getPendingUploads(context);
@@ -137,11 +147,9 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
           break;
         case REPLACE:
           for (Path partitionPath : partitions) {
-            if (s3.exists(partitionPath)) {
-              LOG.info("Removing partition path to be replaced: " +
-                  partitionPath);
-              s3.delete(partitionPath, true /* recursive */);
-            }
+            LOG.info("Removing partition path to be replaced: " +
+                partitionPath);
+            s3.delete(partitionPath, true /* recursive */);
           }
           break;
         default:
@@ -151,9 +159,6 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
       threw = false;
 
-    } catch (IOException e) {
-      throw new IOException(
-          "Failed to enforce conflict resolution: " + e, e);
     } catch (IllegalArgumentException e) {
       // raised when unable to map from confict mode to an enum value.
       throw new IOException(

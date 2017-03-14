@@ -84,8 +84,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
         { 0 },
-//        { 1 },
-//        { 3 },
+        { 1 },
+        { 3 },
     });
   }
 

@@ -271,7 +271,8 @@ public abstract class GenericTestUtils {
    * @throws AssertionError if the expected string is not found
    */
   public static void assertExceptionContains(String expectedText,
-      Throwable t, String message) {
+      Throwable t,
+      String message) {
     Assert.assertNotNull(E_NULL_THROWABLE, t);
     String msg = t.toString();
     if (msg == null) {

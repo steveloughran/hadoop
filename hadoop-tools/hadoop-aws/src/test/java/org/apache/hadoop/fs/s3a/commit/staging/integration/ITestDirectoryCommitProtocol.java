@@ -16,29 +16,30 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging;
+package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
-public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
-
+public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
 
   @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
-    return new PartitionedStagingCommitter(outDir, context);
+    return new DirectoryStagingCommitter(outDir, context);
   }
 
   @Override
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new PartitionedStagingCommitter(outDir, context);
+    return new DirectoryStagingCommitter(outDir, context);
   }
+
 
   @Override
   public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)

@@ -35,12 +35,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.OUTPUT_PREFIX;
+import static org.mockito.Mockito.*;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.BUCKET;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
-public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
+public class TestStagingPartitionedTaskCommit
+    extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedCommitterForTesting(OUTPUT_PATH,
@@ -74,6 +75,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
   public void testDefault() throws Exception {
     FileSystem mockS3 = getMockS3();
 
+    getJob().getConfiguration().unset(CONFLICT_MODE);
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
@@ -87,7 +89,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
         .thenReturn(true);
 
     StagingTestBase.assertThrows(
-        "Should complain because a partition already exists",
+        "Should throw a PathExistsException because a partition already exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws IOException {
@@ -122,7 +124,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(StagingCommitterConstants.CONFLICT_MODE, "fail");
+        .set(CONFLICT_MODE, CONFLICT_MODE_FAIL);
 
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
@@ -172,7 +174,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(StagingCommitterConstants.CONFLICT_MODE, "append");
+        .set(CONFLICT_MODE, CONFLICT_MODE_APPEND);
 
     PartitionedStagingCommitter committer = newTaskCommitter();
 
@@ -211,7 +213,7 @@ public class TestStagingPartitionedTaskCommit extends StagingTestBase.TaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(StagingCommitterConstants.CONFLICT_MODE, "replace");
+        .set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     PartitionedStagingCommitter committer = newTaskCommitter();
 

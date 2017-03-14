@@ -24,21 +24,59 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.s3a.S3AFileStatus;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.util.Progressable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 
+/**
+ * Relays FS calls to the mocked FS, allows for some extra logging with
+ * stack traces to be included. Why? Useful for tracking
+ * down why there are extra calls to a method than a test would expect:
+ * changes in implementation details often trigger such false-positive
+ * test failures.
+ */
 public class MockS3AFileSystem extends S3AFileSystem {
   public static final String BUCKET = "bucket-name";
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
+  protected static final Logger LOG =
+      LoggerFactory.getLogger(MockS3AFileSystem.class);
 
   private S3AFileSystem mock = null;
+  public static final int LOG_NONE = 0;
+  public static final int LOG_NAME = 1;
+  public static final int LOG_STACK = 2;
+  private int logEvents = LOG_NAME;
 
   public MockS3AFileSystem() {
+  }
+
+  public int getLogEvents() {
+    return logEvents;
+  }
+
+  public void setLogEvents(int logEvents) {
+    this.logEvents = logEvents;
+  }
+
+  private void event(String format, Object...args) {
+    Throwable ex = null;
+    switch (logEvents) {
+      case LOG_STACK:
+        ex = new Exception("stack");
+        /* fall through */
+      case LOG_NAME:
+        String s = String.format(format, args);
+        LOG.info(s, ex);
+        break;
+      case LOG_NONE:
+      default:
+        //nothing
+    }
   }
 
   @Override
@@ -73,11 +111,13 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   @Override
   public boolean exists(Path f) throws IOException {
+    event("exists(%s)", f);
     return mock.exists(f);
   }
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+    event("open(%s)", f);
     return mock.open(f, bufferSize);
   }
 
@@ -89,6 +129,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
       short replication,
       long blockSize,
       Progressable progress) throws IOException {
+    event("create(%s)", f);
     return mock.create(f, permission, overwrite, bufferSize, replication,
         blockSize, progress);
   }
@@ -102,17 +143,20 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
+    event("rename(%s, %s)", src, dst);
     return mock.rename(src, dst);
   }
 
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
+    event("delete(%s, %s)", f, recursive);
     return mock.delete(f, recursive);
   }
 
   @Override
   public FileStatus[] listStatus(Path f)
       throws FileNotFoundException, IOException {
+    event("listStatus(%s)", f);
     return mock.listStatus(f);
   }
 
@@ -123,11 +167,13 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+    event("mkdirs(%s)", f);
     return mock.mkdirs(f, permission);
   }
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
+    event("getFileStatus(%s)", f);
     return mock.getFileStatus(f);
   }
 

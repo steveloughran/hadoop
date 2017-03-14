@@ -27,10 +27,9 @@ import org.mockito.Mockito;
 import java.io.FileNotFoundException;
 import java.util.concurrent.Callable;
 
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
+import static org.mockito.Mockito.*;
 
 public class TestStagingDirectoryOutputCommitter
     extends StagingTestBase.JobCommitterTest<DirectoryStagingCommitter> {
@@ -41,55 +40,18 @@ public class TestStagingDirectoryOutputCommitter
 
   @Test
   public void testDefaultConflictResolution() throws Exception {
-    FileSystem mockS3 = getMockS3();
-
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
-
-    final DirectoryStagingCommitter committer = newJobCommitter();
-
-    StagingTestBase.assertThrows("Should throw an exception because the path exists",
-        PathExistsException.class, new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            committer.setupJob(getJob());
-            return null;
-          }
-        });
-
-    StagingTestBase.assertThrows("Should throw an exception because the path exists",
-        PathExistsException.class, new Callable<Void>() {
-          @Override
-          public Void call() throws Exception {
-            committer.commitJob(getJob());
-            return null;
-          }
-        });
-
-    reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
-
-    committer.setupJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
-    verifyNoMoreInteractions(mockS3);
-
-    reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
-    when(mockS3.getFileStatus(OUTPUT_PATH))
-        .thenThrow(FileNotFoundException.class);
-
-    committer.commitJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
-    verifyNoMoreInteractions(mockS3);
+    getJob().getConfiguration().unset(CONFLICT_MODE);
+    verifyFailureConflictOutcome();
   }
-
   @Test
   public void testFailConflictResolution() throws Exception {
+    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_FAIL);
+    verifyFailureConflictOutcome();
+  }
+
+  protected void verifyFailureConflictOutcome() throws Exception {
     FileSystem mockS3 = getMockS3();
-
     when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
-
-    getJob().getConfiguration().set(StagingCommitterConstants.CONFLICT_MODE, "fail");
-
     final DirectoryStagingCommitter committer = newJobCommitter();
 
     StagingTestBase.assertThrows("Should throw an exception because the path exists",
@@ -118,13 +80,10 @@ public class TestStagingDirectoryOutputCommitter
     verifyNoMoreInteractions(mockS3);
 
     reset(mockS3);
-//    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
-    when(mockS3.getFileStatus(OUTPUT_PATH))
-        .thenThrow(FileNotFoundException.class);
-
+    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
     committer.commitJob(getJob());
     verify(mockS3).exists(OUTPUT_PATH);
-    verifyNoMoreInteractions(mockS3);
+    verifyCompletion(mockS3);
   }
 
   @Test
@@ -133,7 +92,7 @@ public class TestStagingDirectoryOutputCommitter
 
     when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
 
-    getJob().getConfiguration().set(StagingCommitterConstants.CONFLICT_MODE, "append");
+    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_APPEND);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
@@ -145,7 +104,7 @@ public class TestStagingDirectoryOutputCommitter
 
     committer.commitJob(getJob());
     verify(mockS3).exists(OUTPUT_PATH);
-    verifyNoMoreInteractions(mockS3);
+    verifyCompletion(mockS3);
   }
 
   @Test
@@ -154,7 +113,7 @@ public class TestStagingDirectoryOutputCommitter
 
     when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
 
-    getJob().getConfiguration().set(StagingCommitterConstants.CONFLICT_MODE, "replace");
+    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
@@ -169,6 +128,6 @@ public class TestStagingDirectoryOutputCommitter
     committer.commitJob(getJob());
     verify(mockS3).exists(OUTPUT_PATH);
     verify(mockS3).delete(OUTPUT_PATH, true);
-    verifyNoMoreInteractions(mockS3);
+    verifyCompletion(mockS3);
   }
 }

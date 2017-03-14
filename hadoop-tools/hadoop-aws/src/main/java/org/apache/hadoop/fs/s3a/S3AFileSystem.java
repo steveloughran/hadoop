@@ -1449,7 +1449,9 @@ public class S3AFileSystem extends FileSystem {
    * @param recursive if path is a directory and set to
    * true, the directory is deleted else throws an exception. In
    * case of a file the recursive can be set to either true or false.
-   * @return  true if delete is successful else false.
+   * @return true if the path existed and then was deleted; false if there
+   * was no path in the first place, or the corner cases of root path deletion
+   * have surfaced.
    * @throws IOException due to inability to delete a directory or file.
    */
   public boolean delete(Path f, boolean recursive) throws IOException {
@@ -1472,7 +1474,7 @@ public class S3AFileSystem extends FileSystem {
    * true, the directory is deleted else throws an exception. In
    * case of a file the recursive can be set to either true or false.
    * @param createFakeDirectory create a fake dir if needed (adds extra GETs).
-   * @return  true if delete is successful else false.
+   * @return true, except in the corner cases of root directory deletion
    * @throws IOException due to inability to delete a directory or file.
    * @throws AmazonClientException on failures inside the AWS SDK
    */

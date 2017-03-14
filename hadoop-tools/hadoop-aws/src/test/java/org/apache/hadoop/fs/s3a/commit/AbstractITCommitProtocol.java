@@ -569,8 +569,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
       AbstractS3GuardCommitter committer) throws Exception {
-    intercept(IOException.class, COMMIT_FAILURE_MESSAGE,
-        () -> committer.commitJob(jContext));
+    intercept(IOException.class,
+        COMMIT_FAILURE_MESSAGE,
+        () -> { committer.commitJob(jContext); return "committed job"; });
   }
 
   @Test
