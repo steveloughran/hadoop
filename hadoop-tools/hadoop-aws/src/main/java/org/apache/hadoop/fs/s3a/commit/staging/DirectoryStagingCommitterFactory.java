@@ -31,20 +31,20 @@ import java.io.IOException;
  * For S3A output, uses the {@link StagingS3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
-public class StagingS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
+public class DirectoryStagingCommitterFactory extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */
   public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitterFactory";
+      = "org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory";
 
   protected AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new DirectoryStagingCommitter(outputPath, context);
   }
 
   protected AbstractS3GuardCommitter createJobCommitter(Path outputPath,
       JobContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new DirectoryStagingCommitter(outputPath, context);
   }
 }

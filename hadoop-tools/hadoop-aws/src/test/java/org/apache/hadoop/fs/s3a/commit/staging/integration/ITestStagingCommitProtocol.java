@@ -20,23 +20,19 @@ package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathExistsException;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.Paths;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
@@ -46,7 +42,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     conf.setBoolean(COMMITTER_ENABLED, false);
     conf.setInt(COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        StagingS3GuardCommitterFactory.NAME);
+        DirectoryStagingCommitterFactory.NAME);
     // disable unique filenames so that the protocol tests of FileOutputFormat
     // and this test generate consistent names.
     conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, false);

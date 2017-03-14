@@ -30,6 +30,14 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
+/**
+ * This commits to a directory. The conflict policy is
+ * <ul>
+ *   <li>FAIL: fail the commit</li>
+ *   <li>APPEND: add extra data to the destination.</li>
+ *   <li>REPLACE: delete the destination directory.</li>
+ * </ul>
+ */
 public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
       DirectoryStagingCommitter.class);
@@ -61,40 +69,34 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
     }
   }
 
-  // TODO: handle aborting commits if delete or exists throws an exception
+  // TODO: handle aborting commits if delete() or exists() throws an exception
   @Override
   public void commitJob(JobContext context) throws IOException {
     try (DurationInfo d = new DurationInfo("Commit Job %s",
         context.getJobID())) {
       Path outputPath = getOutputPath(context);
-      // use the FS implementation because it will check for _$folder$
       FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
-      if (fs.exists(outputPath)) {
-        switch (getConflictResolutionMode(context)) {
-          case FAIL:
-            // this was checked in setupJob, but this avoids some cases where
-            // output was created while the job was processing
+      switch (getConflictResolutionMode(context)) {
+        case FAIL:
+          // this was checked in setupJob, but this avoids some cases where
+          // output was created while the job was processing
+          if (fs.exists(outputPath)) {
             throw new PathExistsException(outputPath.toString());
-          case APPEND:
-            // do nothing
-            break;
-          case REPLACE:
-            LOG.info("Removing output path to be replaced: {}", outputPath);
-            fs.delete(outputPath, true /* recursive */);
-            break;
-          default:
-            throw new IOException(
-                "Unknown conflict resolution mode: "
-                    + getConfictModeOption(context));
-        }
+          }
+          break;
+        case APPEND:
+          // do nothing
+          break;
+        case REPLACE:
+          LOG.debug("Removing output path to be replaced: {}", outputPath);
+          fs.delete(outputPath, true /* recursive */);
+          break;
+        default:
+          throw new IOException(
+              "Unknown conflict resolution mode: "
+                  + getConfictModeOption(context));
       }
-    } catch (IllegalArgumentException e) {
-      // raised when unable to map from confict mode to an enum value.
-      throw new IOException(
-          "Unknown conflict resolution mode: "
-              + getConfictModeOption(context), e);
     }
-
-      super.commitJob(context);
+    super.commitJob(context);
   }
 }

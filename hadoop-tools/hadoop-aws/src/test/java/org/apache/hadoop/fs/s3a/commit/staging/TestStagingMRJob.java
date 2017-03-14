@@ -58,7 +58,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
   public static void setupMiniMRCluster() throws IOException {
     createAndBindMockFSInstance(getConfiguration());
     MR_CLUSTER = new MiniMRYarnCluster(
-        "test-s3-multipart-output-committer", 2);
+        "TestStagingMRJobr", 2);
     MR_CLUSTER.init(getConfiguration());
     MR_CLUSTER.start();
   }
@@ -100,7 +100,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
   @Test
   public void testMRJob() throws Exception {
     FileSystem mockS3 = mock(FileSystem.class);
-    FileSystem s3 = S3_OUTPUT_PATH.getFileSystem(getConfiguration());
+    FileSystem s3 = OUTPUT_PATH.getFileSystem(getConfiguration());
 
     String commitUUID = UUID.randomUUID().toString();
 
@@ -112,14 +112,14 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
         out.write(("file " + i).getBytes(StandardCharsets.UTF_8));
       }
       expectedFiles.add(new Path(
-          S3_OUTPUT_PATH, "part-m-0000" + i + "-" + commitUUID).toString());
+          OUTPUT_PATH, "part-m-0000" + i + "-" + commitUUID).toString());
     }
 
     Job mrJob = Job.getInstance(MR_CLUSTER.getConfig(), "test-committer-job");
     Configuration conf = mrJob.getConfiguration();
 
     mrJob.setOutputFormatClass(S3TextOutputFormat.class);
-    S3TextOutputFormat.setOutputPath(mrJob, S3_OUTPUT_PATH);
+    S3TextOutputFormat.setOutputPath(mrJob, OUTPUT_PATH);
 
     File mockResultsFile = temp.newFile("committer.bin");
     mockResultsFile.delete();

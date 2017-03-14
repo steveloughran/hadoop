@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.hadoop.fs.PathIsDirectoryException;
+import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,30 +88,26 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   @Override
-  public void commitTask(TaskAttemptContext context) throws IOException {
-    // these checks run before any files are uploaded to S3, so it is okay for
-    // this to throw failures.
-    List<FileStatus> taskOutput = getTaskOutput(context);
+  protected int commitTaskInternal(TaskAttemptContext context,
+      List<FileStatus> taskOutput) throws IOException {
     Path attemptPath = getTaskAttemptPath(context);
-    FileSystem attemptFS = getTaskAttemptFilesystem(context);
     Set<String> partitions = getPartitions(attemptPath, taskOutput);
 
     // enforce conflict resolution, but only if the mode is FAIL. for APPEND,
     // it doesn't matter that the partitions are already there, and for REPLACE,
     // deletion should be done during task commit.
     if (getConflictResolutionMode(context) == ConflictResolution.FAIL) {
-      FileSystem s3 = getOutputPath(context)
-          .getFileSystem(context.getConfiguration());
+      FileSystem s3 = getDestFS();
       for (String partition : partitions) {
         // getFinalPath adds the UUID to the file name. this needs the parent.
-        Path partitionPath = getFinalPath(partition + "/file", context).getParent();
+        Path partitionPath = getFinalPath(partition + "/file",
+            context).getParent();
         if (s3.exists(partitionPath)) {
           throw new PathExistsException(partitionPath.toString());
         }
       }
     }
-
-    commitTaskInternal(context, taskOutput);
+    return super.commitTaskInternal(context, taskOutput);
   }
 
   /**
@@ -124,20 +122,23 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
    */
   @Override
   public void commitJob(JobContext context) throws IOException {
-    List<S3Util.PendingUpload> pending = getPendingUploads(context);
 
-    FileSystem s3 = getOutputPath(context)
-        .getFileSystem(context.getConfiguration());
-    Set<Path> partitions = Sets.newLinkedHashSet();
-    for (S3Util.PendingUpload commit : pending) {
-      Path filePath = new Path(
-          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
-      partitions.add(filePath.getParent());
-    }
+    boolean threw = false;
+    List<S3Util.PendingUpload> pending = null;
+    try(DurationInfo d = new DurationInfo("Commit Job %s",
+        context.getJobID())) {
+      pending = getPendingUploads(context);
+
+      FileSystem s3 = getDestFS();
+      Set<Path> partitions = Sets.newLinkedHashSet();
+      for (S3Util.PendingUpload commit : pending) {
+        Path filePath = new Path(
+            "s3a://" + commit.getBucketName() + "/" + commit.getKey());
+        partitions.add(filePath.getParent());
+      }
 
     // enforce conflict resolution
-    boolean threw = true;
-    try {
+    threw = true;
       switch (getConflictResolutionMode(context)) {
         case FAIL:
           // FAIL checking is done on the task side, so this does nothing
@@ -153,19 +154,13 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
           }
           break;
         default:
-          throw new RuntimeException(
-              "Unknown conflict resolution mode: " + getConflictResolutionMode(context));
+          throw new IOException("Unknown conflict resolution mode: "
+                  + getConflictResolutionMode(context));
       }
 
       threw = false;
-
-    } catch (IllegalArgumentException e) {
-      // raised when unable to map from confict mode to an enum value.
-      throw new IOException(
-          "Unknown conflict resolution mode: "
-              + getConfictModeOption(context), e);
     } finally {
-      if (threw) {
+      if (threw /* && pending != null */) {
         abortJobInternal(context, pending, threw);
       }
     }
@@ -182,8 +177,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
       // sanity check the output paths
       Path outputFile = fileStatus.getPath();
       if (!fileStatus.isFile()) {
-        throw new RuntimeException(
-            "Task output entry is not a file: " + outputFile);
+        throw new PathIsDirectoryException(outputFile.toString());
       }
       String partition = getPartition(
           Paths.getRelativePath(attemptPath, outputFile));

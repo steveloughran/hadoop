@@ -489,8 +489,8 @@ public final class LambdaTestUtils {
     return intercept(clazz, contained,
         "Expecting " + clazz.getName()
         + (contained != null? (" with text " + contained) :"")
-        + " but got a result: ",
-        eval);
+        + " but got ",
+        () -> { eval.call(); return "void";});
   }
 
   /**
@@ -513,7 +513,8 @@ public final class LambdaTestUtils {
       String message,
       VoidCallable eval)
       throws Exception {
-    return intercept(clazz, contained, message, () -> eval);
+    return intercept(clazz, contained, message,
+        () -> {eval.call(); return "void";});
   }
 
   /**

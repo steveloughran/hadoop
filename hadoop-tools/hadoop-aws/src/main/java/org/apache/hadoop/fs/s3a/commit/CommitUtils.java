@@ -275,7 +275,7 @@ public final class CommitUtils {
   public static void verifyIsMagicCommitFS(S3AFileSystem fs)
       throws PathCommitException {
     if (!fs.isDelayedCompleteEnabled()) {
-      throw new PathCommitException(fs.pathToKey(new Path("/")),
+      throw new PathCommitException(fs.getUri().toString(),
           E_BAD_PATH);
     }
   }

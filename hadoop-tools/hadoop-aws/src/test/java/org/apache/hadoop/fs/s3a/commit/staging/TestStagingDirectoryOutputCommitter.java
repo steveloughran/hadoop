@@ -21,11 +21,9 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PathExistsException;
 
-import org.apache.hadoop.mapreduce.JobContext;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.io.FileNotFoundException;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
@@ -59,10 +57,10 @@ public class TestStagingDirectoryOutputCommitter
 
   protected void verifyFailureConflictOutcome() throws Exception {
     FileSystem mockS3 = getMockS3();
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
+    pathExists(mockS3, OUTPUT_PATH);
     final DirectoryStagingCommitter committer = newJobCommitter();
 
-    StagingTestBase.assertThrows("Should throw an exception because the path exists",
+    assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -71,7 +69,7 @@ public class TestStagingDirectoryOutputCommitter
           }
         });
 
-    StagingTestBase.assertThrows("Should throw an exception because the path exists",
+    assertThrows("Should throw an exception because the path exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws Exception {
@@ -81,16 +79,16 @@ public class TestStagingDirectoryOutputCommitter
         });
 
     reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
+    pathDoesNotExist(mockS3, OUTPUT_PATH);
 
     committer.setupJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
+    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyNoMoreInteractions(mockS3);
 
     reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(false);
+    pathDoesNotExist(mockS3, OUTPUT_PATH);
     committer.commitJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
+    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyCompletion(mockS3);
   }
 
@@ -98,20 +96,20 @@ public class TestStagingDirectoryOutputCommitter
   public void testAppendConflictResolution() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
+    pathExists(mockS3, OUTPUT_PATH);
 
     getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_APPEND);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
     committer.setupJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
+    verifyExistenceChecked(mockS3, OUTPUT_PATH);
 
     Mockito.reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
+    pathExists(mockS3, OUTPUT_PATH);
 
     committer.commitJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
+//    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyCompletion(mockS3);
   }
 
@@ -119,23 +117,23 @@ public class TestStagingDirectoryOutputCommitter
   public void testReplaceConflictResolution() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
+    pathExists(mockS3, OUTPUT_PATH);
 
     getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
     committer.setupJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
+    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyNoMoreInteractions(mockS3);
 
     Mockito.reset(mockS3);
-    when(mockS3.exists(OUTPUT_PATH)).thenReturn(true);
-    when(mockS3.delete(OUTPUT_PATH, true)).thenReturn(true);
+    pathExists(mockS3, OUTPUT_PATH);
+    canDelete(mockS3, OUTPUT_PATH);
 
     committer.commitJob(getJob());
-    verify(mockS3).exists(OUTPUT_PATH);
-    verify(mockS3).delete(OUTPUT_PATH, true);
+//    verifyExistenceChecked(mockS3, OUTPUT_PATH);
+    verifyDeleted(mockS3, OUTPUT_PATH);
     verifyCompletion(mockS3);
   }
 

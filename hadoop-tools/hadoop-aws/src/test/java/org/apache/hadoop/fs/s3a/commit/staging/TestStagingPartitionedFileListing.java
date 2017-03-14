@@ -19,8 +19,6 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.google.common.collect.Lists;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.FileStatus;
@@ -37,12 +35,12 @@ public class TestStagingPartitionedFileListing
     extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedStagingCommitter(OUTPUT_PATH, getJob());
+    return new PartitionedStagingCommitter(StagingTestBase.OUTPUT_PATH, getJob());
   }
 
   @Override
   PartitionedStagingCommitter newTaskCommitter() throws IOException {
-    return new PartitionedStagingCommitter(OUTPUT_PATH, getTAC());
+    return new PartitionedStagingCommitter(StagingTestBase.OUTPUT_PATH, getTAC());
   }
 
   @Test

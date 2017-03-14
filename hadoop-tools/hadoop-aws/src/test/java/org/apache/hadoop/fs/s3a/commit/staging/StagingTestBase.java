@@ -72,9 +72,9 @@ public class StagingTestBase {
 
   public static final String BUCKET = "bucket-name";
   public static final String OUTPUT_PREFIX = "output/path";
-  public static final Path S3_OUTPUT_PATH = new Path(
+  public static final Path OUTPUT_PATH = new Path(
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
-  public static final URI S3_OUTPUT_PATH_URI = S3_OUTPUT_PATH.toUri();
+  public static final URI OUTPUT_PATH_URI = OUTPUT_PATH.toUri();
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
   public static final Path ROOT_PATH = new Path(FS_URI);
 
@@ -91,7 +91,7 @@ public class StagingTestBase {
       throws IOException {
     S3AFileSystem mockFs = mock(S3AFileSystem.class);
     MockS3AFileSystem wrapperFS = new MockS3AFileSystem();
-    URI uri = S3_OUTPUT_PATH_URI;
+    URI uri = OUTPUT_PATH_URI;
     wrapperFS.setMock(mockFs);
     wrapperFS.initialize(uri, conf);
     FileSystemTestHelper.addFileSystemForTesting(uri, conf,  wrapperFS);
@@ -106,7 +106,7 @@ public class StagingTestBase {
    */
   public static MockS3AFileSystem lookupWrapperFS(Configuration conf)
       throws IOException {
-    return (MockS3AFileSystem) FileSystem.get(S3_OUTPUT_PATH_URI, conf);
+    return (MockS3AFileSystem) FileSystem.get(OUTPUT_PATH_URI, conf);
   }
 
   public static void verifyCompletion(FileSystem mockS3) throws IOException {
@@ -118,9 +118,14 @@ public class StagingTestBase {
     verify(mockS3).delete(path, true);
   }
 
+
+  public static void verifyDeleted(FileSystem mockS3, String child)
+      throws IOException {
+    verifyDeleted(mockS3, new Path(OUTPUT_PATH, child));
+  }
   public static void verifyCleanupTempFiles(FileSystem mockS3) throws IOException {
     verifyDeleted(mockS3,
-        new Path(S3_OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
+        new Path(OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
   }
 
 
@@ -130,6 +135,48 @@ public class StagingTestBase {
     Assert.assertEquals("Conflict resolution mode in " + committer,
         mode, committer.getConflictResolutionMode(job));
   }
+
+
+  public static void pathsExist(FileSystem mockS3, String...children)
+      throws IOException {
+    for (String child : children) {
+      pathExists(mockS3, new Path(OUTPUT_PATH, child));
+    }
+  }
+
+  public static void pathExists(FileSystem mockS3, Path path)
+      throws IOException {
+    when(mockS3.exists(path)).thenReturn(true);
+  }
+
+  public static void pathDoesNotExist(FileSystem mockS3, Path path)
+      throws IOException {
+    when(mockS3.exists(path)).thenReturn(false);
+  }
+
+  public static void canDelete(FileSystem mockS3, String...children)
+      throws IOException {
+    for (String child : children) {
+      canDelete(mockS3, new Path(OUTPUT_PATH, child));
+    }
+  }
+
+  public static void canDelete(FileSystem mockS3, Path f) throws IOException {
+    when(mockS3.delete(f,
+            true /* recursive */))
+        .thenReturn(true);
+  }
+
+  public static void verifyExistenceChecked(FileSystem mockS3, String child)
+      throws IOException {
+    verifyExistenceChecked(mockS3, new Path(OUTPUT_PATH, child));
+  }
+
+  public static void verifyExistenceChecked(FileSystem mockS3, Path path)
+      throws IOException {
+    verify(mockS3).exists(path);
+  }
+
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
@@ -181,9 +228,7 @@ public class StagingTestBase {
   public abstract static class JobCommitterTest<C extends OutputCommitter>
       extends Assert {
     private static final JobID JOB_ID = new JobID("job", 1);
-    private final JobConf jobConf = new JobConf();
-
-    protected static final Path OUTPUT_PATH = S3_OUTPUT_PATH;
+    private JobConf jobConf;
 
     // created in BeforeClass
     private S3AFileSystem mockFS = null;
@@ -195,26 +240,18 @@ public class StagingTestBase {
     private StagingTestBase.ClientErrors errors = null;
     private AmazonS3 mockClient = null;
 
-/*
-    @BeforeClass
-    public static void setupMockS3FileSystem() {
-      CONF.set("fs.s3a.impl", MockS3AFileSystem.class.getName());
-    }
-*/
-
     @Before
     public void setupJob() throws Exception {
+      this.jobConf = new JobConf();
+      jobConf.set(StagingCommitterConstants.UPLOAD_UUID,
+          UUID.randomUUID().toString());
 
       this.mockFS = createAndBindMockFSInstance(jobConf);
       this.wrapperFS = lookupWrapperFS(jobConf);
-
       this.job = new JobContextImpl(jobConf, JOB_ID);
-      job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID,
-          UUID.randomUUID().toString());
-
       this.results = new StagingTestBase.ClientResults();
       this.errors = new StagingTestBase.ClientErrors();
-      this.mockClient = StagingTestBase.newMockClient(results, errors);
+      this.mockClient = newMockClient(results, errors);
     }
 
     public FileSystem getMockS3() {

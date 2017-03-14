@@ -98,7 +98,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     getConfiguration().setInt(COMMITTER_THREADS, numThreads);
     getConfiguration().set(UPLOAD_UUID, UUID.randomUUID().toString());
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
-    this.jobCommitter = new MockedStagingCommitter(S3_OUTPUT_PATH, job);
+    this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job);
     jobCommitter.setupJob(job);
 
     this.uuid = job.getConfiguration().get(UPLOAD_UUID);
@@ -112,7 +112,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
     conf.setInt(UPLOAD_SIZE, 100);
 
-    this.committer = new MockedStagingCommitter(S3_OUTPUT_PATH, tac);
+    this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
   }
 
   @Test
@@ -288,8 +288,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should abort the upload",
         new HashSet<>(committer.results.getUploads()),
         getAbortedIds(committer.results.getAborts()));
-    assertFalse("Should remove the attempt path",
-        fs.exists(attemptPath));
+    assertPathDoesNotExist(fs,
+        "Should remove the attempt path",
+        attemptPath);
   }
 
   @Test
@@ -559,7 +560,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
       TaskAttemptContext attempt = new TaskAttemptContextImpl(
           new Configuration(job.getConfiguration()), attemptID);
       MockedStagingCommitter taskCommitter = new MockedStagingCommitter(
-          S3_OUTPUT_PATH, attempt);
+          OUTPUT_PATH, attempt);
       commitTask(taskCommitter, attempt, numFiles);
       uploads.addAll(taskCommitter.results.getUploads());
     }

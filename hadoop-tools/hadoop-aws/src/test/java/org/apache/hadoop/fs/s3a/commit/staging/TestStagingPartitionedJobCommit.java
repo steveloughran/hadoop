@@ -21,7 +21,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.junit.Assume;
 import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
@@ -74,10 +74,10 @@ public class TestStagingPartitionedJobCommit
 
       for (String dateint : Arrays.asList("20161115", "20161116")) {
         for (String hour : Arrays.asList("13", "14")) {
-          String key = StagingTestBase.OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
+          String key = OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
               "/" + UUID.randomUUID().toString() + ".parquet";
           pending.add(new S3Util.PendingUpload(null,
-              StagingTestBase.BUCKET, key, UUID.randomUUID().toString(),
+              BUCKET, key, UUID.randomUUID().toString(),
               Maps.newHashMap()));
         }
       }
@@ -89,8 +89,8 @@ public class TestStagingPartitionedJobCommit
 
     @Override
     protected void abortJobInternal(JobContext context,
-                                    List<S3Util.PendingUpload> pending,
-                                    boolean suppressExceptions) throws IOException {
+        List<S3Util.PendingUpload> pending,
+        boolean suppressExceptions) throws IOException {
       this.aborted = true;
       super.abortJobInternal(context, pending, suppressExceptions);
     }
@@ -99,8 +99,6 @@ public class TestStagingPartitionedJobCommit
   @Test
   public void testDefaultFailAndAppend() throws Exception {
     FileSystem mockS3 = getMockS3();
-    getWrapperFS().setLogEvents(MockS3AFileSystem.LOG_STACK);
-
 
     // both fail and append don't check. fail is enforced at the task level.
     for (String mode : Arrays.asList(null, CONFLICT_MODE_FAIL,
@@ -125,18 +123,15 @@ public class TestStagingPartitionedJobCommit
 
       // parent and peer directories exist
       reset(mockS3);
-      when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116")))
-          .thenReturn(true);
-      when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=10")))
-          .thenReturn(true);
+      pathsExist(mockS3, "dateint=20161116",
+          "dateint=20161116/hour=10");
       committer.commitJob(getJob());
       verifyCompletion(mockS3);
 
       // a leaf directory exists.
       // NOTE: this is not checked during job commit, the commit succeeds.
       reset(mockS3);
-      when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14")))
-          .thenReturn(true);
+      pathsExist(mockS3, "dateint=20161115/hour=14");
       committer.commitJob(getJob());
       verifyCompletion(mockS3);
     }
@@ -163,10 +158,8 @@ public class TestStagingPartitionedJobCommit
 
     // parent and peer directories exist
     reset(mockS3);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115")))
-        .thenReturn(true);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=12")))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161115",
+        "dateint=20161115/hour=12");
 
     committer.commitJob(getJob());
     verifyReplaceCommitActions(mockS3);
@@ -174,62 +167,46 @@ public class TestStagingPartitionedJobCommit
 
     // partition directories exist and should be removed
     reset(mockS3);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=12")))
-        .thenReturn(true);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=13")))
-        .thenReturn(true);
-    when(mockS3
-        .delete(
-            new Path(OUTPUT_PATH, "dateint=20161115/hour=13"),
-            true /* recursive */ ))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161115/hour=12",
+        "dateint=20161115/hour=13");
+    canDelete(mockS3, "dateint=20161115/hour=13");
 
     committer.commitJob(getJob());
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161115/hour=13"));
+    verifyDeleted(mockS3, "dateint=20161115/hour=13");
     verifyReplaceCommitActions(mockS3);
     verifyCompletion(mockS3);
 
     // partition directories exist and should be removed
     reset(mockS3);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=13")))
-        .thenReturn(true);
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=14")))
-        .thenReturn(true);
-    when(mockS3
-        .delete(
-            new Path(OUTPUT_PATH, "dateint=20161116/hour=13"),
-            true /* recursive */ ))
-        .thenReturn(true);
-    when(mockS3
-        .delete(
-            new Path(OUTPUT_PATH, "dateint=20161116/hour=14"),
-            true /* recursive */ ))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161116/hour=13",
+        "dateint=20161116/hour=14");
+
+    canDelete(mockS3, "dateint=20161116/hour=13",
+        "dateint=20161116/hour=14");
 
     committer.commitJob(getJob());
     verifyReplaceCommitActions(mockS3);
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=13"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=14"));
+    verifyDeleted(mockS3, "dateint=20161116/hour=13");
+    verifyDeleted(mockS3, "dateint=20161116/hour=14");
     verifyCompletion(mockS3);
   }
+
 
   /**
    * Verify the actions which replace does, essentially: delete the parent
    * partitions.
    * @param mockS3 s3 mock
-   * @throws IOException
    */
   protected void verifyReplaceCommitActions(FileSystem mockS3) throws IOException {
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161115/hour=13"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161115/hour=14"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=13"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=14"));
+    verifyDeleted(mockS3, "dateint=20161115/hour=13");
+    verifyDeleted(mockS3, "dateint=20161115/hour=14");
+    verifyDeleted(mockS3, "dateint=20161116/hour=13");
+    verifyDeleted(mockS3, "dateint=20161116/hour=14");
   }
 
   /**
    * The exists() check before the delete has been cut as not needed; it
    * only adds 1-4 HTTP requests which the delete() call will need to do anyway.
-   * @throws Exception
    */
 //  @Test
   public void testReplaceWithExistsFailure() throws Exception {
@@ -239,13 +216,8 @@ public class TestStagingPartitionedJobCommit
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=13")))
-        .thenReturn(true);
-    when(mockS3
-        .delete(
-            new Path(OUTPUT_PATH, "dateint=20161115/hour=13"),
-            true /* recursive */ ))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161115/hour=13");
+    canDelete(mockS3, "dateint=20161115/hour=13");
     String message = "Fake IOException for delete";
     when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14")))
         .thenThrow(new IOException(message));
@@ -260,9 +232,9 @@ public class TestStagingPartitionedJobCommit
           }
         });
 
-    verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=13"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161115/hour=13"));
-    verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14"));
+    verifyExistenceChecked(mockS3, "dateint=20161115/hour=13");
+    verifyDeleted(mockS3, "dateint=20161115/hour=13");
+    verifyExistenceChecked(mockS3, "dateint=20161115/hour=14");
     assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyCompletion(mockS3);
@@ -276,8 +248,7 @@ public class TestStagingPartitionedJobCommit
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=14")))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161116/hour=14");
     when(mockS3
         .delete(
             new Path(OUTPUT_PATH, "dateint=20161116/hour=14"),
@@ -294,7 +265,7 @@ public class TestStagingPartitionedJobCommit
         });
 
     verifyReplaceCommitActions(mockS3);
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=14"));
+    verifyDeleted(mockS3, "dateint=20161116/hour=14");
     assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyCompletion(mockS3);
@@ -307,16 +278,16 @@ public class TestStagingPartitionedJobCommit
    * root directories or the path not existing.
    * @throws Exception
    */
-//  @Test
+  @Test
   public void testReplaceWithDeleteFalse() throws Exception {
+    Assume.assumeTrue("not needed", false);
     FileSystem mockS3 = getMockS3();
 
     getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 
-    when(mockS3.exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=13")))
-        .thenReturn(true);
+    pathsExist(mockS3, "dateint=20161116/hour=13");
     when(mockS3
         .delete(
             new Path(OUTPUT_PATH, "dateint=20161116/hour=13"),
@@ -333,10 +304,10 @@ public class TestStagingPartitionedJobCommit
           }
         });
 
-    verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=13"));
-    verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161115/hour=14"));
-    verify(mockS3).exists(new Path(OUTPUT_PATH, "dateint=20161116/hour=13"));
-    verifyDeleted(mockS3, new Path(OUTPUT_PATH, "dateint=20161116/hour=13"));
+    verifyExistenceChecked(mockS3, "dateint=20161115/hour=13");
+    verifyExistenceChecked(mockS3, "dateint=20161115/hour=14");
+    verifyExistenceChecked(mockS3, "dateint=20161116/hour=13");
+    verifyDeleted(mockS3, "dateint=20161116/hour=13");
     assertTrue("Should have aborted",
         ((TestPartitionedStagingCommitter) committer).aborted);
     verifyCompletion(mockS3);

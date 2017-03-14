@@ -3106,7 +3106,7 @@ public class S3AFileSystem extends FileSystem {
         long length = sourceFile.length();
         Preconditions.checkArgument(offset == 0 || offset < length,
             "Offset %d beyond length of file %d", offset, length);
-        long range = length = offset;
+        long range = length - offset;
         Preconditions.checkArgument( range <= size,
             "Partion size %d > available bytes %d from offset %d in file %s",
             size, range, offset);
