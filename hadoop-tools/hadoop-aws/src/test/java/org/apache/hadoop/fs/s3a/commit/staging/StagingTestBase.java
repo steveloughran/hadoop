@@ -123,6 +123,13 @@ public class StagingTestBase {
         new Path(S3_OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
   }
 
+
+  protected static void assertConflictResolution(StagingS3GuardCommitter committer,
+      JobContext job,
+      ConflictResolution mode) {
+    Assert.assertEquals("Conflict resolution mode in " + committer,
+        mode, committer.getConflictResolutionMode(job));
+  }
   /**
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
@@ -174,7 +181,7 @@ public class StagingTestBase {
   public abstract static class JobCommitterTest<C extends OutputCommitter>
       extends Assert {
     private static final JobID JOB_ID = new JobID("job", 1);
-    private static final JobConf CONF = new JobConf();
+    private final JobConf jobConf = new JobConf();
 
     protected static final Path OUTPUT_PATH = S3_OUTPUT_PATH;
 
@@ -198,10 +205,10 @@ public class StagingTestBase {
     @Before
     public void setupJob() throws Exception {
 
-      this.mockFS = createAndBindMockFSInstance(CONF);
-      this.wrapperFS = lookupWrapperFS(CONF);
+      this.mockFS = createAndBindMockFSInstance(jobConf);
+      this.wrapperFS = lookupWrapperFS(jobConf);
 
-      this.job = new JobContextImpl(CONF, JOB_ID);
+      this.job = new JobContextImpl(jobConf, JOB_ID);
       job.getConfiguration().set(StagingCommitterConstants.UPLOAD_UUID,
           UUID.randomUUID().toString());
 

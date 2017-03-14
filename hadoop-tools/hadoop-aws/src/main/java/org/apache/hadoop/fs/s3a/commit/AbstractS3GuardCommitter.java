@@ -51,6 +51,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private Path workPath;
   private Configuration conf;
   private FileSystem destFS;
+  private JobContext jobContext;
 
   /**
    * Create a committer.
@@ -61,6 +62,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   protected AbstractS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
     Preconditions.checkArgument(outputPath != null);
+    Preconditions.checkArgument(context != null);
+    this.jobContext = context;
     setConf(context.getConfiguration());
     initOutput(outputPath);
     LOG.debug("Committer instantiated for job \"{}\" ID {} with destination {}",
@@ -78,7 +81,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * Create a committer.
    * This constructor binds the destination directory and configuration, but
    * does not update the work path: That must be calculated by the implemenation;
-   * its ommitted here to avoid subclass methods being called too early.
+   * its omitted here to avoid subclass methods being called too early.
    * @param outputPath the job's output path: MUST NOT be null.
    * @param context the task's context
    * @throws IOException on a failure
@@ -90,6 +93,14 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
             "ID {}",
         context.getTaskAttemptID(),
         context.getJobName(), context.getJobID());
+  }
+
+  /**
+   * Get the job/task context this committer was instantiated with
+   * @return the context.
+   */
+  public JobContext getJobContext() {
+    return jobContext;
   }
 
   /**

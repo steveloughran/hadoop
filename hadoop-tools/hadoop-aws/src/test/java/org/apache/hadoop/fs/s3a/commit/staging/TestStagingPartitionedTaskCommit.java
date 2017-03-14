@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -37,7 +38,6 @@ import java.util.concurrent.Callable;
 
 import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.BUCKET;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
 public class TestStagingPartitionedTaskCommit
@@ -71,14 +71,24 @@ public class TestStagingPartitionedTaskCommit
     }
   }
 
+
+  @Test
+  public void testBadConflictMode() throws Throwable {
+    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    assertThrows("commiter conflict", IllegalArgumentException.class,
+        "MERGE", this::newJobCommitter);
+  }
+
   @Test
   public void testDefault() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    getJob().getConfiguration().unset(CONFLICT_MODE);
+    JobContext job = getJob();
+    job.getConfiguration().unset(CONFLICT_MODE);
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
+    assertConflictResolution(committer, job, ConflictResolution.FAIL);
     StagingTestBase.createTestOutputFiles(relativeFiles,
         committer.getTaskAttemptPath(getTAC()), getTAC().getConfiguration());
 
@@ -89,7 +99,7 @@ public class TestStagingPartitionedTaskCommit
         .thenReturn(true);
 
     StagingTestBase.assertThrows(
-        "Should throw a PathExistsException because a partition already exists",
+        "Expected a PathExistsException as a partition already exists",
         PathExistsException.class, new Callable<Void>() {
           @Override
           public Void call() throws IOException {

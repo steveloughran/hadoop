@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.PathExistsException;
 
+import org.apache.hadoop.mapreduce.JobContext;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -36,6 +37,13 @@ public class TestStagingDirectoryOutputCommitter
   @Override
   DirectoryStagingCommitter newJobCommitter() throws Exception {
     return new DirectoryStagingCommitter(OUTPUT_PATH, getJob());
+  }
+
+  @Test
+  public void testBadConflictMode() throws Throwable {
+    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    assertThrows("commiter conflict", IllegalArgumentException.class,
+        "MERGE", this::newJobCommitter);
   }
 
   @Test
@@ -130,4 +138,5 @@ public class TestStagingDirectoryOutputCommitter
     verify(mockS3).delete(OUTPUT_PATH, true);
     verifyCompletion(mockS3);
   }
+
 }

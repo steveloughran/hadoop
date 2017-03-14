@@ -143,6 +143,13 @@ public class TestStagingPartitionedJobCommit
   }
 
   @Test
+  public void testBadConflictMode() throws Throwable {
+    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    assertThrows("commiter conflict", IllegalArgumentException.class,
+        "MERGE", this::newJobCommitter);
+  }
+
+  @Test
   public void testReplace() throws Exception {
     FileSystem mockS3 = getMockS3();
 

@@ -49,7 +49,7 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
     Path outputPath = getOutputPath(context);
     FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
     if (fs.exists(outputPath)) {
-      switch (getMode(context)) {
+      switch (getConflictResolutionMode(context)) {
         case FAIL:
           throw new PathExistsException(outputPath.toString());
         case APPEND:
@@ -70,7 +70,7 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
       // use the FS implementation because it will check for _$folder$
       FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
       if (fs.exists(outputPath)) {
-        switch (getMode(context)) {
+        switch (getConflictResolutionMode(context)) {
           case FAIL:
             // this was checked in setupJob, but this avoids some cases where
             // output was created while the job was processing

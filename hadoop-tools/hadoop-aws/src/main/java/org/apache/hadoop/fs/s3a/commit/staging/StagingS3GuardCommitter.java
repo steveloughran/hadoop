@@ -124,6 +124,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
     this.wrappedCommitter = createWrappedCommitter(context, conf);
+    postCreationActions();
   }
 
   public StagingS3GuardCommitter(Path outputPath,
@@ -132,14 +133,21 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     constructorOutputPath = getOutputPath();
     Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
-    uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
+    this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
-    uuid = getUploadUUID(conf, context.getJobID());
+    this.uuid = getUploadUUID(conf, context.getJobID());
     this.uniqueFilenames = conf.getBoolean(COMMITTER_UNIQUE_FILENAMES,
         DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
-    wrappedCommitter = createWrappedCommitter(context, conf);
+    this.wrappedCommitter = createWrappedCommitter(context, conf);
+    postCreationActions();
+  }
+
+  private void postCreationActions() throws IOException {
+    // forces evaluation and caching of the resolution mode.
+    ConflictResolution mode = getConflictResolutionMode(getJobContext());
+    LOG.debug("Conflict resolution mode: {}", mode);
   }
 
   /**
@@ -476,7 +484,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return a list of pending uploads.
    * @throws IOException Any IO failure
    */
-
   protected List<S3Util.PendingUpload> getPendingUploads(JobContext context)
       throws IOException {
     return getPendingUploads(context, false);
@@ -978,7 +985,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context the JobContext for this commit
    * @return the ConflictResolution mode
    */
-  protected final ConflictResolution getMode(JobContext context) {
+  public final ConflictResolution getConflictResolutionMode(JobContext context) {
     if (conflictResolution == null) {
       this.conflictResolution = ConflictResolution.valueOf(
           getConfictModeOption(context));
@@ -991,7 +998,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context context with the config
    * @return the trimmed configuration option, upper case.
    */
-  protected final String getConfictModeOption(JobContext context) {
+  public static final String getConfictModeOption(JobContext context) {
     return context
         .getConfiguration()
         .getTrimmed(CONFLICT_MODE, DEFAULT_CONFLICT_MODE)

@@ -97,7 +97,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     // enforce conflict resolution, but only if the mode is FAIL. for APPEND,
     // it doesn't matter that the partitions are already there, and for REPLACE,
     // deletion should be done during task commit.
-    if (getMode(context) == ConflictResolution.FAIL) {
+    if (getConflictResolutionMode(context) == ConflictResolution.FAIL) {
       FileSystem s3 = getOutputPath(context)
           .getFileSystem(context.getConfiguration());
       for (String partition : partitions) {
@@ -138,7 +138,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     // enforce conflict resolution
     boolean threw = true;
     try {
-      switch (getMode(context)) {
+      switch (getConflictResolutionMode(context)) {
         case FAIL:
           // FAIL checking is done on the task side, so this does nothing
           break;
@@ -154,7 +154,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
           break;
         default:
           throw new RuntimeException(
-              "Unknown conflict resolution mode: " + getMode(context));
+              "Unknown conflict resolution mode: " + getConflictResolutionMode(context));
       }
 
       threw = false;
