@@ -103,7 +103,7 @@ public class TestStagingDirectoryOutputCommitter
     final DirectoryStagingCommitter committer = newJobCommitter();
 
     committer.setupJob(getJob());
-    verifyExistenceChecked(mockS3, OUTPUT_PATH);
+    verifyNoMoreInteractions(mockS3);
 
     Mockito.reset(mockS3);
     pathExists(mockS3, OUTPUT_PATH);
@@ -124,7 +124,6 @@ public class TestStagingDirectoryOutputCommitter
     final DirectoryStagingCommitter committer = newJobCommitter();
 
     committer.setupJob(getJob());
-    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyNoMoreInteractions(mockS3);
 
     Mockito.reset(mockS3);

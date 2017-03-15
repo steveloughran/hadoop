@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -56,47 +55,42 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
     super.setupJob(context);
     Path outputPath = getOutputPath(context);
     FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
-    if (fs.exists(outputPath)) {
-      switch (getConflictResolutionMode(context)) {
-        case FAIL:
-          throw new PathExistsException(outputPath.toString());
-        case APPEND:
-        case REPLACE:
-          // do nothing.
-          // removing the directory, if overwriting is done in commitJob, in
-          // case there is a failure before commit.
-      }
+    if (getConflictResolutionMode(context) == ConflictResolution.FAIL
+        && fs.exists(outputPath)) {
+      throw new PathExistsException(outputPath.toString());
     }
   }
 
-  // TODO: handle aborting commits if delete() or exists() throws an exception
+
+  /**
+   * Pre-commit actions for a job.
+   * Here: look at the conflict resolution mode and choose
+   * an action based on the current policy.
+   * @param context job context
+   * @throws IOException any failure
+   */
   @Override
-  public void commitJob(JobContext context) throws IOException {
-    try (DurationInfo d = new DurationInfo("Commit Job %s",
-        context.getJobID())) {
-      Path outputPath = getOutputPath(context);
-      FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
-      switch (getConflictResolutionMode(context)) {
-        case FAIL:
-          // this was checked in setupJob, but this avoids some cases where
-          // output was created while the job was processing
-          if (fs.exists(outputPath)) {
-            throw new PathExistsException(outputPath.toString());
-          }
-          break;
-        case APPEND:
-          // do nothing
-          break;
-        case REPLACE:
-          LOG.debug("Removing output path to be replaced: {}", outputPath);
-          fs.delete(outputPath, true /* recursive */);
-          break;
-        default:
-          throw new IOException(
-              "Unknown conflict resolution mode: "
-                  + getConfictModeOption(context));
-      }
+  protected void preCommitJob(JobContext context) throws IOException {
+    Path outputPath = getOutputPath(context);
+    FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
+    switch (getConflictResolutionMode(context)) {
+      case FAIL:
+        // this was checked in setupJob, but this avoids some cases where
+        // output was created while the job was processing
+        if (fs.exists(outputPath)) {
+          throw new PathExistsException(outputPath.toString());
+        }
+        break;
+      case APPEND:
+        // do nothing
+        break;
+      case REPLACE:
+        LOG.debug("Removing output path to be replaced: {}", outputPath);
+        fs.delete(outputPath, true /* recursive */);
+        break;
+      default:
+        throw new IOException("Unknown conflict resolution mode: "
+                + getConfictModeOption(context));
     }
-    super.commitJob(context);
   }
 }

@@ -551,9 +551,20 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void commitJob(JobContext context) throws IOException {
     try (DurationInfo d = new DurationInfo("Commit Job %s",
         context.getJobID())) {
+      // TODO: handle aborting commits if this fails
+      preCommitJob(context);
       List<S3Util.PendingUpload> pending = getPendingUploads(context);
       commitJobInternal(context, pending);
     }
+  }
+
+  /**
+   * Subclass-specific pre commit actions
+   * @param context job context
+   * @throws IOException any failure
+   */
+  protected void preCommitJob(JobContext context) throws IOException {
+
   }
 
   protected void commitJobInternal(JobContext context,
