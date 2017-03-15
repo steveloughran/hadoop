@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assume;
 import org.junit.Test;
 
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
@@ -255,12 +257,11 @@ public class TestStagingPartitionedJobCommit
             true /* recursive */ ))
         .thenThrow(new IOException("Fake IOException for delete"));
 
-    StagingTestBase.assertThrows("Should throw the fake IOException",
-        IOException.class, new Callable<Void>() {
+    intercept(IOException.class, null, "Should throw the fake IOException",
+       new LambdaTestUtils.VoidCallable() {
           @Override
-          public Void call() throws IOException {
+          public void call() throws IOException {
             committer.commitJob(getJob());
-            return null;
           }
         });
 

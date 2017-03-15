@@ -109,7 +109,6 @@ public class TestStagingDirectoryOutputCommitter
     pathExists(mockS3, OUTPUT_PATH);
 
     committer.commitJob(getJob());
-//    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyCompletion(mockS3);
   }
 
@@ -131,7 +130,6 @@ public class TestStagingDirectoryOutputCommitter
     canDelete(mockS3, OUTPUT_PATH);
 
     committer.commitJob(getJob());
-//    verifyExistenceChecked(mockS3, OUTPUT_PATH);
     verifyDeleted(mockS3, OUTPUT_PATH);
     verifyCompletion(mockS3);
   }

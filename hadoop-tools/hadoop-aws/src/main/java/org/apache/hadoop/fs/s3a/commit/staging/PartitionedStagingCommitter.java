@@ -118,54 +118,41 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
    *   <li>REPLACE deletes all existing partitions</li>
    * </o>
    * @param context job context
-   * @throws IOException failure in an operation
+   * @param pending the pending operations
+   * @throws IOException any failure
    */
   @Override
-  public void commitJob(JobContext context) throws IOException {
+  protected void preCommitJob(JobContext context,
+      List<S3Util.PendingUpload> pending) throws IOException {
 
-    boolean threw = false;
-    List<S3Util.PendingUpload> pending = null;
-    try(DurationInfo d = new DurationInfo("Commit Job %s",
-        context.getJobID())) {
-      pending = getPendingUploads(context);
 
-      FileSystem s3 = getDestFS();
-      Set<Path> partitions = Sets.newLinkedHashSet();
-      for (S3Util.PendingUpload commit : pending) {
-        Path filePath = new Path(
-            "s3a://" + commit.getBucketName() + "/" + commit.getKey());
-        partitions.add(filePath.getParent());
-      }
-
-    // enforce conflict resolution
-    threw = true;
-      switch (getConflictResolutionMode(context)) {
-        case FAIL:
-          // FAIL checking is done on the task side, so this does nothing
-          break;
-        case APPEND:
-          // no check is needed because the output may exist for appending
-          break;
-        case REPLACE:
-          for (Path partitionPath : partitions) {
-            LOG.info("Removing partition path to be replaced: " +
-                partitionPath);
-            s3.delete(partitionPath, true /* recursive */);
-          }
-          break;
-        default:
-          throw new IOException("Unknown conflict resolution mode: "
-                  + getConflictResolutionMode(context));
-      }
-
-      threw = false;
-    } finally {
-      if (threw /* && pending != null */) {
-        abortJobInternal(context, pending, threw);
-      }
+    FileSystem s3 = getDestFS();
+    Set<Path> partitions = Sets.newLinkedHashSet();
+    for (S3Util.PendingUpload commit : pending) {
+      Path filePath = new Path(
+          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
+      partitions.add(filePath.getParent());
     }
 
-    commitJobInternal(context, pending);
+    // enforce conflict resolution
+    switch (getConflictResolutionMode(context)) {
+      case FAIL:
+        // FAIL checking is done on the task side, so this does nothing
+        break;
+      case APPEND:
+        // no check is needed because the output may exist for appending
+        break;
+      case REPLACE:
+        for (Path partitionPath : partitions) {
+          LOG.info("Removing partition path to be replaced: " +
+              partitionPath);
+          s3.delete(partitionPath, true /* recursive */);
+        }
+        break;
+      default:
+        throw new IOException("Unknown conflict resolution mode: "
+            + getConflictResolutionMode(context));
+    }
   }
 
   protected Set<String> getPartitions(Path attemptPath,

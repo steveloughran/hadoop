@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -547,23 +548,44 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return pending;
   }
 
+  /**
+   * Commit work.
+   * This consists of two stages: precommit and commit.
+   * <p>
+   * Precommit: identify pending uploads, then allow subclasses
+   * to validate the state of the destination and the pending uploads.
+   * Any failure here triggers an abort of all pending uploads.
+   * <p>
+   * Commit internal: do the final commit sequence.
+   * @param context job context
+   * @throws IOException any failure
+   */
   @Override
   public void commitJob(JobContext context) throws IOException {
+    List<S3Util.PendingUpload> pending = Collections.emptyList();
+    try (DurationInfo d = new DurationInfo("Pre-commit Job %s",
+        context.getJobID())) {
+      pending = getPendingUploads(context);
+      preCommitJob(context, pending);
+    } catch (IOException e) {
+      LOG.warn("Precommit failure for job {}", context.getJobID(), e);
+      abortJobInternal(context, pending, true);
+      throw e;
+    }
     try (DurationInfo d = new DurationInfo("Commit Job %s",
         context.getJobID())) {
-      // TODO: handle aborting commits if this fails
-      preCommitJob(context);
-      List<S3Util.PendingUpload> pending = getPendingUploads(context);
       commitJobInternal(context, pending);
     }
   }
 
   /**
-   * Subclass-specific pre commit actions
+   * Subclass-specific pre commit actions.
    * @param context job context
+   * @param pending the pending operations
    * @throws IOException any failure
    */
-  protected void preCommitJob(JobContext context) throws IOException {
+  protected void preCommitJob(JobContext context,
+      List<S3Util.PendingUpload> pending) throws IOException {
 
   }
 
@@ -582,13 +604,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Tasks.foreach(pending)
           .stopOnFailure().throwFailureWhenFinished()
           .executeWith(getThreadPool(context))
-          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
-            @Override
-            public void run(S3Util.PendingUpload commit,
-                            Exception exception) throws IOException {
-              S3Util.abortCommit(client, commit);
-            }
-          })
+          .onFailure(
+              new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
+                @Override
+                public void run(S3Util.PendingUpload commit,
+                    Exception exception) throws IOException {
+                  S3Util.abortCommit(client, commit);
+                }
+              })
           .abortWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit) throws IOException {
@@ -626,9 +649,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   protected void abortJobInternal(JobContext context,
-                                  List<S3Util.PendingUpload> pending,
-                                  boolean suppressExceptions)
+      List<S3Util.PendingUpload> pending,
+      boolean suppressExceptions)
       throws IOException {
+    LOG.warn("Aborting Job {}", context.getJobID());
+    if (pending == null || pending.isEmpty()) {
+      LOG.info("No pending commits to abort");
+      return;
+    }
     final AmazonS3 client = getClient(
         getOutputPath(context), context.getConfiguration());
 
@@ -802,16 +830,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             public void run(FileStatus stat) throws IOException {
               File localFile = new File(
                   URI.create(stat.getPath().toString()).getPath());
-/* 0 byte files are still PUTtable
-              if (localFile.length() <= 0) {
-                return;
-              }
-*/
               String relative = Paths.getRelativePath(attemptPath, stat.getPath());
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
               S3Util.PendingUpload commit = S3Util.multipartUpload(amazonS3,
-                  localFile, partition, getBucket(context), key,
+                  localFile, partition,
+                  getBucket(context), key,
                   uploadPartSize);
               LOG.debug("Adding pending commit {}", commit);
               commits.add(commit);
@@ -1009,7 +1033,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context context with the config
    * @return the trimmed configuration option, upper case.
    */
-  public static final String getConfictModeOption(JobContext context) {
+  public static String getConfictModeOption(JobContext context) {
     return context
         .getConfiguration()
         .getTrimmed(CONFLICT_MODE, DEFAULT_CONFLICT_MODE)

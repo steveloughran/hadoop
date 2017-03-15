@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * This commits to a directory. The conflict policy is
@@ -67,10 +68,12 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
    * Here: look at the conflict resolution mode and choose
    * an action based on the current policy.
    * @param context job context
+   * @param pending
    * @throws IOException any failure
    */
   @Override
-  protected void preCommitJob(JobContext context) throws IOException {
+  protected void preCommitJob(JobContext context,
+      List<S3Util.PendingUpload> pending) throws IOException {
     Path outputPath = getOutputPath(context);
     FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
     switch (getConflictResolutionMode(context)) {

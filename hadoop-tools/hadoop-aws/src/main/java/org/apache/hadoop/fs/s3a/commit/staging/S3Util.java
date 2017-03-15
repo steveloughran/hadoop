@@ -42,7 +42,6 @@ import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Lists;
@@ -72,6 +71,12 @@ public class S3Util {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3Util.class);
 
+  /**
+   * Revert a pending commit by deleting the destination.
+   * @param client client
+   * @param commit pending
+   * @throws IOException failure
+   */
   public static void revertCommit(AmazonS3 client,
       PendingUpload commit) throws IOException {
     LOG.debug("Revert {}", commit);
@@ -82,6 +87,12 @@ public class S3Util {
     }
   }
 
+  /**
+   * Finish the pending commit.
+   * @param client client
+   * @param commit pending
+   * @throws IOException failure
+   */
   public static void finishCommit(AmazonS3 client,
       PendingUpload commit) throws IOException {
     LOG.debug("Finish {}", commit);
@@ -92,12 +103,25 @@ public class S3Util {
     }
   }
 
+  /**
+   * Abort a pending commit.
+   * @param client client
+   * @param pending pending commit to abort
+   * @throws IOException failure
+   */
   public static void abortCommit(AmazonS3 client,
-      PendingUpload commit) throws IOException {
-    LOG.debug("Abort {}", commit);
-    abort(client, commit.getKey(), commit.newAbortRequest());
+      PendingUpload pending) throws IOException {
+    LOG.debug("Abort {}", pending);
+    abort(client, pending.getKey(), pending.newAbortRequest());
   }
 
+  /**
+   * Abort an MPU.
+   * @param client S3 client
+   * @param key dest key
+   * @param request MPU request
+   * @throws IOException failure
+   */
   protected static void abort(AmazonS3 client,
       String key,
       AbortMultipartUploadRequest request) throws IOException {
@@ -108,6 +132,18 @@ public class S3Util {
     }
   }
 
+  /**
+   * Upload all the data in the local file, returning the information
+   * needed to commit the work.
+   * @param client S3 client
+   * @param localFile local file (be  a file)
+   * @param partition partition/subdir. Not used
+   * @param bucket dest bucket
+   * @param key dest key
+   * @param uploadPartSize size of upload
+   * @return a pending upload entry
+   * @throws IOException failure
+   */
   public static PendingUpload multipartUpload(
       AmazonS3 client, File localFile, String partition,
       String bucket, String key, long uploadPartSize)
@@ -259,8 +295,11 @@ public class S3Util {
     private final String uploadId;
     private final SortedMap<Integer, String> parts;
 
-    public PendingUpload(String partition, String bucket, String key,
-                         String uploadId, Map<Integer, String> etags) {
+    public PendingUpload(String partition,
+        String bucket,
+        String key,
+        String uploadId,
+        Map<Integer, String> etags) {
       this.partition = partition;
       this.bucket = bucket;
       this.key = key;
@@ -268,8 +307,10 @@ public class S3Util {
       this.parts = ImmutableSortedMap.copyOf(etags);
     }
 
-    public PendingUpload(String bucket, String key,
-                         String uploadId, List<PartETag> etags) {
+    public PendingUpload(String bucket,
+        String key,
+        String uploadId,
+        List<PartETag> etags) {
       this.partition = null;
       this.bucket = bucket;
       this.key = key;
