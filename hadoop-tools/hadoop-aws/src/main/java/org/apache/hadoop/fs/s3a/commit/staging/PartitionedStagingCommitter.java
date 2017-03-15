@@ -18,20 +18,15 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.PathIsDirectoryException;
-import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -63,28 +58,6 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     sb.append(super.toString());
     sb.append('}');
     return sb.toString();
-  }
-
-  @Override
-  protected List<FileStatus> getTaskOutput(TaskAttemptContext context)
-      throws IOException {
-    PathFilter filter = Paths.HiddenPathFilter.get();
-
-    // get files on the local FS in the attempt path
-    Path attemptPath = getTaskAttemptPath(context);
-    FileSystem attemptFS = getTaskAttemptFilesystem(context);
-    RemoteIterator<LocatedFileStatus> iter = attemptFS
-        .listFiles(attemptPath, true /* recursive */ );
-
-    List<FileStatus> stats = Lists.newArrayList();
-    while (iter.hasNext()) {
-      FileStatus stat = iter.next();
-      if (filter.accept(stat.getPath())) {
-        stats.add(stat);
-      }
-    }
-
-    return stats;
   }
 
   @Override

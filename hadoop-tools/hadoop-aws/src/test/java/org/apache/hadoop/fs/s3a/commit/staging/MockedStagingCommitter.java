@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientErrors;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientResults;
 import org.apache.hadoop.conf.Configuration;
@@ -79,6 +80,7 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   @Override
   public void commitJob(JobContext context) throws IOException {
+    // turn off stamping an output marker, as that codepath isn't mocked yet.
     super.commitJob(context);
     Configuration conf = context.getConfiguration();
     try {
@@ -94,4 +96,9 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
     }
   }
 
+  @Override
+  protected void maybeTouchSuccessMarker(JobContext context)
+      throws IOException {
+     //skipped
+  }
 }

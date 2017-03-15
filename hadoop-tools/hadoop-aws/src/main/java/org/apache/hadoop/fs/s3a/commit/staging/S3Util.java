@@ -222,6 +222,7 @@ public class S3Util {
   static List<PendingUpload> readPendingCommits(FileSystem fs,
                                                 Path pendingCommitsFile)
       throws IOException {
+    LOG.debug("Reading pending commits in file {}", pendingCommitsFile);
     List<PendingUpload> commits = Lists.newArrayList();
 
     ObjectInputStream in = new ObjectInputStream(fs.open(pendingCommitsFile));

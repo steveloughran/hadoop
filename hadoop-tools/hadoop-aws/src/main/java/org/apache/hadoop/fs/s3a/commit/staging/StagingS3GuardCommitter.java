@@ -23,6 +23,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +48,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -111,7 +113,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   /** The directory in the cluster FS for commits to go to */
   private Path commitsDirectory;
 
-  public StagingS3GuardCommitter(Path outputPath, JobContext context)
+  /**
+   * Committer for a job attempt.
+   * @param outputPath final output path
+   * @param context job context
+   * @throws IOException on a failure
+   */
+  public StagingS3GuardCommitter(Path outputPath,
+      JobContext context)
       throws IOException {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
@@ -128,6 +137,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     postCreationActions();
   }
 
+  /**
+   * Committer for a single task attempt.
+   * @param outputPath final output path
+   * @param context task context
+   * @throws IOException on a failure
+   */
   public StagingS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
@@ -158,7 +173,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context job/task context.
    * @param conf config
    * @return the inner committer
-   * @throws IOException
+   * @throws IOException on a failure
    */
   protected FileOutputCommitter createWrappedCommitter(JobContext context,
       Configuration conf) throws IOException {
@@ -381,23 +396,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected List<FileStatus> getTaskOutput(TaskAttemptContext context)
       throws IOException {
-    // get files on the local FS in the attempt path
-    Path workPath = getWorkPath();
-    Preconditions.checkNotNull(workPath, "No work path in {}", this);
-    FileSystem attemptFS = workPath.getFileSystem(context.getConfiguration());
-    LOG.debug("Scanning {} for files to commit", workPath);
-    try {
-      FileStatus[] stats = attemptFS.listStatus(workPath,
-          Paths.HiddenPathFilter.get());
-      return Arrays.asList(stats);
-    } catch (FileNotFoundException e) {
-      LOG.debug("No output generated in task");
-//      return new ArrayList<>(0);
-      throw (FileNotFoundException) new FileNotFoundException(
-          String.format("No local working directory %s for task %s",
-              workPath, context.getTaskAttemptID().toString())).initCause(e);
+    PathFilter filter = Paths.HiddenPathFilter.get();
 
+    // get files on the local FS in the attempt path
+    Path attemptPath = getTaskAttemptPath(context);
+    Preconditions.checkNotNull(attemptPath, "No attemptPath path in {}", this);
+
+    LOG.debug("Scanning {} for files to commit", attemptPath);
+    FileSystem attemptFS = getTaskAttemptFilesystem(context);
+    RemoteIterator<LocatedFileStatus> iter = attemptFS
+        .listFiles(attemptPath, true /* recursive */);
+
+    List<FileStatus> stats = Lists.newArrayList();
+    while (iter.hasNext()) {
+      FileStatus stat = iter.next();
+      if (filter.accept(stat.getPath())) {
+        stats.add(stat);
+      }
     }
+    return stats;
   }
 
   /**
@@ -557,6 +574,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * Any failure here triggers an abort of all pending uploads.
    * <p>
    * Commit internal: do the final commit sequence.
+   * <p>
+   * The final commit action is to call {@link #maybeTouchSuccessMarker(JobContext)}
+   * to set the {@code __SUCCESS} file entry.
+   * </p>
    * @param context job context
    * @throws IOException any failure
    */
@@ -576,6 +597,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         context.getJobID())) {
       commitJobInternal(context, pending);
     }
+    maybeTouchSuccessMarker(context);
   }
 
   /**
@@ -755,7 +777,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       // list didn't find a directory, so nothing to commit
       // TODO: throw this up as an error?
       LOG.info("No files to commit");
-      return false;
+      throw e;
     }
   }
 

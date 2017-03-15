@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.magic;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
@@ -57,8 +58,6 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public static final String NAME
       = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter";
 
-  private FileCommitActions commitActions;
-
   /**
    * Instantiate.
    * @param outputPath output path
@@ -68,7 +67,6 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public MagicS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
     super(outputPath, context);
-    commitActions = new FileCommitActions(getDestS3AFS());
   }
 
   /**
@@ -80,7 +78,6 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public MagicS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
-    commitActions = new FileCommitActions(getDestS3AFS());
     setWorkPath(getTaskAttemptPath(context));
     verifyIsDelayedCommitPath(getDestS3AFS(), getWorkPath());
     LOG.debug("Task attempt {} has work path {}",
@@ -120,13 +117,9 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     getDestFS().getFileStatus(getJobAttemptPath(context));
 
     cleanupJob(context);
+    maybeTouchSuccessMarker(context);
 
-    // True if the job requires output.dir marked on successful job.
-    // Note that by default it is set to true.
-    if (context.getConfiguration().getBoolean(
-        SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true)) {
-      commitActions.touchSuccessMarker(getOutputPath());
-    }
+
   }
 
   @Override

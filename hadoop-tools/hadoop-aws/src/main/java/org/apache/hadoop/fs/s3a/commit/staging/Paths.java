@@ -236,10 +236,13 @@ public class Paths {
     @Override
     public boolean accept(Path path) {
       return (
-          !path.getName().startsWith(".") &&
-              !path.getName().startsWith("_")
+          !isHiddenPath(path)
       );
     }
+  }
+
+  public static boolean isHiddenPath(Path path) {
+    return path.getName().startsWith(".") || path.getName().startsWith("_");
   }
 
   public static class CommitFileFilter implements PathFilter {

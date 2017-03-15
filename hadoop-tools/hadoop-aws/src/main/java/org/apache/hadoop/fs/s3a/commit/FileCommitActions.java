@@ -228,6 +228,7 @@ public class FileCommitActions {
    */
   public void touchSuccessMarker(Path outputPath) throws IOException {
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
+    LOG.debug("Touching success marker for job {}", markerPath);
     fs.create(markerPath, true).close();
   }
 

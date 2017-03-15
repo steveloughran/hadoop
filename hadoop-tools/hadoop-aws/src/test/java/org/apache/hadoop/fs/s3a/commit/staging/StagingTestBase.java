@@ -245,6 +245,9 @@ public class StagingTestBase {
       this.jobConf = new JobConf();
       jobConf.set(StagingCommitterConstants.UPLOAD_UUID,
           UUID.randomUUID().toString());
+      jobConf.setBoolean(
+          CommitConstants.CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
+          false);
 
       this.mockFS = createAndBindMockFSInstance(jobConf);
       this.wrapperFS = lookupWrapperFS(jobConf);

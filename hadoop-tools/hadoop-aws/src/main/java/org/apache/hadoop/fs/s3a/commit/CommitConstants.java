@@ -71,7 +71,7 @@ public interface CommitConstants {
   /**
    * Flag to trigger creation of a marker file on job completion.
    */
-  String SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
+  String CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
       = FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
 
   /**
@@ -79,4 +79,5 @@ public interface CommitConstants {
    */
   String SUCCESS_FILE_NAME = "_SUCCESS";
 
+  boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
 }

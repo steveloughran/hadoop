@@ -406,7 +406,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     Job job = Job.getInstance(getConfiguration());
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-    conf.setBoolean(SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
+    conf.setBoolean(CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
     FileOutputFormat.setOutputPath(job, outDir);
     return job;
   }

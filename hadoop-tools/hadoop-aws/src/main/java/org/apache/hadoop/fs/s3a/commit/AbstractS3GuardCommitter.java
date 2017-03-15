@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -47,11 +48,12 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
+  protected final FileCommitActions commitActions;
   private Path outputPath;
   private Path workPath;
   private Configuration conf;
   private FileSystem destFS;
-  private JobContext jobContext;
+  private final JobContext jobContext;
 
   /**
    * Create a committer.
@@ -68,13 +70,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     initOutput(outputPath);
     LOG.debug("Committer instantiated for job \"{}\" ID {} with destination {}",
         context.getJobName(), context.getJobID(), outputPath);
-  }
-
-  /** TESTING ONLY; allows mock FS to cheat. */
-  protected void initOutput(Path out) throws IOException {
-    FileSystem fs = getDestination(out, getConf());
-    setDestFS(fs);
-    setOutputPath(fs.makeQualified(out));
+    commitActions = new FileCommitActions(getDestS3AFS());
   }
 
   /**
@@ -93,6 +89,13 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
             "ID {}",
         context.getTaskAttemptID(),
         context.getJobName(), context.getJobID());
+  }
+
+  /** TESTING ONLY; allows mock FS to cheat. */
+  protected void initOutput(Path out) throws IOException {
+    FileSystem fs = getDestination(out, getConf());
+    setDestFS(fs);
+    setOutputPath(fs.makeQualified(out));
   }
 
   /**
@@ -240,6 +243,20 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     LOG.warn("Cannot recover task {}", taskContext.getTaskAttemptID());
     throw new IOException(String.format("Unable to recover task %s",
         taskContext.getTaskAttemptID()));
+  }
+
+  /**
+   * if the job requires output.dir marked on successful job,
+   * create the file {@link CommitConstants#SUCCESS_FILE_NAME}
+   * @param context job context
+   * @throws IOException IO failure
+   */
+  protected void maybeTouchSuccessMarker(JobContext context) throws IOException {
+    if (context.getConfiguration().getBoolean(
+        CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
+        DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER)) {
+      commitActions.touchSuccessMarker(getOutputPath());
+    }
   }
 
   @Override
