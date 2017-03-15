@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.scale;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.Constants;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 
 /**
  * Use classic output for writing things; tweaks the configuration to do
@@ -32,6 +33,9 @@ public class ITestS3AHugeFilesClassicOutput extends AbstractSTestS3AHugeFiles {
   protected Configuration createScaleConfiguration() {
     final Configuration conf = super.createScaleConfiguration();
     conf.setBoolean(Constants.FAST_UPLOAD, false);
+    // turn off magic committer if it was on, as that will force the
+    // FS into using the fast upload stream again
+    conf.setBoolean(CommitConstants.COMMITTER_ENABLED, false);
     return conf;
   }
 
