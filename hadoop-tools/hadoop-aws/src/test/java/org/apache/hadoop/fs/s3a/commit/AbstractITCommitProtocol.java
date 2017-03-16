@@ -25,10 +25,13 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -385,6 +388,21 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       assertTrue("No files to commit were found by " + committer,
           committer.needsTaskCommit(tContext));
       committer.commitTask(tContext);
+
+      // this is only task commit; there MUST be no part- files in the dest dir
+      try {
+        RemoteIterator<LocatedFileStatus> files
+            = getFileSystem().listFiles(outDir, false);
+        S3ATestUtils.iterateOverFiles(files,
+            (LocatedFileStatus status) -> {
+              assertFalse("task committed file to dest :" + status,
+                  status.getPath().toString().contains("part"));
+            });
+      } catch (FileNotFoundException e) {
+        LOG.info("Outdir {} is not created by task commit phase ",
+            outDir);
+      }
+
       describe("3. Committing job");
       committer.commitJob(jContext);
       describe("4. Validating content");

@@ -750,7 +750,15 @@ public final class S3ATestUtils {
   public interface CallOnLocatedFileStatus {
     void call(LocatedFileStatus status) throws Exception;
   }
-  public static void iterate(RemoteIterator<LocatedFileStatus> iterator,
+
+  /**
+   * Iterate over files
+   * @param iterator iterator from a list
+   * @param eval closure to evaluate
+   * @throws Exception anything in the closure, or iteration logic.
+   */
+  public static void iterateOverFiles(
+      RemoteIterator<LocatedFileStatus> iterator,
       CallOnLocatedFileStatus eval) throws Exception {
     while(iterator.hasNext()) {
       eval.call(iterator.next());
@@ -771,7 +779,7 @@ public final class S3ATestUtils {
       LOG.info("Empty path");
       return;
     }
-    iterate(fileSystem.listFiles(path, recursive),
+    iterateOverFiles(fileSystem.listFiles(path, recursive),
         (LocatedFileStatus status) -> LOG.info("  {}", status));
   }
 
