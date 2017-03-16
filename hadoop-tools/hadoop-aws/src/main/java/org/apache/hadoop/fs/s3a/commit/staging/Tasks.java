@@ -33,9 +33,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-// TODO: retries
-public class Tasks {
+
+/**
+ * Utility class for parallel execution, takes closures for the various
+ * actions.
+ * TODO: retries
+ */
+final class Tasks {
   private static final Logger LOG = LoggerFactory.getLogger(Tasks.class);
+
+  private Tasks() {
+  }
 
   interface FailureTask<I, E extends Exception> {
     void run(I item, Exception exception) throws E;

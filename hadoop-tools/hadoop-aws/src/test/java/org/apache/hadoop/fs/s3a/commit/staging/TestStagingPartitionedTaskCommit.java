@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
+/** Test suite.*/
 public class TestStagingPartitionedTaskCommit
     extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
   @Override
@@ -111,7 +112,8 @@ public class TestStagingPartitionedTaskCommit
 
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
-    for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
+    for (InitiateMultipartUploadRequest request :
+        getMockResults().getRequests().values()) {
       assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
@@ -159,7 +161,8 @@ public class TestStagingPartitionedTaskCommit
 
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
-    for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
+    for (InitiateMultipartUploadRequest request :
+        getMockResults().getRequests().values()) {
       assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
@@ -194,7 +197,8 @@ public class TestStagingPartitionedTaskCommit
 
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
-    for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
+    for (InitiateMultipartUploadRequest request :
+        getMockResults().getRequests().values()) {
       assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }
@@ -231,7 +235,8 @@ public class TestStagingPartitionedTaskCommit
 
     committer.commitTask(getTAC());
     Set<String> files = Sets.newHashSet();
-    for (InitiateMultipartUploadRequest request : getMockResults().getRequests().values()) {
+    for (InitiateMultipartUploadRequest request :
+        getMockResults().getRequests().values()) {
       assertEquals(BUCKET, request.getBucketName());
       files.add(request.getKey());
     }

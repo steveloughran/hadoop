@@ -41,6 +41,7 @@ import static org.apache.hadoop.util.StringUtils.join;
  * it must also be serialized. Jackson expects lists, and it is used
  * to persist to disk.
  *
+ * Also: checkstyle can STFU.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving

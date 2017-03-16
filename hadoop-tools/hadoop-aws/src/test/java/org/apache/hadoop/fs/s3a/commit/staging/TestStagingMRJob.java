@@ -50,25 +50,26 @@ import java.util.UUID;
 import static org.mockito.Mockito.mock;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 
+/** Test suite.*/
 public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
-  private static MiniMRYarnCluster MR_CLUSTER = null;
+  private static MiniMRYarnCluster cluster = null;
 
   @BeforeClass
   public static void setupMiniMRCluster() throws IOException {
     createAndBindMockFSInstance(getConfiguration());
-    MR_CLUSTER = new MiniMRYarnCluster(
+    cluster = new MiniMRYarnCluster(
         "TestStagingMRJobr", 2);
-    MR_CLUSTER.init(getConfiguration());
-    MR_CLUSTER.start();
+    cluster.init(getConfiguration());
+    cluster.start();
   }
 
-    @AfterClass
+  @AfterClass
   public static void stopMiniMRCluster() {
-    if (MR_CLUSTER != null) {
-      MR_CLUSTER.stop();
+    if (cluster != null) {
+      cluster.stop();
     }
-    MR_CLUSTER = null;
+    cluster = null;
   }
 
   public static class S3TextOutputFormat<K, V>
@@ -86,6 +87,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     }
   }
 
+  /** Test class. */
   public static class M extends Mapper<LongWritable, Text, LongWritable, Text> {
     @Override
     protected void map(LongWritable key, Text value, Context context)
@@ -115,7 +117,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
           OUTPUT_PATH, "part-m-0000" + i + "-" + commitUUID).toString());
     }
 
-    Job mrJob = Job.getInstance(MR_CLUSTER.getConfig(), "test-committer-job");
+    Job mrJob = Job.getInstance(cluster.getConfig(), "test-committer-job");
     Configuration conf = mrJob.getConfiguration();
 
     mrJob.setOutputFormatClass(S3TextOutputFormat.class);
@@ -154,7 +156,8 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
     Set<String> actualFiles = Sets.newHashSet();
     for (CompleteMultipartUploadRequest commit : results.commits) {
-      actualFiles.add("s3a://" + commit.getBucketName() + "/" + commit.getKey());
+      actualFiles.add(
+          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
     }
 
     assertEquals("Should commit the correct file paths",

@@ -372,12 +372,12 @@ public final class CommitUtils {
    * @param out The output path to put things in.
    * @return the path where a task attempt should be stored.
    */
-  public static Path getMagicTaskAttemptPath(TaskAttemptContext context, Path out) {
+  public static Path getMagicTaskAttemptPath(TaskAttemptContext context,
+      Path out) {
     Path p1 = new Path(getMagicTaskAttemptsPath(context, out),
         String.valueOf(context.getTaskAttemptID()));
     return new Path(p1, BASE_PATH);
   }
-
 
   /**
    * Compute a path for temporary data associated with a job.
@@ -397,7 +397,8 @@ public final class CommitUtils {
    * @param out output directory of job
    * @return the path to store temporary job attempt data.
    */
-  public static Path getTempTaskAttemptPath(TaskAttemptContext context, Path out) {
+  public static Path getTempTaskAttemptPath(TaskAttemptContext context,
+      Path out) {
     return new Path(getTempJobAttemptPath(getAppAttemptId(context), out),
         String.valueOf(context.getTaskAttemptID()));
   }

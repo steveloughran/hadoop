@@ -30,6 +30,7 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.mockito.Mockito.*;
 
+/** Test suite.*/
 public class TestStagingDirectoryOutputCommitter
     extends StagingTestBase.JobCommitterTest<DirectoryStagingCommitter> {
   @Override
@@ -40,8 +41,10 @@ public class TestStagingDirectoryOutputCommitter
   @Test
   public void testBadConflictMode() throws Throwable {
     getJob().getConfiguration().set(CONFLICT_MODE, "merge");
-    assertThrows("commiter conflict", IllegalArgumentException.class,
-        "MERGE", this::newJobCommitter);
+    assertThrows("commiter conflict",
+        IllegalArgumentException.class,
+        "MERGE",
+        this::newJobCommitter);
   }
 
   @Test

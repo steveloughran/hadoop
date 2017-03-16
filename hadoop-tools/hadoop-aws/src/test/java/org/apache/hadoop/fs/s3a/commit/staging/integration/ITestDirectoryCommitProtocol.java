@@ -26,6 +26,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
+/** ITest of the low level protocol methods. */
 public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
 
   @Override
@@ -42,8 +43,8 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
 
 
   @Override
-  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
-      throws IOException {
+  public AbstractS3GuardCommitter createFailingCommitter(
+      TaskAttemptContext tContext) throws IOException {
     return new CommitterWithFailedThenSucceed(outDir, tContext);
   }
 
@@ -51,8 +52,7 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
    * The class provides a overridden implementation of commitJobInternal which
    * causes the commit failed for the first time then succeed.
    */
-
-  private static class CommitterWithFailedThenSucceed extends
+  private static final class CommitterWithFailedThenSucceed extends
       DirectoryStagingCommitter {
     private final FailThenSucceed failure = new FailThenSucceed();
 

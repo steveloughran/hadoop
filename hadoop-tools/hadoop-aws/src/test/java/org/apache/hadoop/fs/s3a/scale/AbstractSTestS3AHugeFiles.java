@@ -83,7 +83,6 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
         DEFAULT_HUGE_FILESIZE);
   }
 
-
   /**
    * Note that this can get called before test setup.
    * @return the configuration to use.
@@ -91,7 +90,7 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
   @Override
   protected Configuration createScaleConfiguration() {
     Configuration conf = super.createScaleConfiguration();
-    partitionSize = (int)getTestPropertyBytes(conf,
+    partitionSize = (int) getTestPropertyBytes(conf,
         KEY_HUGE_PARTITION_SIZE,
         DEFAULT_PARTITION_SIZE);
     assertTrue("Partition size too small: " + partitionSize,
@@ -300,7 +299,7 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     }
 
     private void verifyNoFailures(String operation) {
-      assertEquals("Failures in " + operation +": " + this, 0, failures.get());
+      assertEquals("Failures in " + operation + ": " + this, 0, failures.get());
     }
   }
 
@@ -319,7 +318,8 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
    */
   private void assumeFileExists(Path file) throws IOException {
     S3AFileSystem fs = getFileSystem();
-    ContractTestUtils.assertPathExists(fs, "huge file not created", hugefile);
+    ContractTestUtils.assertPathExists(fs, "huge file not created",
+        hugefile);
     FileStatus status = fs.getFileStatus(hugefile);
     ContractTestUtils.assertIsFile(hugefile, status);
     assertTrue("File " + hugefile + " is empty", status.getLen() > 0);
@@ -360,11 +360,11 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     describe("Positioned reads of %s %s", filetype, hugefile);
     S3AFileSystem fs = getFileSystem();
     FileStatus status = fs.getFileStatus(hugefile);
-    long filesize = status.getLen();
+    long size = status.getLen();
     int ops = 0;
     final int bufferSize = 8192;
     byte[] buffer = new byte[bufferSize];
-    long eof = filesize - 1;
+    long eof = size - 1;
 
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
     ContractTestUtils.NanoTimer readAtByte0, readAtByte0Again, readAtEOF;
@@ -385,7 +385,7 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
       ops++;
       LOG.info("Final stream state: {}", in);
     }
-    long mb = Math.max(filesize / _1MB, 1);
+    long mb = Math.max(size / _1MB, 1);
 
     logFSState();
     timer.end("time to perform positioned reads of %s of %d MB ",
@@ -404,8 +404,8 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     describe("Reading %s", hugefile);
     S3AFileSystem fs = getFileSystem();
     FileStatus status = fs.getFileStatus(hugefile);
-    long filesize = status.getLen();
-    long blocks = filesize / uploadBlockSize;
+    long size = status.getLen();
+    long blocks = size / uploadBlockSize;
     byte[] data = new byte[uploadBlockSize];
 
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
@@ -416,11 +416,11 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
       LOG.info("Final stream state: {}", in);
     }
 
-    long mb = Math.max(filesize / _1MB, 1);
+    long mb = Math.max(size / _1MB, 1);
     timer.end("time to read file of %d MB ", mb);
     LOG.info("Time per MB to read = {} nS",
         toHuman(timer.nanosPerOperation(mb)));
-    bandwidth(timer, filesize);
+    bandwidth(timer, size);
     logFSState();
   }
 
@@ -430,18 +430,18 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     describe("renaming %s to %s", hugefile, hugefileRenamed);
     S3AFileSystem fs = getFileSystem();
     FileStatus status = fs.getFileStatus(hugefile);
-    long filesize = status.getLen();
+    long size = status.getLen();
     fs.delete(hugefileRenamed, false);
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
     fs.rename(hugefile, hugefileRenamed);
-    long mb = Math.max(filesize / _1MB, 1);
+    long mb = Math.max(size / _1MB, 1);
     timer.end("time to rename file of %d MB", mb);
     LOG.info("Time per MB to rename = {} nS",
         toHuman(timer.nanosPerOperation(mb)));
-    bandwidth(timer, filesize);
+    bandwidth(timer, size);
     logFSState();
     FileStatus destFileStatus = fs.getFileStatus(hugefileRenamed);
-    assertEquals(filesize, destFileStatus.getLen());
+    assertEquals(size, destFileStatus.getLen());
 
     // rename back
     ContractTestUtils.NanoTimer timer2 = new ContractTestUtils.NanoTimer();
@@ -449,7 +449,7 @@ public abstract class AbstractSTestS3AHugeFiles extends S3AScaleTestBase {
     timer2.end("Renaming back");
     LOG.info("Time per MB to rename = {} nS",
         toHuman(timer2.nanosPerOperation(mb)));
-    bandwidth(timer2, filesize);
+    bandwidth(timer2, size);
   }
 
   /**

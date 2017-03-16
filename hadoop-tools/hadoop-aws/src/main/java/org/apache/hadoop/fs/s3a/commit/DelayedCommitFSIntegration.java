@@ -49,7 +49,7 @@ public class DelayedCommitFSIntegration {
   private final boolean delayedCommitEnabled;
 
   /**
-   * Instantiate
+   * Instantiate.
    * @param owner pwner class
    * @param delayedCommitEnabled is delayed commit enabled.
    */

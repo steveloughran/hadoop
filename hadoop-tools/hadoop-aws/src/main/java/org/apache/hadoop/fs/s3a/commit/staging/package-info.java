@@ -16,13 +16,10 @@
  * limitations under the License.
  */
 
+/**
+ * The staging committers.
+ */
+@InterfaceAudience.Private
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-/**
- * Enum of conflict resolution algorithms.
- */
-public enum ConflictResolution {
-  FAIL,
-  APPEND,
-  REPLACE
-}
+import org.apache.hadoop.classification.InterfaceAudience;

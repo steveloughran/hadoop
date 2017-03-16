@@ -32,8 +32,10 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
+/** ITest of the low level protocol methods. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
   @Override
@@ -42,7 +44,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     conf.setBoolean(COMMITTER_ENABLED, false);
     conf.setInt(COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        DirectoryStagingCommitterFactory.NAME);
+        DIRECTORY_COMMITTER_FACTORY);
     // disable unique filenames so that the protocol tests of FileOutputFormat
     // and this test generate consistent names.
     conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, false);
@@ -62,8 +64,8 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   }
 
   @Override
-  protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
-      throws IOException {
+  protected AbstractS3GuardCommitter createCommitter(
+      TaskAttemptContext context) throws IOException {
     return new StagingS3GuardCommitter(outDir, context);
   }
 
@@ -74,8 +76,8 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   }
 
 
-  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
-      throws IOException {
+  public AbstractS3GuardCommitter createFailingCommitter(
+      TaskAttemptContext tContext) throws IOException {
     return new CommitterWithFailedThenSucceed(outDir, tContext);
   }
 
@@ -95,8 +97,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
    * The class provides a overridden implementation of commitJobInternal which
    * causes the commit failed for the first time then succeed.
    */
-
-  private static class CommitterWithFailedThenSucceed extends
+  private static final class CommitterWithFailedThenSucceed extends
       StagingS3GuardCommitter {
     private final FailThenSucceed failure = new FailThenSucceed();
 

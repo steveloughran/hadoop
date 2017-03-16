@@ -63,8 +63,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected AbstractS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
-    Preconditions.checkArgument(outputPath != null);
-    Preconditions.checkArgument(context != null);
+    Preconditions.checkArgument(outputPath != null, "null output path");
+    Preconditions.checkArgument(context != null, "null job context");
     this.jobContext = context;
     setConf(context.getConfiguration());
     initOutput(outputPath);
@@ -76,8 +76,9 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * Create a committer.
    * This constructor binds the destination directory and configuration, but
-   * does not update the work path: That must be calculated by the implemenation;
-   * its omitted here to avoid subclass methods being called too early.
+   * does not update the work path: That must be calculated by the
+   * implementation;
+   * It is omitted here to avoid subclass methods being called too early.
    * @param outputPath the job's output path: MUST NOT be null.
    * @param context the task's context
    * @throws IOException on a failure
@@ -99,7 +100,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * Get the job/task context this committer was instantiated with
+   * Get the job/task context this committer was instantiated with.
    * @return the context.
    */
   public JobContext getJobContext() {
@@ -121,7 +122,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
 
   /**
    * This is the critical method for {@code FileOutputFormat}; it declares
-   * the path for work
+   * the path for work.
    * @return the working path.
    */
   @Override
@@ -143,7 +144,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * Get the destination FS, on demand if it is not already set
+   * Get the destination FS, on demand if it is not already set.
    * @return the filesystem; requires the output path to be set up
    * @throws IOException if the FS cannot be instantiated.
    */
@@ -162,7 +163,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @throws IOException if the FS cannot be instantiated.
    */
   protected S3AFileSystem getDestS3AFS() throws IOException {
-    return (S3AFileSystem)getDestFS();
+    return (S3AFileSystem) getDestFS();
   }
 
   protected void setDestFS(FileSystem destFS) {
@@ -216,14 +217,14 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * Get the destination filesystem from the output path and the configuration.
    * @param out output path
-   * @param conf job/task config
+   * @param config job/task config
    * @return the associated FS
    * @throws PathCommitException output path isn't to an S3A FS instance.
    * @throws IOException failure to instantiate the FS.
    */
-  protected FileSystem getDestination(Path out, Configuration conf)
+  protected FileSystem getDestination(Path out, Configuration config)
       throws IOException {
-    return getS3AFileSystem(out, conf, isDelayedCommitRequired());
+    return getS3AFileSystem(out, config, isDelayedCommitRequired());
   }
 
   /**
@@ -247,11 +248,12 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
 
   /**
    * if the job requires output.dir marked on successful job,
-   * create the file {@link CommitConstants#SUCCESS_FILE_NAME}
+   * create the file {@link CommitConstants#SUCCESS_FILE_NAME}.
    * @param context job context
    * @throws IOException IO failure
    */
-  protected void maybeTouchSuccessMarker(JobContext context) throws IOException {
+  protected void maybeTouchSuccessMarker(JobContext context)
+      throws IOException {
     if (context.getConfiguration().getBoolean(
         CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
         DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER)) {
@@ -270,13 +272,13 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     }
   }
 
-/**
- * Get the task attempt path filesystem. This may not be the same as the
- * final destination FS, and so may not be an S3A FS.
- * @param context task attempt
- * @return the filesystem
- * @throws IOException failure to instantiate
- */
+  /**
+   * Get the task attempt path filesystem. This may not be the same as the
+   * final destination FS, and so may not be an S3A FS.
+   * @param context task attempt
+   * @return the filesystem
+   * @throws IOException failure to instantiate
+   */
   protected FileSystem getTaskAttemptFilesystem(TaskAttemptContext context)
       throws IOException {
     return getTaskAttemptPath(context).getFileSystem(getConf());

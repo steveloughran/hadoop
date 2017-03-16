@@ -27,11 +27,10 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import java.io.IOException;
 
 /**
- * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link StagingS3GuardCommitter}; for other filesystems
- * use the classic committer.
+ * Creates the Directory committer.
  */
-public class DirectoryStagingCommitterFactory extends Abstract3GuardCommitterFactory {
+public class DirectoryStagingCommitterFactory
+    extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */

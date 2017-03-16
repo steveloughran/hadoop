@@ -65,9 +65,12 @@ import java.util.Map;
 import java.util.SortedMap;
 
 /**
- * TODO: All this needs to be replaced by delegating to S3AFS
+ * TODO: All this needs to be replaced by delegating to S3AFS.
  */
-public class S3Util {
+public final class S3Util {
+
+  private S3Util() {
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(S3Util.class);
 
@@ -219,9 +222,15 @@ public class S3Util {
     }
   }
 
+  /**
+   * deserialize a file of pending commits.
+   * @param fs filesystem
+   * @param pendingCommitsFile filename
+   * @return the list of uploads
+   * @throws IOException IO Failure
+   */
   static List<PendingUpload> readPendingCommits(FileSystem fs,
-                                                Path pendingCommitsFile)
-      throws IOException {
+      Path pendingCommitsFile) throws IOException {
     LOG.debug("Reading pending commits in file {}", pendingCommitsFile);
     List<PendingUpload> commits = Lists.newArrayList();
 
@@ -239,7 +248,11 @@ public class S3Util {
     return commits;
   }
 
-  private static class ObjectIterator<T> implements Iterator<T>, Iterable<T> {
+  /**
+   * Iterator over objects in an object stream.
+   * @param <T> type of object.
+   */
+  private static final class ObjectIterator<T> implements Iterator<T>, Iterable<T> {
     private final ObjectInputStream stream;
     private boolean hasNext;
     private T next;
@@ -289,7 +302,7 @@ public class S3Util {
    * This class is used to pass information about pending uploads from tasks to
    * the job committer. It is serializable and will instantiate S3 requests.
    */
-  public static class PendingUpload implements Serializable {
+  public static final class PendingUpload implements Serializable {
     private final String partition;
     private final String bucket;
     private final String key;

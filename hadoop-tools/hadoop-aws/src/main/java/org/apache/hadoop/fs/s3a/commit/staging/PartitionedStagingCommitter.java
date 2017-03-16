@@ -34,6 +34,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Partitioned committer.
+ */
 public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   protected static final String TABLE_ROOT = "table_root";
 
@@ -46,7 +49,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   public PartitionedStagingCommitter(Path outputPath,
-                                      TaskAttemptContext context)
+      TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
   }
@@ -85,11 +88,11 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
   /**
    * The partition path conflict resolution assumes that:
-   * <o>
+   * <ol>
    *   <li>FAIL checking has taken place earlier.</li>
    *   <li>APPEND is allowed</li>
    *   <li>REPLACE deletes all existing partitions</li>
-   * </o>
+   * </ol>
    * @param context job context
    * @param pending the pending operations
    * @throws IOException any failure
@@ -97,7 +100,6 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   @Override
   protected void preCommitJob(JobContext context,
       List<S3Util.PendingUpload> pending) throws IOException {
-
 
     FileSystem s3 = getDestFS();
     Set<Path> partitions = Sets.newLinkedHashSet();
@@ -109,22 +111,22 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
     // enforce conflict resolution
     switch (getConflictResolutionMode(context)) {
-      case FAIL:
-        // FAIL checking is done on the task side, so this does nothing
-        break;
-      case APPEND:
-        // no check is needed because the output may exist for appending
-        break;
-      case REPLACE:
-        for (Path partitionPath : partitions) {
-          LOG.info("Removing partition path to be replaced: " +
-              partitionPath);
-          s3.delete(partitionPath, true /* recursive */);
-        }
-        break;
-      default:
-        throw new IOException("Unknown conflict resolution mode: "
-            + getConflictResolutionMode(context));
+    case FAIL:
+      // FAIL checking is done on the task side, so this does nothing
+      break;
+    case APPEND:
+      // no check is needed because the output may exist for appending
+      break;
+    case REPLACE:
+      for (Path partitionPath : partitions) {
+        LOG.info("Removing partition path to be replaced: " +
+            partitionPath);
+        s3.delete(partitionPath, true);
+      }
+      break;
+    default:
+      throw new IOException("Unknown conflict resolution mode: "
+          + getConflictResolutionMode(context));
     }
   }
 

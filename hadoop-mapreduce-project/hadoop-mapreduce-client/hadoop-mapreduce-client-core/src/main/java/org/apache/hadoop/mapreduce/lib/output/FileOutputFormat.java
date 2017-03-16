@@ -61,7 +61,8 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
   private PathOutputCommitter committer = null;
 
   /** Configuration option: should output be compressed? {@value}. */
-  public static final String COMPRESS ="mapreduce.output.fileoutputformat.compress";
+  public static final String COMPRESS =
+      "mapreduce.output.fileoutputformat.compress";
 
   /** If compression is enabled, name of codec: {@value}. */
   public static final String COMPRESS_CODEC =
@@ -70,10 +71,12 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
    * Type of compression {@value}: NONE, RECORD, BLOCK.
    * Generally only used in {@code SequenceFileOutputFormat}.
    */
-  public static final String COMPRESS_TYPE = "mapreduce.output.fileoutputformat.compress.type";
+  public static final String COMPRESS_TYPE =
+      "mapreduce.output.fileoutputformat.compress.type";
 
   /** Destination directory of work : {@value}. */
-  public static final String OUTDIR = "mapreduce.output.fileoutputformat.outputdir";
+  public static final String OUTDIR =
+      "mapreduce.output.fileoutputformat.outputdir";
 
   @Deprecated
   public enum Counter {
@@ -304,8 +307,8 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
         "Null workPath returned by committer %s", c);
     Path workFile = new Path(workPath,
         getUniqueFile(context, getOutputName(context), extension));
-    LOG.debug("Work file for {} extension '{}' is {}", context, extension,
-        workFile);
+    LOG.debug("Work file for {} extension '{}' is {}",
+        context, extension, workFile);
     return workFile;
   }
 

@@ -23,17 +23,20 @@ package org.apache.hadoop.fs.s3a.commit.staging;
  * MUST use the "fs.s3a." prefix so as to support per-bucket configuration.
  */
 public class StagingCommitterConstants {
-  public static final String UPLOAD_SIZE = "fs.s3a.staging.committer.upload.size";
+  public static final String UPLOAD_SIZE =
+      "fs.s3a.staging.committer.upload.size";
   public static final long DEFAULT_UPLOAD_SIZE = 10485760L; // 10 MB
   public static final String UPLOAD_UUID = "fs.s3a.staging.committer.uuid";
-  public static final String CONFLICT_MODE = "fs.s3a.staging.committer.conflict-mode";
+  public static final String CONFLICT_MODE =
+      "fs.s3a.staging.committer.conflict-mode";
   public static final String CONFLICT_MODE_FAIL = "fail";
   public static final String CONFLICT_MODE_APPEND = "append";
   public static final String CONFLICT_MODE_REPLACE = "replace";
   public static final String DEFAULT_CONFLICT_MODE = CONFLICT_MODE_FAIL;
 
 
-  public static final String COMMITTER_THREADS = "fs.s3a.staging.committer.threads";
+  public static final String COMMITTER_THREADS =
+      "fs.s3a.staging.committer.threads";
   public static final int DEFAULT_COMMITTER_THREADS = 8;
 
   /**
@@ -46,12 +49,13 @@ public class StagingCommitterConstants {
       "fs.s3a.staging.committer.unique-filenames";
 
   /**
-   * Default value for {@link #COMMITTER_UNIQUE_FILENAMES}: {@value}
+   * Default value for {@link #COMMITTER_UNIQUE_FILENAMES}: {@value}.
    */
   public static final boolean DEFAULT_COMMITTER_UNIQUE_FILENAMES = true;
 
   // Spark configuration keys
-  public static final String SPARK_WRITE_UUID = "spark.sql.sources.writeJobUUID";
+  public static final String SPARK_WRITE_UUID =
+      "spark.sql.sources.writeJobUUID";
   public static final String SPARK_APP_ID = "spark.app.id";
   public static final String MAPREDUCE_CLUSTER_LOCAL_DIR
       = "mapreduce.cluster.local.dir";

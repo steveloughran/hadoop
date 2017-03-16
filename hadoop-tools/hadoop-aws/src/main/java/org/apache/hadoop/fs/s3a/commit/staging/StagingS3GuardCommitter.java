@@ -92,7 +92,6 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
-
   private static final Logger LOG = LoggerFactory.getLogger(
       StagingS3GuardCommitter.class);
   private final Path constructorOutputPath;
@@ -110,7 +109,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private String s3KeyPrefix = null;
   private Path bucketRoot = null;
 
-  /** The directory in the cluster FS for commits to go to */
+  /** The directory in the cluster FS for commits to go to. */
   private Path commitsDirectory;
 
   /**
@@ -251,12 +250,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Get the filesystem for the job attempt
+   * Get the filesystem for the job attempt.
    * @param context the context of the job.  This is used to get the
    * application attempt id.
    * @return the FS to store job attempt data.
    */
-  public FileSystem getJobAttemptFileSystem(JobContext context) throws IOException {
+  public FileSystem getJobAttemptFileSystem(JobContext context)
+      throws IOException {
     Path p = getJobAttemptPath(context);
     return p.getFileSystem(context.getConfiguration());
   }
@@ -977,7 +977,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return finalOutputPath;
   }
 
-  private final String getBucket(JobContext context) throws IOException {
+  private String getBucket(JobContext context) throws IOException {
     if (bucket == null) {
       // getting the output path sets the bucket from the path
       getOutputPath(context);
@@ -1042,7 +1042,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context the JobContext for this commit
    * @return the ConflictResolution mode
    */
-  public final ConflictResolution getConflictResolutionMode(JobContext context) {
+  public final ConflictResolution getConflictResolutionMode(
+      JobContext context) {
     if (conflictResolution == null) {
       this.conflictResolution = ConflictResolution.valueOf(
           getConfictModeOption(context));
@@ -1051,7 +1052,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Get the conflict mode option string
+   * Get the conflict mode option string.
    * @param context context with the config
    * @return the trimmed configuration option, upper case.
    */

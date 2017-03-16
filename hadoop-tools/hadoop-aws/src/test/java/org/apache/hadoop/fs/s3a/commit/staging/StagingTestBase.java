@@ -68,6 +68,10 @@ import static org.apache.hadoop.test.LambdaTestUtils.*;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Test base for staging: core constants and static methods, inner classes
+ * for specific test types.
+ */
 public class StagingTestBase {
 
   public static final String BUCKET = "bucket-name";
@@ -94,14 +98,14 @@ public class StagingTestBase {
     URI uri = OUTPUT_PATH_URI;
     wrapperFS.setMock(mockFs);
     wrapperFS.initialize(uri, conf);
-    FileSystemTestHelper.addFileSystemForTesting(uri, conf,  wrapperFS);
+    FileSystemTestHelper.addFileSystemForTesting(uri, conf, wrapperFS);
     return mockFs;
   }
 
   /**
-   * The FS URI as a wrapper FS
-   * @param conf
-   * @return
+   * Look up the FS by URI, return a (cast) Mock wrapper.
+   * @param conf config
+   * @return F
    * @throws IOException
    */
   public static MockS3AFileSystem lookupWrapperFS(Configuration conf)
@@ -114,7 +118,8 @@ public class StagingTestBase {
     verifyNoMoreInteractions(mockS3);
   }
 
-  public static void verifyDeleted(FileSystem mockS3, Path path) throws IOException {
+  public static void verifyDeleted(FileSystem mockS3, Path path)
+      throws IOException {
     verify(mockS3).delete(path, true);
   }
 
@@ -123,13 +128,16 @@ public class StagingTestBase {
       throws IOException {
     verifyDeleted(mockS3, new Path(OUTPUT_PATH, child));
   }
-  public static void verifyCleanupTempFiles(FileSystem mockS3) throws IOException {
+
+  public static void verifyCleanupTempFiles(FileSystem mockS3)
+      throws IOException {
     verifyDeleted(mockS3,
         new Path(OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
   }
 
 
-  protected static void assertConflictResolution(StagingS3GuardCommitter committer,
+  protected static void assertConflictResolution(
+      StagingS3GuardCommitter committer,
       JobContext job,
       ConflictResolution mode) {
     Assert.assertEquals("Conflict resolution mode in " + committer,
@@ -137,7 +145,7 @@ public class StagingTestBase {
   }
 
 
-  public static void pathsExist(FileSystem mockS3, String...children)
+  public static void pathsExist(FileSystem mockS3, String... children)
       throws IOException {
     for (String child : children) {
       pathExists(mockS3, new Path(OUTPUT_PATH, child));
@@ -154,7 +162,7 @@ public class StagingTestBase {
     when(mockS3.exists(path)).thenReturn(false);
   }
 
-  public static void canDelete(FileSystem mockS3, String...children)
+  public static void canDelete(FileSystem mockS3, String... children)
       throws IOException {
     for (String child : children) {
       canDelete(mockS3, new Path(OUTPUT_PATH, child));
@@ -163,7 +171,7 @@ public class StagingTestBase {
 
   public static void canDelete(FileSystem mockS3, Path f) throws IOException {
     when(mockS3.delete(f,
-            true /* recursive */))
+        true /* recursive */))
         .thenReturn(true);
   }
 
@@ -204,7 +212,7 @@ public class StagingTestBase {
       if (cluster == null) {
         Configuration c = new JobConf();
         c.setBoolean("dfs.webhdfs.enabled", false);
-        // if this fails with "The directory is already locked" set umask to 0022
+        // if this fails with "directory is already locked" set umask to 0022
         cluster = new MiniDFSCluster(c, 1, true, null);
         //cluster = new MiniDFSCluster.Builder(new Configuration()).build();
         dfs = cluster.getFileSystem();
@@ -284,6 +292,7 @@ public class StagingTestBase {
     abstract C newJobCommitter() throws Exception;
   }
 
+  /** */
   public abstract static class TaskCommitterTest<C extends OutputCommitter>
       extends JobCommitterTest<C> {
     private static final TaskAttemptID AID = new TaskAttemptID(
@@ -317,6 +326,7 @@ public class StagingTestBase {
     abstract C newTaskCommitter() throws Exception;
   }
 
+  /** */
   public static class ClientResults implements Serializable {
     // For inspection of what the committer did
     public final Map<String, InitiateMultipartUploadRequest> requests =
@@ -326,7 +336,8 @@ public class StagingTestBase {
     public final Map<String, List<String>> tagsByUpload = Maps.newHashMap();
     public final List<CompleteMultipartUploadRequest> commits =
         Lists.newArrayList();
-    public final List<AbortMultipartUploadRequest> aborts = Lists.newArrayList();
+    public final List<AbortMultipartUploadRequest> aborts
+        = Lists.newArrayList();
     public final List<DeleteObjectRequest> deletes = Lists.newArrayList();
 
     public Map<String, InitiateMultipartUploadRequest> getRequests() {
@@ -358,6 +369,7 @@ public class StagingTestBase {
     }
   }
 
+  /** */
   public static class ClientErrors {
     // For injecting errors
     public int failOnInit = -1;
@@ -388,7 +400,7 @@ public class StagingTestBase {
   }
 
   public static AmazonS3 newMockClient(final ClientResults results,
-                                       final ClientErrors errors) {
+      final ClientErrors errors) {
     AmazonS3Client mockClient = mock(AmazonS3Client.class);
     final Object lock = new Object();
 
@@ -511,7 +523,7 @@ public class StagingTestBase {
   }
 
   private static UploadPartResult newResult(UploadPartRequest request,
-                                            String etag) {
+      String etag) {
     UploadPartResult result = new UploadPartResult();
     result.setPartNumber(request.getPartNumber());
     result.setETag(etag);
@@ -526,9 +538,8 @@ public class StagingTestBase {
   }
 
   public static void createTestOutputFiles(List<String> relativeFiles,
-                                           Path attemptPath,
-                                           Configuration conf)
-      throws Exception {
+      Path attemptPath,
+      Configuration conf) throws Exception {
     // create files in the attempt path that should be found by getTaskOutput
     FileSystem attemptFS = attemptPath.getFileSystem(conf);
     attemptFS.delete(attemptPath, true);
@@ -541,7 +552,7 @@ public class StagingTestBase {
   }
 
   /**
-   * A convenience method to avoid a large number of @Test(expected=...) tests
+   * A convenience method to avoid a large number of @Test(expected=...) tests.
    * @param message A String message to describe this assertion
    * @param expected An Exception class that the Runnable should throw
    * @param callable A Callable that is expected to throw the exception
@@ -553,7 +564,7 @@ public class StagingTestBase {
   }
 
   /**
-   * A convenience method to avoid a large number of @Test(expected=...) tests
+   * A convenience method to avoid a large number of @Test(expected=...) tests.
    * @param message A String message to describe this assertion
    * @param expected An Exception class that the Runnable should throw
    * @param callable A Callable that is expected to throw the exception
@@ -565,7 +576,7 @@ public class StagingTestBase {
   }
 
   /**
-   * A convenience method to avoid a large number of @Test(expected=...) tests
+   * A convenience method to avoid a large number of @Test(expected=...) tests.
    * @param message A String message to describe this assertion
    * @param expected An Exception class that the Runnable should throw
    * @param runnable A Runnable that is expected to throw the exception
@@ -577,7 +588,7 @@ public class StagingTestBase {
   }
 
   /**
-   * A convenience method to avoid a large number of @Test(expected=...) tests
+   * A convenience method to avoid a large number of @Test(expected=...) tests.
    * @param message A String message to describe this assertion
    * @param expected An Exception class that the Runnable should throw
    * @param runnable A Runnable that is expected to throw the exception

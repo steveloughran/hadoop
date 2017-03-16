@@ -86,7 +86,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * require delayed commit supported in the FS
+   * Require delayed commit supported in the FS.
    * @return true, always.
    */
   @Override
@@ -118,8 +118,6 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
 
     cleanupJob(context);
     maybeTouchSuccessMarker(context);
-
-
   }
 
   @Override
@@ -233,7 +231,6 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       deleteQuietly(getDestFS(), getTempTaskAttemptPath(context), true);
     }
   }
-
 
   /**
    * Compute the path where the output of a given job attempt will be placed.

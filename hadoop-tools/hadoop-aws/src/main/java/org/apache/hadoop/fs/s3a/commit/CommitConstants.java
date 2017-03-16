@@ -18,8 +18,18 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.staging.PartitonedStagingCommitterFactory;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 
+/**
+ * Constants for working with committers.
+ */
+@InterfaceAudience.Public
+@InterfaceStability.Unstable
 public interface CommitConstants {
 
   /**
@@ -79,5 +89,10 @@ public interface CommitConstants {
    */
   String SUCCESS_FILE_NAME = "_SUCCESS";
 
+  /** Default job marker option: {@value}. */
   boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
+
+  String MAGIC_COMMITTER_FACTORY = MagicS3GuardCommitterFactory.NAME;
+  String DIRECTORY_COMMITTER_FACTORY = DirectoryStagingCommitterFactory.NAME;
+  String PARTITION_COMMITTER_FACTORY = PartitonedStagingCommitterFactory.NAME;
 }

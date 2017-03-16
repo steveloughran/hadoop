@@ -32,7 +32,10 @@ import static org.apache.hadoop.fs.s3a.Constants.BUFFER_DIR;
  * A class which manages access to a temporary directory store, uses the
  * directories listed in {@link Constants#BUFFER_DIR} for this.
  */
-class LocalTempDir {
+final class LocalTempDir {
+
+  private LocalTempDir() {
+  }
 
   private static LocalDirAllocator directoryAllocator;
 
@@ -52,7 +55,7 @@ class LocalTempDir {
    * @param prefix filename prefix
    * @param size file size, or -1 if not known
    * @return the temp file. The file has been created.
-   * @throws IOException
+   * @throws IOException IO failure
    */
   public static File tempFile(Configuration conf, String prefix, long size)
       throws IOException {
@@ -60,6 +63,14 @@ class LocalTempDir {
         prefix, size, conf);
   }
 
+  /**
+   * Get a temporary path
+   * @param conf configuration to use when creating the allocator
+   * @param prefix filename prefix
+   * @param size file size, or -1 if not known
+   * @return the temp path.
+   * @throws IOException IO failure
+   */
   public static Path tempPath(Configuration conf, String prefix, long size)
       throws IOException {
     return getAllocator(conf, BUFFER_DIR).getLocalPathForWrite(

@@ -24,7 +24,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -36,7 +35,10 @@ import java.util.Random;
 /**
  * Path operations for the staging committers.
  */
-public class Paths {
+public final class Paths {
+
+  private Paths() {
+  }
 
   public static String addUUID(String path, String uuid) {
     // In some cases, Spark will add the UUID to the filename itself.
@@ -59,7 +61,12 @@ public class Paths {
     }
   }
 
-  private static class Pair<L, R> {
+  /**
+   * A simple tuple.
+   * @param <L> left element type
+   * @param <R> right element type
+   */
+  private static final class Pair<L, R> {
     private final L first;
     private final R second;
 
@@ -154,25 +161,25 @@ public class Paths {
    */
   public static Path tempDirForFileSystem(FileSystem fs) {
     Path temp;
-    switch( fs.getScheme()) {
-      case "file":
-        temp = fs.makeQualified(new Path(System.getProperty(
-            StagingCommitterConstants.JAVA_IO_TMPDIR)));
-        break;
-      case "s3a":
-        temp = new Path(fs.getHomeDirectory(),  "tmp");
-        break;
+    switch (fs.getScheme()) {
+    case "file":
+      temp = fs.makeQualified(new Path(System.getProperty(
+          StagingCommitterConstants.JAVA_IO_TMPDIR)));
+      break;
+    case "s3a":
+      temp = new Path(fs.getHomeDirectory(), "tmp");
+      break;
 
-        // here assume that /tmp is valid
-      case "hdfs":
-      default:
-        temp = fs.makeQualified(new Path("/tmp"));
+    // here assume that /tmp is valid
+    case "hdfs":
+    default:
+      temp = fs.makeQualified(new Path("/tmp"));
     }
     return temp;
   }
 
   /**
-   * Get the Application Attempt Id for this job
+   * Get the Application Attempt Id for this job.
    * @param context the context to look in
    * @return the Application Attempt Id for a given job.
    */
@@ -183,7 +190,7 @@ public class Paths {
 
   /**
    * Build a temporary path for the multipart upload commit information
-   * in the filesystem
+   * in the filesystem.
    * @param conf configuration defining default FS.
    * @param uuid uuid of job
    * @return a path which can be used for temporary work
@@ -223,6 +230,9 @@ public class Paths {
     return path.substring(start, end);
   }
 
+  /**
+   * path filter.
+   */
   public static class HiddenPathFilter implements PathFilter {
     private static final HiddenPathFilter INSTANCE = new HiddenPathFilter();
   
@@ -235,29 +245,8 @@ public class Paths {
   
     @Override
     public boolean accept(Path path) {
-      return (
-          !isHiddenPath(path)
-      );
-    }
-  }
-
-  public static boolean isHiddenPath(Path path) {
-    return path.getName().startsWith(".") || path.getName().startsWith("_");
-  }
-
-  public static class CommitFileFilter implements PathFilter {
-    private static final CommitFileFilter INSTANCE = new CommitFileFilter();
-  
-    public static CommitFileFilter get() {
-      return INSTANCE;
-    }
-  
-    private CommitFileFilter() {
-    }
-  
-    @Override
-    public boolean accept(Path path) {
-      return path.getName().equals(StagingCommitterConstants.COMMIT_FILENAME);
+      return !path.getName().startsWith(".")
+          && !path.getName().startsWith("_");
     }
   }
 

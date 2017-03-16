@@ -64,7 +64,8 @@ public abstract class Abstract3GuardCommitterFactory
     return outputCommitter;
   }
 
-  protected abstract AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
+  protected abstract AbstractS3GuardCommitter createTaskCommitter(
+      Path outputPath,
       TaskAttemptContext context) throws IOException;
 
   public FileSystem getDestFS(Path outputPath, JobContext context)
@@ -90,6 +91,7 @@ public abstract class Abstract3GuardCommitterFactory
     return outputCommitter;
   }
 
-  protected abstract AbstractS3GuardCommitter createJobCommitter(Path outputPath,
+  protected abstract AbstractS3GuardCommitter createJobCommitter(
+      Path outputPath,
       JobContext context) throws IOException;
 }

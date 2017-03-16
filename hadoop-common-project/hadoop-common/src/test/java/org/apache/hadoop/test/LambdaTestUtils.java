@@ -490,7 +490,7 @@ public final class LambdaTestUtils {
         "Expecting " + clazz.getName()
         + (contained != null? (" with text " + contained) :"")
         + " but got ",
-        () -> { eval.call(); return "void";});
+        () -> { eval.call(); return "void"; });
   }
 
   /**
@@ -514,7 +514,7 @@ public final class LambdaTestUtils {
       VoidCallable eval)
       throws Exception {
     return intercept(clazz, contained, message,
-        () -> {eval.call(); return "void";});
+        () -> { eval.call(); return "void"; });
   }
 
   /**

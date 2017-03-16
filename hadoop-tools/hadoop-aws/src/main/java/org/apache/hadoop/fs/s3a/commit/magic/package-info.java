@@ -16,13 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging;
-
 /**
- * Enum of conflict resolution algorithms.
+ * This is the "Magic" committer and support.
  */
-public enum ConflictResolution {
-  FAIL,
-  APPEND,
-  REPLACE
-}
+@InterfaceAudience.Private
+package org.apache.hadoop.fs.s3a.commit.magic;
+
+import org.apache.hadoop.classification.InterfaceAudience;

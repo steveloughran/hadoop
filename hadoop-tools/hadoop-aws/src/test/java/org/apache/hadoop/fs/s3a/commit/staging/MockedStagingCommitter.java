@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientErrors;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientResults;
 import org.apache.hadoop.conf.Configuration;
@@ -37,16 +36,17 @@ import java.io.ObjectOutputStream;
  */
 class MockedStagingCommitter extends StagingS3GuardCommitter {
 
-  public final ClientResults results = new ClientResults();
-  public final ClientErrors errors = new ClientErrors();
-  private final AmazonS3 mockClient = StagingTestBase.newMockClient(results, errors);
+  private final ClientResults results = new ClientResults();
+  private final ClientErrors errors = new ClientErrors();
+  private final AmazonS3 mockClient = StagingTestBase.newMockClient(
+      getResults(), getErrors());
 
-  public MockedStagingCommitter(Path outputPath, JobContext context)
+  MockedStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
     super(outputPath, context);
   }
 
-  public MockedStagingCommitter(Path outputPath, TaskAttemptContext context)
+  MockedStagingCommitter(Path outputPath, TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
   }
@@ -54,14 +54,14 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   /**
    * Returns the mock FS without checking FS type.
    * @param out output path
-   * @param conf job/task config
+   * @param config job/task config
    * @return a filesystem.
-   * @throws IOException
+   * @throws IOException IO failure
    */
   @Override
-  protected FileSystem getDestination(Path out, Configuration conf)
+  protected FileSystem getDestination(Path out, Configuration config)
       throws IOException {
-    return out.getFileSystem(conf);
+    return out.getFileSystem(config);
   }
 
   /*
@@ -75,7 +75,7 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   @Override
   protected AmazonS3 getClient(Path path, Configuration conf) {
-    return mockClient;
+    return getMockClient();
   }
 
   @Override
@@ -87,8 +87,9 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
       String jobCommitterPath = conf.get("mock-results-file");
       if (jobCommitterPath != null) {
         try (ObjectOutputStream out = new ObjectOutputStream(
-            FileSystem.getLocal(conf).create(new Path(jobCommitterPath), false))) {
-          out.writeObject(results);
+            FileSystem.getLocal(conf)
+                .create(new Path(jobCommitterPath), false))) {
+          out.writeObject(getResults());
         }
       }
     } catch (Exception e) {
@@ -100,5 +101,17 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   protected void maybeTouchSuccessMarker(JobContext context)
       throws IOException {
      //skipped
+  }
+
+  public ClientResults getResults() {
+    return results;
+  }
+
+  public ClientErrors getErrors() {
+    return errors;
+  }
+
+  public AmazonS3 getMockClient() {
+    return mockClient;
   }
 }

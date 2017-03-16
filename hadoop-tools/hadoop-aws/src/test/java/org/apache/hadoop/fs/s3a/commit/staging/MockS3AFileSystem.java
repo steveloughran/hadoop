@@ -63,19 +63,19 @@ public class MockS3AFileSystem extends S3AFileSystem {
     this.logEvents = logEvents;
   }
 
-  private void event(String format, Object...args) {
+  private void event(String format, Object... args) {
     Throwable ex = null;
     switch (logEvents) {
-      case LOG_STACK:
-        ex = new Exception("stack");
+    case LOG_STACK:
+      ex = new Exception("stack");
         /* fall through */
-      case LOG_NAME:
-        String s = String.format(format, args);
-        LOG.info(s, ex);
-        break;
-      case LOG_NONE:
-      default:
-        //nothing
+    case LOG_NAME:
+      String s = String.format(format, args);
+      LOG.info(s, ex);
+      break;
+    case LOG_NONE:
+    default:
+      //nothing
     }
   }
 
@@ -161,8 +161,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public void setWorkingDirectory(Path new_dir) {
-    mock.setWorkingDirectory(new_dir);
+  public void setWorkingDirectory(Path newDir) {
+    mock.setWorkingDirectory(newDir);
   }
 
   @Override

@@ -511,7 +511,7 @@ class S3ABlockOutputStream extends OutputStream {
     }
 
     /**
-     * Get a count of parts submitted
+     * Get a count of parts submitted.
      * @return the number of parts submitted; will always be >= the
      * value of {@link #getPartsUploaded()}
      */
@@ -520,7 +520,7 @@ class S3ABlockOutputStream extends OutputStream {
     }
 
     /**
-     * Count of parts actually uploaded
+     * Count of parts actually uploaded.
      * @return the count of successfully completed part uploads.
      */
     public int getPartsUploaded() {
@@ -528,7 +528,7 @@ class S3ABlockOutputStream extends OutputStream {
     }
 
     /**
-     * Get the upload ID; will be null after construction completes
+     * Get the upload ID; will be null after construction completes.
      * @return the upload ID
      */
     public String getUploadId() {

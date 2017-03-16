@@ -699,7 +699,7 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Create a new WriteOperationHelper instance against a specific key.
+   * Create a new {@code WriteOperationHelper} instance against a specific key.
    *
    * This class contains methods for writing to the specific path, along with
    * other low-level operations against the store. It is unstable and
@@ -2895,13 +2895,14 @@ public class S3AFileSystem extends FileSystem {
 
     /**
      * Create a {@link PutObjectRequest} request to upload a file.
-     * @param key key to PUT to.
+     * @param dest key to PUT to.
      * @param sourceFile source file
      * @return the request
      */
-    public PutObjectRequest createPutObjectRequest(String key, File sourceFile) {
+    public PutObjectRequest createPutObjectRequest(String dest,
+        File sourceFile) {
       int length = (int) sourceFile.length();
-      PutObjectRequest request = newPutObjectRequest(key,
+      PutObjectRequest request = newPutObjectRequest(dest,
           newObjectMetadata(length), sourceFile);
       return request;
     }
@@ -2956,17 +2957,17 @@ public class S3AFileSystem extends FileSystem {
 
     /**
      * Abort a multipart upload operation.
-     * @param key destination key of upload
+     * @param dest destination key of upload
      * @param uploadId multipart operation Id
      * @throws IOException on problems.
      */
-    public void abortMultipartCommit(String key,
+    public void abortMultipartCommit(String dest,
         String uploadId) throws IOException {
       try {
-        abortMultipartUpload(key, uploadId);
+        abortMultipartUpload(dest, uploadId);
       } catch (AmazonClientException e) {
         throw translateException("aborting multipart commit",
-            keyToPath(key), e);
+            keyToPath(dest), e);
       }
     }
     /**
@@ -2974,7 +2975,8 @@ public class S3AFileSystem extends FileSystem {
      * @param uploadId multipart operation Id
      * @throws IOException on problems.
      */
-    public void abortMultipartCommit(MultipartUpload upload) throws IOException {
+    public void abortMultipartCommit(MultipartUpload upload)
+        throws IOException {
       abortMultipartCommit(
           upload.getKey(),
           upload.getUploadId());
@@ -3107,7 +3109,7 @@ public class S3AFileSystem extends FileSystem {
         Preconditions.checkArgument(offset == 0 || offset < length,
             "Offset %d beyond length of file %d", offset, length);
         long range = length - offset;
-        Preconditions.checkArgument( range <= size,
+        Preconditions.checkArgument(range <= size,
             "Partion size %d > available bytes %d from offset %d in file %s",
             size, range, offset);
         request.setFile(sourceFile);

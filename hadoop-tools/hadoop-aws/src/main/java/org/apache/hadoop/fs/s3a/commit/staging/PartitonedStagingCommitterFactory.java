@@ -27,9 +27,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import java.io.IOException;
 
 /**
- * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link PartitionedStagingCommitter}; for other filesystems
- * use the classic committer.
+ * Creates the {@link PartitionedStagingCommitter}.
  */
 public class PartitonedStagingCommitterFactory
     extends Abstract3GuardCommitterFactory {

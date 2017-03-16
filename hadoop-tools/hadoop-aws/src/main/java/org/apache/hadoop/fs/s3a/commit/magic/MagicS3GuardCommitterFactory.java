@@ -28,11 +28,11 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import java.io.IOException;
 
 /**
- * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
- * use the classic committer.
+ * Creates the Magic committer.
  */
-public class MagicS3GuardCommitterFactory extends Abstract3GuardCommitterFactory {
+public class MagicS3GuardCommitterFactory
+    extends Abstract3GuardCommitterFactory {
+
   /**
    * Name of this class: {@value}.
    */

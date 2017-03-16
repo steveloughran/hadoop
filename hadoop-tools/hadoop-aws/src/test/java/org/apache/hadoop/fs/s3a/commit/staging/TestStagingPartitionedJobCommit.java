@@ -41,6 +41,7 @@ import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 
+/** Test suite.*/
 public class TestStagingPartitionedJobCommit
     extends StagingTestBase.JobCommitterTest<PartitionedStagingCommitter> {
 
@@ -55,7 +56,7 @@ public class TestStagingPartitionedJobCommit
     return new TestPartitionedStagingCommitter(getJob(), mock(AmazonS3.class));
   }
 
-  private static class TestPartitionedStagingCommitter
+  private static final class TestPartitionedStagingCommitter
       extends PartitionedStagingCommitter {
     private final AmazonS3 client;
     private TestPartitionedStagingCommitter(JobContext context, AmazonS3 client)
@@ -254,7 +255,7 @@ public class TestStagingPartitionedJobCommit
     when(mockS3
         .delete(
             new Path(OUTPUT_PATH, "dateint=20161116/hour=14"),
-            true /* recursive */ ))
+            true))
         .thenThrow(new IOException("Fake IOException for delete"));
 
     intercept(IOException.class, null, "Should throw the fake IOException",
@@ -292,7 +293,7 @@ public class TestStagingPartitionedJobCommit
     when(mockS3
         .delete(
             new Path(OUTPUT_PATH, "dateint=20161116/hour=13"),
-            true /* recursive */ ))
+            true))
         .thenReturn(false);
 
     StagingTestBase.assertThrows(

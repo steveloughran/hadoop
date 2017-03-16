@@ -32,13 +32,13 @@ class PartitionedCommitterForTesting extends
     PartitionedStagingCommitter {
   private final AmazonS3 mockClient;
 
-  public PartitionedCommitterForTesting(Path outputPath,
+  PartitionedCommitterForTesting(Path outputPath,
       TaskAttemptContext context, AmazonS3 mockClient) throws IOException {
     super(outputPath, context);
     this.mockClient = mockClient;
   }
 
-  public PartitionedCommitterForTesting(Path outputPath,
+  PartitionedCommitterForTesting(Path outputPath,
       JobContext context,
       AmazonS3 mockClient) throws IOException {
     super(outputPath, context);
@@ -59,14 +59,14 @@ class PartitionedCommitterForTesting extends
   /**
    * Returns the mock FS without checking FS type.
    * @param out output path
-   * @param conf job/task config
+   * @param config job/task config
    * @return a filesystem.
    * @throws IOException
    */
   @Override
-  protected FileSystem getDestination(Path out, Configuration conf)
+  protected FileSystem getDestination(Path out, Configuration config)
       throws IOException {
-    return out.getFileSystem(conf);
+    return out.getFileSystem(config);
   }
 
 }

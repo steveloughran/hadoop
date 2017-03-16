@@ -31,7 +31,8 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * This commits to a directory. The conflict policy is
+ * This commits to a directory.
+ * The conflict policy is
  * <ul>
  *   <li>FAIL: fail the commit</li>
  *   <li>APPEND: add extra data to the destination.</li>
@@ -42,7 +43,8 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
       DirectoryStagingCommitter.class);
 
-  public DirectoryStagingCommitter(Path outputPath, JobContext context) throws IOException {
+  public DirectoryStagingCommitter(Path outputPath, JobContext context)
+      throws IOException {
     super(outputPath, context);
   }
 
@@ -62,7 +64,6 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
     }
   }
 
-
   /**
    * Pre-commit actions for a job.
    * Here: look at the conflict resolution mode and choose
@@ -77,23 +78,23 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
     Path outputPath = getOutputPath(context);
     FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
     switch (getConflictResolutionMode(context)) {
-      case FAIL:
-        // this was checked in setupJob, but this avoids some cases where
-        // output was created while the job was processing
-        if (fs.exists(outputPath)) {
-          throw new PathExistsException(outputPath.toString());
-        }
-        break;
-      case APPEND:
-        // do nothing
-        break;
-      case REPLACE:
-        LOG.debug("Removing output path to be replaced: {}", outputPath);
-        fs.delete(outputPath, true /* recursive */);
-        break;
-      default:
-        throw new IOException("Unknown conflict resolution mode: "
-                + getConfictModeOption(context));
+    case FAIL:
+      // this was checked in setupJob, but this avoids some cases where
+      // output was created while the job was processing
+      if (fs.exists(outputPath)) {
+        throw new PathExistsException(outputPath.toString());
+      }
+      break;
+    case APPEND:
+      // do nothing
+      break;
+    case REPLACE:
+      LOG.debug("Removing output path to be replaced: {}", outputPath);
+      fs.delete(outputPath, true /* recursive */);
+      break;
+    default:
+      throw new IOException("Unknown conflict resolution mode: "
+          + getConfictModeOption(context));
     }
   }
 }
