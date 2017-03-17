@@ -30,7 +30,10 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
-public interface CommitConstants {
+public final class CommitConstants {
+
+  private CommitConstants() {
+  }
 
   /**
    * Flag to indicate whether the S3 committer is enabled, and
@@ -38,61 +41,63 @@ public interface CommitConstants {
    * be converted to pending commit operations.
    * Value: {@value}.
    */
-  String COMMITTER_ENABLED
+  public static final String COMMITTER_ENABLED
       = "fs.s3a.committer.enabled";
 
   /**
    * Is the committer enabled by default? No.
    */
-  boolean DEFAULT_COMMITTER_ENABLED = false;
+  public static final boolean DEFAULT_COMMITTER_ENABLED = false;
 
   /**
    * Path for "magic" pending writes: path and {@link #PENDING_SUFFIX} files:
    * {@value}.
    */
-  String MAGIC_DIR_NAME = "__magic";
+  public static final String MAGIC_DIR_NAME = "__magic";
 
   /**
    * This is the "Pending" directory of the FileOutputCommitter;
    * data written here is, in that algorithm, renamed into place.
-   * Value: {@value}. Why is the name unchanged? For consistency
-   * of code review.
+   * Value: {@value}.
    */
-  String PENDING_DIR_NAME = "_temporary";
+  public static final String PENDING_DIR_NAME = "_temporary";
 
   /**
    * Marker of the start of a directory tree for calculating
    * the final path names: {@value}.
    */
-  String BASE_PATH = "__base";
+  public static final String BASE_PATH = "__base";
 
   /**
    * Temp data which is not auto-committed: {@value}.
    * Uses a different name from normal just to make clear it is different.
    */
-  String TEMP_DATA_PATH = "__temp-data";
+  public static final String TEMP_DATA_PATH = "__temp-data";
 
 
   /**
    * Suffix applied to pending commit data: {@value}.
    */
-  String PENDING_SUFFIX = ".pending";
+  public static final String PENDING_SUFFIX = ".pending";
 
   /**
    * Flag to trigger creation of a marker file on job completion.
    */
-  String CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
+  public static final String CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
       = FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
 
   /**
    * Marker file to create on success.
    */
-  String SUCCESS_FILE_NAME = "_SUCCESS";
+  public static final String SUCCESS_FILE_NAME = "_SUCCESS";
 
   /** Default job marker option: {@value}. */
-  boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
+  public static final boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
 
-  String MAGIC_COMMITTER_FACTORY = MagicS3GuardCommitterFactory.NAME;
-  String DIRECTORY_COMMITTER_FACTORY = DirectoryStagingCommitterFactory.NAME;
-  String PARTITION_COMMITTER_FACTORY = PartitonedStagingCommitterFactory.NAME;
+  public static final String MAGIC_COMMITTER_FACTORY =
+      MagicS3GuardCommitterFactory.NAME;
+  public static final String DIRECTORY_COMMITTER_FACTORY =
+      DirectoryStagingCommitterFactory.NAME;
+  public static final String PARTITION_COMMITTER_FACTORY =
+      PartitonedStagingCommitterFactory.NAME;
 }

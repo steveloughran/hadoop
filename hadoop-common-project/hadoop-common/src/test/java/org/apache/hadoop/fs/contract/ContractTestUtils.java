@@ -853,7 +853,7 @@ public class ContractTestUtils extends Assert {
   }
 
   /**
-   * Test for the host being an OSX machine
+   * Test for the host being an OSX machine.
    * @return true if the JVM thinks that is running on OSX
    */
   public static boolean isOSX() {

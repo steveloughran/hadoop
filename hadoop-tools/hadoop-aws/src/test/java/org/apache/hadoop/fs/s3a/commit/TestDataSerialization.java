@@ -19,14 +19,19 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
+/**
+ * Plan: some testing of serialization, including some regression testing
+ * of persisted versions.
+ */
 public class TestDataSerialization extends Assert {
 
 
   @Test
   public void testValidRoundTrip() throws Throwable {
- // TODO
+    Assume.assumeTrue("TODO", false);
   }
 
 }

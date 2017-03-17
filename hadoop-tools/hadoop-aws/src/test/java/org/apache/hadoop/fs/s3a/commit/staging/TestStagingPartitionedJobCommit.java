@@ -53,14 +53,19 @@ public class TestStagingPartitionedJobCommit
 
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new TestPartitionedStagingCommitter(getJob(), mock(AmazonS3.class));
+    return new PartitionedStagingCommitterForTesting(getJob(),
+        mock(AmazonS3.class));
   }
 
-  private static final class TestPartitionedStagingCommitter
+  /**
+   * Subclass of the Partitioned Staging committer used in the test cases.
+   */
+  private static final class PartitionedStagingCommitterForTesting
       extends PartitionedStagingCommitter {
     private final AmazonS3 client;
-    private TestPartitionedStagingCommitter(JobContext context, AmazonS3 client)
-        throws IOException {
+
+    private PartitionedStagingCommitterForTesting(JobContext context,
+        AmazonS3 client) throws IOException {
       super(OUTPUT_PATH, context);
       this.client = client;
     }
@@ -200,7 +205,8 @@ public class TestStagingPartitionedJobCommit
    * partitions.
    * @param mockS3 s3 mock
    */
-  protected void verifyReplaceCommitActions(FileSystem mockS3) throws IOException {
+  protected void verifyReplaceCommitActions(FileSystem mockS3)
+      throws IOException {
     verifyDeleted(mockS3, "dateint=20161115/hour=13");
     verifyDeleted(mockS3, "dateint=20161115/hour=14");
     verifyDeleted(mockS3, "dateint=20161116/hour=13");
@@ -239,7 +245,7 @@ public class TestStagingPartitionedJobCommit
     verifyDeleted(mockS3, "dateint=20161115/hour=13");
     verifyExistenceChecked(mockS3, "dateint=20161115/hour=14");
     assertTrue("Should have aborted",
-        ((TestPartitionedStagingCommitter) committer).aborted);
+        ((PartitionedStagingCommitterForTesting) committer).aborted);
     verifyCompletion(mockS3);
   }
 
@@ -259,7 +265,7 @@ public class TestStagingPartitionedJobCommit
         .thenThrow(new IOException("Fake IOException for delete"));
 
     intercept(IOException.class, null, "Should throw the fake IOException",
-       new LambdaTestUtils.VoidCallable() {
+        new LambdaTestUtils.VoidCallable() {
           @Override
           public void call() throws IOException {
             committer.commitJob(getJob());
@@ -269,7 +275,7 @@ public class TestStagingPartitionedJobCommit
     verifyReplaceCommitActions(mockS3);
     verifyDeleted(mockS3, "dateint=20161116/hour=14");
     assertTrue("Should have aborted",
-        ((TestPartitionedStagingCommitter) committer).aborted);
+        ((PartitionedStagingCommitterForTesting) committer).aborted);
     verifyCompletion(mockS3);
   }
 
@@ -311,7 +317,7 @@ public class TestStagingPartitionedJobCommit
     verifyExistenceChecked(mockS3, "dateint=20161116/hour=13");
     verifyDeleted(mockS3, "dateint=20161116/hour=13");
     assertTrue("Should have aborted",
-        ((TestPartitionedStagingCommitter) committer).aborted);
+        ((PartitionedStagingCommitterForTesting) committer).aborted);
     verifyCompletion(mockS3);
   }
 }

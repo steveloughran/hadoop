@@ -80,7 +80,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected Path outDir;
   public static final String COMMIT_FAILURE_MESSAGE = "oops";
 
-  private String SUB_DIR = "SUB_DIR";
+  private static final String SUB_DIR = "SUB_DIR";
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(AbstractITCommitProtocol.class);
@@ -153,8 +153,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @throws IOException failure
    */
 
-  protected abstract AbstractS3GuardCommitter
-    createCommitter(TaskAttemptContext context) throws IOException;
+  protected abstract AbstractS3GuardCommitter createCommitter(
+      TaskAttemptContext context) throws IOException;
 
   /**
    * Create a committer for a job.
@@ -162,22 +162,22 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @return new committer
    * @throws IOException failure
    */
-  public abstract AbstractS3GuardCommitter
-    createCommitter(JobContext context) throws IOException;
+  public abstract AbstractS3GuardCommitter createCommitter(
+      JobContext context) throws IOException;
 
   protected void writeTextOutput(TaskAttemptContext context)
       throws IOException, InterruptedException {
     describe("write output");
     try (DurationInfo d = new DurationInfo("Writing Text output for task %s",
         context.getTaskAttemptID())) {
-      writeOutput(new LoggingTextOutputFormat().getRecordWriter(context), context);
+      writeOutput(new LoggingTextOutputFormat().getRecordWriter(context),
+          context);
     }
   }
 
   private void writeOutput(RecordWriter theRecordWriter,
       TaskAttemptContext context) throws IOException, InterruptedException {
     NullWritable nullWritable = NullWritable.get();
-
     try {
       theRecordWriter.write(key1, val1);
       theRecordWriter.write(null, nullWritable);
@@ -329,7 +329,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected int countMultipartUploads(String prefix) throws IOException {
     int count = 0;
-    for (MultipartUpload upload : getFileSystem().listMultipartUploads(prefix)) {
+    for (MultipartUpload upload : getFileSystem().listMultipartUploads(
+        prefix)) {
       count++;
       LOG.info("Upload {} to {}", upload.getUploadId(), upload.getKey());
     }
@@ -355,8 +356,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       try {
         writeOps.abortMultipartCommit(upload);
       } catch (FileNotFoundException e) {
-        LOG.info("Already aborted: {}");
-
+        LOG.info("Already aborted: {}", upload.getKey(), e);
       }
     }
     if (count > 0) {
@@ -507,7 +507,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Expect a job commit operation to fail with a specific exception
+   * Expect a job commit operation to fail with a specific exception.
    * @param jContext job context
    * @param committer committer
    * @param clazz class of exception
@@ -523,7 +523,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Create a committer which fails; the class {@link FailThenSucceed}
-   * implements the logic
+   * implements the logic.
    * @param tContext task context
    * @return committer instance
    * @throws IOException failure to instantiate
@@ -589,7 +589,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       AbstractS3GuardCommitter committer) throws Exception {
     intercept(IOException.class,
         COMMIT_FAILURE_MESSAGE,
-        () -> { committer.commitJob(jContext); return "committed job"; });
+        () -> {
+          committer.commitJob(jContext);
+          return "committed job";
+        });
   }
 
   @Test
@@ -686,11 +689,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
     describe("\nsetup job");
-    try(DurationInfo d = new DurationInfo("setup job %s",
+    try (DurationInfo d = new DurationInfo("setup job %s",
         jContext.getJobID())) {
       committer.setupJob(jContext);
     }
-    try(DurationInfo d = new DurationInfo("setup task %s",
+    try (DurationInfo d = new DurationInfo("setup task %s",
         tContext.getTaskAttemptID())) {
       committer.setupTask(tContext);
     }
@@ -739,7 +742,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     FileOutputFormat.setOutputPath(job, outDir);
     Configuration conf = job.getConfiguration();
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+        TASK_ATTEMPT_0);
     AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup
@@ -783,7 +787,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     Configuration conf = job.getConfiguration();
     FileOutputFormat.setOutputPath(job, outDir);
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+        TASK_ATTEMPT_0);
     AbstractS3GuardCommitter committer = createCommitter(tContext);
 
     // do setup
@@ -931,7 +936,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return ContractTestUtils.readUTF8(getFileSystem(), f, -1);
   }
 
-
+  /**
+   * Helper class for the failure simulation.
+   * The first time {@link #exec()}
+   * is called it will thrown an exception containing the string
+   * {@link #COMMIT_FAILURE_MESSAGE}. The second time it will succeed.
+   */
   public static class FailThenSucceed {
     private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
 

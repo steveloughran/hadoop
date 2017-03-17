@@ -26,8 +26,10 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
+/**
+ * Test the magic committer's commit protocol.
+ */
 public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
-
 
   @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
@@ -41,8 +43,8 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     return new MagicS3GuardCommitter(outDir, context);
   }
 
-  public AbstractS3GuardCommitter createFailingCommitter(TaskAttemptContext tContext)
-      throws IOException {
+  public AbstractS3GuardCommitter createFailingCommitter(
+      TaskAttemptContext tContext) throws IOException {
     return new CommitterWithFailedThenSucceed(outDir, tContext);
   }
 
@@ -51,7 +53,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
    * causes the commit failed for the first time then succeed.
    */
 
-  private static class CommitterWithFailedThenSucceed extends
+  private static final class CommitterWithFailedThenSucceed extends
       MagicS3GuardCommitter {
     private final FailThenSucceed failure = new FailThenSucceed();
 

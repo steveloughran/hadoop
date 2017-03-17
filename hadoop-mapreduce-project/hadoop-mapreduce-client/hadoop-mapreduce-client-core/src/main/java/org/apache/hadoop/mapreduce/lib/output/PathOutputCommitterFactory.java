@@ -69,6 +69,7 @@ public class PathOutputCommitterFactory extends Configured {
    * @param outputPath the job's output path, or null if you want the output
    * committer to act as a noop.
    * @param context the task's context
+   * @return the committer to use
    * @throws IOException problems instantiating the committer
    */
   public PathOutputCommitter createOutputCommitter(Path outputPath,

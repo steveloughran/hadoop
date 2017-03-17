@@ -66,7 +66,7 @@ public final class Paths {
    * @param <L> left element type
    * @param <R> right element type
    */
-  private static final class Pair<L, R> {
+  public static final class Pair<L, R> {
     private final L first;
     private final R second;
 
@@ -153,7 +153,6 @@ public final class Paths {
         attempt.toString());
   }
 
-
   /**
    * Try to come up with a good temp directory for different filesystems.
    * @param fs filesystem
@@ -233,7 +232,7 @@ public final class Paths {
   /**
    * path filter.
    */
-  public static class HiddenPathFilter implements PathFilter {
+  public static final class HiddenPathFilter implements PathFilter {
     private static final HiddenPathFilter INSTANCE = new HiddenPathFilter();
   
     public static HiddenPathFilter get() {

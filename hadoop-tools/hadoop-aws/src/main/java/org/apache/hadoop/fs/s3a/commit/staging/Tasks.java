@@ -121,7 +121,8 @@ final class Tasks {
       }
     }
 
-    private <E extends Exception> boolean runSingleThreaded(Task<I, E> task) throws E {
+    private <E extends Exception> boolean runSingleThreaded(Task<I, E> task)
+        throws E {
       List<I> succeeded = Lists.newArrayList();
       List<Exception> exceptions = Lists.newArrayList();
 
@@ -200,7 +201,8 @@ final class Tasks {
       return !threw;
     }
 
-    private <E extends Exception> boolean runParallel(final Task<I, E> task) throws E {
+    private <E extends Exception> boolean runParallel(final Task<I, E> task)
+        throws E {
       final Queue<I> succeeded = new ConcurrentLinkedQueue<>();
       final Queue<Exception> exceptions = new ConcurrentLinkedQueue<>();
       final AtomicBoolean taskFailed = new AtomicBoolean(false);
@@ -341,7 +343,8 @@ final class Tasks {
   }
 
   @SuppressWarnings("unchecked")
-  private static <E extends Exception> void throwOne(Collection<Exception> exceptions)
+  private static <E extends Exception> void throwOne(
+      Collection<Exception> exceptions)
       throws E {
     Iterator<Exception> iter = exceptions.iterator();
     Exception e = iter.next();

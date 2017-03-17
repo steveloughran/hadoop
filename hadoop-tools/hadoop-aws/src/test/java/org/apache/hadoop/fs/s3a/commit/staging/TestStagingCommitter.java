@@ -56,6 +56,7 @@ import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.staging.Paths.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 
@@ -139,20 +140,20 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "/0/attempt_job_0001_r_000002_3";
     assertEquals(message,
         expected,
-        Paths.getLocalTaskAttemptTempDir(config,
+        getLocalTaskAttemptTempDir(config,
             jobUUID, tac.getTaskAttemptID()).toString());
 
     config.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
         "file:/tmp/mr-local-0,file:/tmp/mr-local-1");
     assertEquals("Path should be the same with file scheme",
         expected,
-        Paths.getLocalTaskAttemptTempDir(config, jobUUID, tac.getTaskAttemptID())
+        getLocalTaskAttemptTempDir(config, jobUUID, tac.getTaskAttemptID())
             .toString());
 
     config.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
         "hdfs://nn:8020/tmp/mr-local-0,hdfs://nn:8020/tmp/mr-local-1");
     intercept(IllegalArgumentException.class, "Wrong FS",
-        () -> Paths.getLocalTaskAttemptTempDir(config, jobUUID,
+        () -> getLocalTaskAttemptTempDir(config, jobUUID,
             tac.getTaskAttemptID()));
   }
 

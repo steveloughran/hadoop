@@ -64,7 +64,7 @@ final class LocalTempDir {
   }
 
   /**
-   * Get a temporary path
+   * Get a temporary path.
    * @param conf configuration to use when creating the allocator
    * @param prefix filename prefix
    * @param size file size, or -1 if not known

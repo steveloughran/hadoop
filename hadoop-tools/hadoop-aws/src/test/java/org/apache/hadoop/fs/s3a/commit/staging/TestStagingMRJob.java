@@ -72,6 +72,11 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     cluster = null;
   }
 
+  /**
+   * Text output format which uses the mocked staging committer.
+   * @param <K> text key
+   * @param <V> text value
+   */
   public static class S3TextOutputFormat<K, V>
       extends LoggingTextOutputFormat<K, V> {
     private MockedStagingCommitter committer = null;
@@ -137,7 +142,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     mrJob.setNumReduceTasks(0);
 
     mrJob.submit();
-    assertTrue("MR job should succeed", mrJob.waitForCompletion(true));
+    assertTrue("MR job failed", mrJob.waitForCompletion(true));
 
     StagingTestBase.ClientResults results;
     try (ObjectInputStream in = new ObjectInputStream(

@@ -165,7 +165,7 @@ public interface S3ATestConstants {
       "test.fs.s3a.endpoint";
 
   /**
-   * Property to set to disable caching
+   * Property to set to disable caching.
    */
   String FS_S3A_IMPL_DISABLE_CACHE
       = "fs.s3a.impl.disable.cache";

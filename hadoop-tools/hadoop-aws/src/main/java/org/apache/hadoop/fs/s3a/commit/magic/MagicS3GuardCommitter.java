@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a.commit.magic;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;

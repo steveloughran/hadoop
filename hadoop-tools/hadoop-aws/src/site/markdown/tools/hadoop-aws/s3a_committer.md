@@ -1038,11 +1038,11 @@ a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <
 The initial option set:
 
 | option | meaning |
---------------------
-| `fs.s3a.staging.committer.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`.
+|--------|----------|
+| `fs.s3a.staging.committer.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`. |
 |  `fs.s3a.staging.committer.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
-|  `fs.s3a.staging.committer.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. }
-|  `fs.s3a.staging.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. }
+|  `fs.s3a.staging.committer.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
+|  `fs.s3a.staging.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
 
 
 (The upload side can be unified with the `fs.s3a.multipart.size` property.)

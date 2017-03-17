@@ -82,6 +82,9 @@ public class StagingTestBase {
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
   public static final Path ROOT_PATH = new Path(FS_URI);
 
+  protected StagingTestBase() {
+  }
+
   /**
    * Sets up the mock filesystem instance and binds it to the
    * {@link FileSystem#get(URI, Configuration)} call for the supplied URI
@@ -233,6 +236,10 @@ public class StagingTestBase {
     }
   }
 
+  /**
+   * Base class for job committer tests.
+   * @param <C> committer
+   */
   public abstract static class JobCommitterTest<C extends OutputCommitter>
       extends Assert {
     private static final JobID JOB_ID = new JobID("job", 1);

@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.Paths;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;

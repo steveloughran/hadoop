@@ -752,7 +752,7 @@ public final class S3ATestUtils {
   }
 
   /**
-   * Iterate over files
+   * Iterate over files.
    * @param iterator iterator from a list
    * @param eval closure to evaluate
    * @throws Exception anything in the closure, or iteration logic.
@@ -788,7 +788,7 @@ public final class S3ATestUtils {
    */
   public static class FilterTempFiles implements PathFilter {
     @Override
-    public boolean accept (Path path){
+    public boolean accept(Path path) {
       String name = path.getName();
       return !name.startsWith("_") && !name.startsWith(".");
     }

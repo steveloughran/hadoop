@@ -497,7 +497,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Get the list of pending uploads for this job attempt
+   * Get the list of pending uploads for this job attempt.
    * @param context job context
    * @return a list of pending uploads.
    * @throws IOException Any IO failure
@@ -575,7 +575,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * <p>
    * Commit internal: do the final commit sequence.
    * <p>
-   * The final commit action is to call {@link #maybeTouchSuccessMarker(JobContext)}
+   * The final commit action is to call
+   * {@link #maybeTouchSuccessMarker(JobContext)}
    * to set the {@code __SUCCESS} file entry.
    * </p>
    * @param context job context
@@ -614,7 +615,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   protected void commitJobInternal(JobContext context,
                                    List<S3Util.PendingUpload> pending)
       throws IOException {
-    final AmazonS3 client = getClient(
+    final AmazonS3 s3Client = getClient(
         getOutputPath(context), context.getConfiguration());
 
     if (pending.isEmpty()) {
@@ -631,25 +632,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
                 @Override
                 public void run(S3Util.PendingUpload commit,
                     Exception exception) throws IOException {
-                  S3Util.abortCommit(client, commit);
+                  S3Util.abortCommit(s3Client, commit);
                 }
               })
           .abortWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit) throws IOException {
-              S3Util.abortCommit(client, commit);
+              S3Util.abortCommit(s3Client, commit);
             }
           })
           .revertWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit) throws IOException {
-              S3Util.revertCommit(client, commit);
+              S3Util.revertCommit(s3Client, commit);
             }
           })
           .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit) throws IOException {
-              S3Util.finishCommit(client, commit);
+              S3Util.finishCommit(s3Client, commit);
             }
           });
 
@@ -679,7 +680,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       LOG.info("No pending commits to abort");
       return;
     }
-    final AmazonS3 client = getClient(
+    final AmazonS3 s3Client = getClient(
         getOutputPath(context), context.getConfiguration());
 
     boolean threw = true;
@@ -691,13 +692,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             @Override
             public void run(S3Util.PendingUpload commit,
                             Exception exception) throws IOException {
-              S3Util.abortCommit(client, commit);
+              S3Util.abortCommit(s3Client, commit);
             }
           })
           .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
             @Override
             public void run(S3Util.PendingUpload commit) throws IOException {
-              S3Util.abortCommit(client, commit);
+              S3Util.abortCommit(s3Client, commit);
             }
           });
 
@@ -873,7 +874,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     } finally {
       if (threw) {
         LOG.error("Exception during commit process, aborting {} commit(s)",
-          commits.size());
+            commits.size());
         Tasks.foreach(commits)
             .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
               @Override
@@ -947,7 +948,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       try {
         deleteQuietly(path.getFileSystem(getConf()), path, true);
       } catch (IOException e) {
-        LOG.debug("Failed to delete path {}",path, e);
+        LOG.debug("Failed to delete path {}", path, e);
       }
     }
   }

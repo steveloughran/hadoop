@@ -34,9 +34,17 @@ import org.slf4j.LoggerFactory;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+/**
+ * A subclass of TextOutputFormat which logs what is happening.
+ * Used for testing; we could maybe pull the logging up into the base class for
+ * all to enjoy.
+ * @param <K> text key
+ * @param <V> text value
+ */
 public class LoggingTextOutputFormat<K, V> extends TextOutputFormat<K, V> {
   private static final Logger LOG =
       LoggerFactory.getLogger(LoggingTextOutputFormat.class);
+
   @Override
   public RecordWriter<K, V> getRecordWriter(TaskAttemptContext job)
       throws IOException, InterruptedException {
@@ -83,7 +91,7 @@ public class LoggingTextOutputFormat<K, V> extends TextOutputFormat<K, V> {
     @Override
     public synchronized void write(K key, V value) throws IOException {
       super.write(key, value);
-      lines ++;
+      lines++;
     }
 
     public synchronized void close(TaskAttemptContext context)

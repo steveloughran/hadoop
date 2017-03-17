@@ -27,20 +27,24 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
+
 /** Test suite.*/
 public class TestStagingPartitionedFileListing
-    extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
+    extends TaskCommitterTest<PartitionedStagingCommitter> {
+
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedStagingCommitter(StagingTestBase.OUTPUT_PATH, getJob());
+    return new PartitionedStagingCommitter(OUTPUT_PATH, getJob());
   }
 
   @Override
   PartitionedStagingCommitter newTaskCommitter() throws IOException {
-    return new PartitionedStagingCommitter(StagingTestBase.OUTPUT_PATH, getTAC());
+    return new PartitionedStagingCommitter(OUTPUT_PATH, getTAC());
   }
 
   @Test
@@ -69,7 +73,8 @@ public class TestStagingPartitionedFileListing
         String relative = Paths.getRelativePath(attemptPath, stat.getPath());
         actualFiles.add(relative);
       }
-
+      Collections.sort(attemptFiles);
+      Collections.sort(actualFiles);
       assertEquals("File sets should match", expectedFiles, actualFiles);
     } finally {
       attemptFS.delete(attemptPath, true);
@@ -110,7 +115,8 @@ public class TestStagingPartitionedFileListing
         String relative = Paths.getRelativePath(attemptPath, stat.getPath());
         actualFiles.add(relative);
       }
-
+      Collections.sort(attemptFiles);
+      Collections.sort(actualFiles);
       assertEquals("File sets should match", expectedFiles, actualFiles);
     } finally {
       attemptFS.delete(attemptPath, true);
