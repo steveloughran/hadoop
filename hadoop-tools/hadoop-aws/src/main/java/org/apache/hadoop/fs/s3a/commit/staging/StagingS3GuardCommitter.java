@@ -668,6 +668,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         context.getJobID(), state)) {
       List<S3Util.PendingUpload> pending = getPendingUploadsIgnoreErrors(context);
       abortJobInternal(context, pending, false);
+    } catch (IOException e) {
+      LOG.error("Exception when aborting job {} in state {}",
+          context.getJobID(), state, e);
+      throw e;
     }
   }
 
@@ -903,6 +907,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       deleteTaskAttemptPathQuietly(context);
       deleteTaskWorkingPathQuietly(context);
       wrappedCommitter.abortTask(context);
+    } catch (IOException e) {
+      LOG.error("Exception when aborting task {}",
+          context.getTaskAttemptID(), e);
+      throw e;
     }
   }
 

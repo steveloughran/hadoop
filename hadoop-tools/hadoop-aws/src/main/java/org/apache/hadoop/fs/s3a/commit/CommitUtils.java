@@ -44,6 +44,10 @@ public final class CommitUtils {
 
   public static final String E_BAD_PATH
       = "Path does not represent a magic-commit path";
+
+  public static final String E_NORMAL_FS
+      = "Filesystem does not have support for 'magic' committer enabled";
+
   public static final String E_WRONG_FS
       = "Output path is not on an S3A Filesystem";
 
@@ -276,7 +280,7 @@ public final class CommitUtils {
       throws PathCommitException {
     if (!fs.isDelayedCompleteEnabled()) {
       throw new PathCommitException(fs.getUri().toString(),
-          E_BAD_PATH);
+          E_NORMAL_FS);
     }
   }
 

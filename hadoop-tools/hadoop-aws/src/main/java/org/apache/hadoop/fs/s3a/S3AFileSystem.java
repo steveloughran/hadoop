@@ -2814,7 +2814,7 @@ public class S3AFileSystem extends FileSystem {
   /**
    * Listing all multipart uploads; limited to the first few hundred.
    * @return a listing of multipart uploads.
-   * @param prefix prefix to scan for
+   * @param prefix prefix to scan for, "" for none
    */
   @InterfaceAudience.Private
   public List<MultipartUpload> listMultipartUploads(String prefix)
@@ -3055,9 +3055,29 @@ public class S3AFileSystem extends FileSystem {
      */
     public void abortMultipartUpload(String uploadKey, String uploadId)
         throws AmazonClientException {
-      LOG.debug("Aborting multipart upload {}", uploadId);
+      LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
       s3.abortMultipartUpload(
           new AbortMultipartUploadRequest(bucket, uploadKey, uploadId));
+    }
+
+    /**
+     * Abort all multipart uploads under a path.
+     * @param prefix prefix for uploads to abort
+     * @return a count of aborts
+     * @throws IOException trouble. FileNotFoundExceptions are swallowed.
+     */
+    public int abortMultipartUploadsUnderPath(String prefix)
+        throws IOException {
+      int count = 0;
+      for (MultipartUpload upload : listMultipartUploads(prefix)) {
+        try {
+          abortMultipartCommit(upload);
+          count++;
+        } catch (FileNotFoundException e) {
+          LOG.debug("Already aborted: {}", upload.getKey(), e);
+        }
+      }
+      return count;
     }
 
     /**

@@ -57,7 +57,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -307,7 +309,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Dump all uploads.   */
+   * Dump all uploads.  */
   protected void dumpMultipartUploads() throws IOException {
     countMultipartUploads("");
   }
@@ -318,13 +320,23 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   protected void assertNoMultipartUploadsPending(Path path) throws IOException {
-    int count = countMultipartUploads(path);
-    assertEquals("Multipart uploads in progress under " + path, 0, count);
+    List<String> uploads = listMultipartUploads(pathToPrefix(path));
+    if (!uploads.isEmpty()) {
+      StringBuilder result = new StringBuilder();
+      for (String upload : uploads) {
+        result.append(upload).append("; ");
+      }
+      fail("Multipart uploads in progress under " + path + " \n" + result);
+    }
   }
 
   protected int countMultipartUploads(Path path) throws IOException {
-    return countMultipartUploads(path == null ? "" :
-        getFileSystem().pathToKey(path));
+    return countMultipartUploads(pathToPrefix(path));
+  }
+
+  private String pathToPrefix(Path path) {
+    return path == null ? "" :
+        getFileSystem().pathToKey(path);
   }
 
   protected int countMultipartUploads(String prefix) throws IOException {
@@ -337,34 +349,35 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return count;
   }
 
+  protected List<String> listMultipartUploads(String prefix) throws IOException {
+    List<MultipartUpload> uploads = getFileSystem().listMultipartUploads(
+        prefix);
+    List<String> result = new ArrayList<>(uploads.size());
+
+    for (MultipartUpload upload : uploads) {
+      result.add(String.format("Upload %s to %s",
+          upload.getUploadId(), upload.getKey()));
+    }
+    return result;
+  }
+
   /**
    * Abort all multipart uploads under a path.
-   * @param key key/prefix
+   * @param path path for uploads to abort
    * @return a count of aborts
    * @throws IOException trouble.
    */
   protected int abortMultipartUploadsUnderPath(Path path) throws IOException {
-    int count = 0;
     S3AFileSystem fs = getFileSystem();
     String key = fs.pathToKey(path);
     S3AFileSystem.WriteOperationHelper writeOps
         = fs.createWriteOperationHelper(key);
-    for (MultipartUpload upload : fs.listMultipartUploads(key)) {
-      count++;
-      LOG.info("Aborting upload {} to {}",
-          upload.getUploadId(), upload.getKey());
-      try {
-        writeOps.abortMultipartCommit(upload);
-      } catch (FileNotFoundException e) {
-        LOG.info("Already aborted: {}", upload.getKey(), e);
-      }
-    }
+    int count = writeOps.abortMultipartUploadsUnderPath(key);
     if (count > 0) {
       LOG.info("Multipart uploads deleted: {}", count);
     }
     return count;
   }
-
 
   @Test
   public void testCommitter() throws Exception {
@@ -404,6 +417,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       }
 
       describe("3. Committing job");
+      assertMultipartUploadsPending(outDir);
       committer.commitJob(jContext);
       describe("4. Validating content");
 
@@ -736,6 +750,44 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("commit complete\n");
   }
 
+  public interface ActionToTest {
+    void exec(Job job, JobContext jContext, TaskAttemptContext tContext,
+        AbstractS3GuardCommitter committer) throws Exception;
+  }
+
+  public void executeWork(String name, ActionToTest action) throws Exception{
+    Job job = newJob();
+    FileOutputFormat.setOutputPath(job, outDir);
+    Configuration conf = job.getConfiguration();
+    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+        TASK_ATTEMPT_0);
+    AbstractS3GuardCommitter committer = createCommitter(tContext);
+
+    // do setup
+    setup(committer, jContext, tContext);
+    try (DurationInfo d =
+             new DurationInfo("Executing %s", name)) {
+      action.exec(job, jContext, tContext, committer);
+    }
+  }
+
+  @Test
+  public void testAbortTaskNoWorkDone() throws Exception {
+    executeWork("abort task no work",
+        ((job, jContext, tContext, committer) ->
+             committer.abortTask(tContext)));
+  }
+
+  @Test
+  public void testAbortJobNoWorkDone() throws Exception {
+    executeWork("abort task no work",
+        ((job, jContext, tContext, committer) -> {
+          committer.abortJob(jContext, JobStatus.State.RUNNING);
+        }));
+  }
+
+
   @Test
   public void testAbort() throws Exception {
     Job job = newJob();
@@ -815,6 +867,19 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer.abortJob(jContext, JobStatus.State.FAILED);
     assertNoMultipartUploadsPending(outDir);
 
+  }
+
+  @Test
+  public void testAbortJobNotTask() throws Exception {
+    executeWork("abort task no work",
+        ((job, jContext, tContext, committer) -> {
+          // write output
+          writeTextOutput(tContext);
+          committer.abortJob(jContext, JobStatus.State.RUNNING);
+          assertPathDoesNotExist("job temp dir",
+              committer.getJobAttemptPath(jContext));
+          assertNoMultipartUploadsPending(outDir);
+        }));
   }
 
   /*
