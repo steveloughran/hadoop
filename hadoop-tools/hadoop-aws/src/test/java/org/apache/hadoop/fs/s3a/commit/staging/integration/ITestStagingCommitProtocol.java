@@ -38,6 +38,11 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
   @Override
+  protected String suitename() {
+    return "ITestStagingCommitProtocol";
+  }
+
+  @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
 //    conf.setBoolean(COMMITTER_ENABLED, false);

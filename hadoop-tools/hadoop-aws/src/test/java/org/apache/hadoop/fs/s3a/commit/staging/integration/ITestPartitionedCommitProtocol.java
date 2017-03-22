@@ -31,6 +31,11 @@ import java.io.IOException;
 public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
 
   @Override
+  protected String suitename() {
+    return "ITestPartitionedCommitProtocol";
+  }
+
+  @Override
   protected AbstractS3GuardCommitter createCommitter(
       TaskAttemptContext context)
       throws IOException {

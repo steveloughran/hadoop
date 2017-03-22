@@ -32,6 +32,11 @@ import java.io.IOException;
 public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
   @Override
+  protected String suitename() {
+    return "ITestMagicCommitProtocol";
+  }
+
+  @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
     return new MagicS3GuardCommitter(outDir, context);

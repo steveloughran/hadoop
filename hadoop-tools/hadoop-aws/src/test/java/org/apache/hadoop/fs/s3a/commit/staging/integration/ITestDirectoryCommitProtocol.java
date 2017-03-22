@@ -30,6 +30,11 @@ import java.io.IOException;
 public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
 
   @Override
+  protected String suitename() {
+    return "ITestDirectoryCommitProtocol";
+  }
+
+  @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
     return new DirectoryStagingCommitter(outDir, context);

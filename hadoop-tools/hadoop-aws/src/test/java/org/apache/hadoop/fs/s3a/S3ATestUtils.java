@@ -64,7 +64,7 @@ public final class S3ATestUtils {
    * a property has been unset.
    */
   public static final String UNSET_PROPERTY = "unset";
-  public static final int PURGE_DELAY_SECONDS = 30 * 60;
+  public static final int PURGE_DELAY_SECONDS = 60 * 60;
 
   /**
    * Get S3A FS name.

@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -66,10 +65,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.FilterTempFiles;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.lsR;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 /**
  * Test the job/task commit actions of an S3A Committer, including trying to
@@ -77,7 +75,7 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
  * Derived from
  * {@code org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter}.
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "ThrowableNotThrown"})
 public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected Path outDir;
   public static final String COMMIT_FAILURE_MESSAGE = "oops";
@@ -103,6 +101,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   private Text key2 = new Text("key2");
   private Text val1 = new Text("val1");
   private Text val2 = new Text("val2");
+  private JobData abortInTeardown;
 
   private void cleanupDestDir() throws IOException {
     rmdir(this.outDir, getConfiguration());
@@ -112,6 +111,18 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("deleting %s", dir);
     FileSystem fs = dir.getFileSystem(conf);
     fs.delete(dir, true);
+  }
+
+  /**
+   * This must return the name of a suite which is unique to the non-abstract
+   * test.
+   * @return a string which must be unique and a valid path.
+   */
+  protected abstract String suitename();
+
+  @Override
+  protected String getMethodName() {
+    return suitename() + "-" + super.getMethodName();
   }
 
   @Override
@@ -125,8 +136,18 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   @Override
   public void teardown() throws Exception {
+    describe("teardown");
+    if (abortInTeardown != null) {
+      abortQuietly(abortInTeardown.committer, abortInTeardown.jContext,
+          abortInTeardown.tContext);
+    }
     abortMultipartUploadsUnderPath(outDir);
     cleanupDestDir();
+    super.teardown();
+  }
+
+  protected void abortInTeardown(JobData jobData) {
+    abortInTeardown = jobData;
   }
 
   @Override
@@ -208,22 +229,144 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
-  @Test
-  public void testRecovery() throws Exception {
-    Job job = newJob();
+   protected static class JobData {
+     final Job job;
+     final JobContext jContext;
+     final TaskAttemptContext tContext;
+     final AbstractS3GuardCommitter committer;
+     final Configuration conf;
+
+     public JobData(Job job,
+         JobContext jContext,
+         TaskAttemptContext tContext,
+         AbstractS3GuardCommitter committer) {
+       this.job = job;
+       this.jContext = jContext;
+       this.tContext = tContext;
+       this.committer = committer;
+       conf = job.getConfiguration();
+     }
+   }
+
+
+  /**
+   * Create a a new job. Sets the task attempt ID.
+   * @return the new job
+   * @throws IOException failure
+   */
+  public Job newJob() throws IOException {
+    Job job = Job.getInstance(getConfiguration());
     Configuration conf = job.getConfiguration();
     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-    conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
+    conf.setBoolean(CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
+    FileOutputFormat.setOutputPath(job, outDir);
+    return job;
+  }
 
-    // setup
-    setup(committer, jContext, tContext);
+  /**
+   * Start a job with a committer; optionally write the test data.
+   * Always register the job to be aborted (quietly) in teardown.
+   * This is, from an "OO-purity perspective" the wrong kind of method to
+   * do: it's setting things up, mixing functionality, registering for teardown.
+   * Its aim is simple though: a common body of code for starting work
+   * in test cases.
+   * @param attemptID attempt ID
+   * @param writeText should the text be written?
+   * @return the job data 4-tuple
+   * @throws IOException IO problems
+   * @throws InterruptedException interruption during write
+   */
+   protected JobData startJob(int attemptID, boolean writeText)
+       throws IOException, InterruptedException {
+     Job job = newJob();
+     Configuration conf = job.getConfiguration();
+     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
+     conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, attemptID);
+     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
+     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+         TASK_ATTEMPT_0);
+     AbstractS3GuardCommitter committer = createCommitter(tContext);
 
-    // write output
-    writeTextOutput(tContext);
+     // setup
+     setup(committer, jContext, tContext);
+     JobData jobData = new JobData(job, jContext, tContext, committer);
+     abortInTeardown(jobData);
+
+     if (writeText) {
+       // write output
+       writeTextOutput(tContext);
+     }
+     return jobData;
+   }
+
+
+  /**
+   * Set up the job and task.
+   * @param committer committer
+   * @param jContext job context
+   * @param tContext task context
+   * @throws IOException problems
+   */
+  protected void setup(AbstractS3GuardCommitter committer,
+      JobContext jContext,
+      TaskAttemptContext tContext) throws IOException {
+    describe("\nsetup job");
+    try (DurationInfo d = new DurationInfo("setup job %s",
+        jContext.getJobID())) {
+      committer.setupJob(jContext);
+    }
+    try (DurationInfo d = new DurationInfo("setup task %s",
+        tContext.getTaskAttemptID())) {
+      committer.setupTask(tContext);
+    }
+    describe("setup complete\n");
+
+    // also: clean the test dir
+  }
+
+  protected void abortQuietly(AbstractS3GuardCommitter committer,
+      JobContext jContext,
+      TaskAttemptContext tContext) throws IOException {
+    describe("\naborting task");
+    try {
+      committer.abortTask(tContext);
+    } catch (IOException e) {
+      LOG.warn("Exception aborting task:", e);
+    }
+    describe("\naborting job");
+    try {
+      committer.abortJob(jContext, JobStatus.State.KILLED);
+    } catch (IOException e) {
+      LOG.warn("Exception aborting job", e);
+    }
+  }
+
+  /**
+   * Commit up the task and then the job.
+   * @param committer committer
+   * @param jContext job context
+   * @param tContext task context
+   * @throws IOException problems
+   */
+  protected void commit(AbstractS3GuardCommitter committer,
+      JobContext jContext,
+      TaskAttemptContext tContext) throws IOException {
+    try (DurationInfo d = new DurationInfo("committing work",
+        jContext.getJobID())) {
+      describe("\ncommitting task");
+      committer.commitTask(tContext);
+      describe("\ncommitting job");
+      committer.commitJob(jContext);
+      describe("commit complete\n");
+    }
+  }
+
+  @Test
+  public void testRecovery() throws Exception {
+    JobData jobData = startJob(1, true);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
 
     // do commit
     committer.commitTask(tContext);
@@ -243,7 +386,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 */
     //now while running the second app attempt,
     //recover the task output from first attempt
-    Configuration conf2 = job.getConfiguration();
+
+    Configuration conf2 = jobData.job.getConfiguration();
     conf2.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
     conf2.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 2);
     JobContext jContext2 = new JobContextImpl(conf2, TASK_ATTEMPT_0.getJobID());
@@ -267,14 +411,20 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 */
   }
 
+  /**
+   * Verify the output of the directory. That includes the "part-m-00000"
+   * file existence and contents, as well as optionally, the success marker.
+   * @param dir directory to scan.
+   * @param expectSuccessMarker check the success marker?
+   * @throws IOException
+   */
   private void validateContent(Path dir, boolean expectSuccessMarker)
       throws IOException {
     if (expectSuccessMarker) {
       assertSuccessMarkerExists(dir);
     }
-    Path expectedFile = new Path(dir, PART_00000);
+    Path expectedFile = getPart0000(dir);
     LOG.debug("Validating content in {}", expectedFile);
-    assertPathExists("Output file", expectedFile);
     StringBuffer expectedOutput = new StringBuffer();
     expectedOutput.append(key1).append('\t').append(val1).append("\n");
     expectedOutput.append(val1).append("\n");
@@ -287,6 +437,22 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         expectedOutput.toString(), output);
   }
 
+  private Path getPart0000(Path dir) throws IOException {
+    FileStatus[] statuses = getFileSystem().listStatus(dir,
+        new PathFilter() {
+          @Override
+          public boolean accept(Path path) {
+            return path.getName().startsWith(PART_00000);
+          }
+        });
+    if (statuses.length != 1) {
+      // fail, with a listing of the parent dir
+      assertPathExists("Output file", new Path(dir, PART_00000));
+    }
+
+    return statuses[0].getPath();
+  }
+
   /**
    * Look for the partFile subdir of the output dir.
    * @param fs filesystem
@@ -297,7 +463,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       FileSystem fs, Path dir) throws IOException {
     // map output is a directory with index and data files
     assertPathExists("Map output", dir);
-    Path expectedMapDir = new Path(dir, PART_00000);
+    Path expectedMapDir = getPart0000(dir);
     assertPathExists("Map output", expectedMapDir);
     assertIsDirectory(expectedMapDir);
     FileStatus[] files = fs.listStatus(expectedMapDir);
@@ -349,14 +515,20 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return count;
   }
 
+  /**
+   * Get a list of all pending uploads under a prefix, one which can be printed.
+   * @param prefix prefix to look under
+   * @return possibly empty list
+   * @throws IOException IO failure.
+   */
   protected List<String> listMultipartUploads(String prefix) throws IOException {
     List<MultipartUpload> uploads = getFileSystem().listMultipartUploads(
         prefix);
     List<String> result = new ArrayList<>(uploads.size());
 
     for (MultipartUpload upload : uploads) {
-      result.add(String.format("Upload %s to %s",
-          upload.getUploadId(), upload.getKey()));
+      result.add(String.format("Upload to %s with ID %s",
+          upload.getKey(), upload.getUploadId()));
     }
     return result;
   }
@@ -379,84 +551,69 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return count;
   }
 
-  @Test
-  public void testCommitter() throws Exception {
-    Job job = newJob();
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
-
-    // setup
-    setup(committer, jContext, tContext);
-
-    try {
-      // write output
-      describe("1. Writing output");
-      writeTextOutput(tContext);
-
-      dumpMultipartUploads();
-      describe("2. Committing task");
-      assertTrue("No files to commit were found by " + committer,
-          committer.needsTaskCommit(tContext));
-      committer.commitTask(tContext);
-
-      // this is only task commit; there MUST be no part- files in the dest dir
-      try {
-        RemoteIterator<LocatedFileStatus> files
-            = getFileSystem().listFiles(outDir, false);
-        S3ATestUtils.iterateOverFiles(files,
-            (LocatedFileStatus status) -> {
-              assertFalse("task committed file to dest :" + status,
-                  status.getPath().toString().contains("part"));
-            });
-      } catch (FileNotFoundException e) {
-        LOG.info("Outdir {} is not created by task commit phase ",
-            outDir);
-      }
-
-      describe("3. Committing job");
-      assertMultipartUploadsPending(outDir);
-      committer.commitJob(jContext);
-      describe("4. Validating content");
-
-      // validate output
-      validateContent(outDir, shouldExpectSuccessMarker());
-      assertNoMultipartUploadsPending(outDir);
-    } finally {
-      abort(committer, jContext, tContext);
-    }
-  }
-
   /**
-   * Create a a new job. Sets the task attempt ID.
-   * @return the new job
-   * @throws IOException failure
+   * Full test of the expected lifecycle: start job, task, write, commit task,
+   * commit job.
+   * @throws Exception on a failure
    */
-  public Job newJob() throws IOException {
-    Job job = Job.getInstance(getConfiguration());
-    Configuration conf = job.getConfiguration();
-    conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-    conf.setBoolean(CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
-    FileOutputFormat.setOutputPath(job, outDir);
-    return job;
+  @Test
+  public void testCommitLifecycle() throws Exception {
+    describe("Full test of the expected lifecycle:\n" +
+        " start job, task, write, commit task, commit job.\n" +
+        "Verify:\n" +
+        "* no files are visible after task commit\n" +
+        "* the expected file is visible after job commit\n" +
+        "* no outstanding MPUs after job commit");
+    JobData jobData = startJob(1, false);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
+
+    // write output
+    describe("1. Writing output");
+    writeTextOutput(tContext);
+
+    dumpMultipartUploads();
+    describe("2. Committing task");
+    assertTrue("No files to commit were found by " + committer,
+        committer.needsTaskCommit(tContext));
+    committer.commitTask(tContext);
+
+    // this is only task commit; there MUST be no part- files in the dest dir
+    try {
+      RemoteIterator<LocatedFileStatus> files
+          = getFileSystem().listFiles(outDir, false);
+      iterateOverFiles(files,
+          (LocatedFileStatus status) -> {
+            assertFalse("task committed file to dest :" + status,
+                status.getPath().toString().contains("part"));
+          });
+    } catch (FileNotFoundException e) {
+      LOG.info("Outdir {} is not created by task commit phase ",
+          outDir);
+    }
+
+    describe("3. Committing job");
+    assertMultipartUploadsPending(outDir);
+    committer.commitJob(jContext);
+
+    // validate output
+    describe("4. Validating content");
+    validateContent(outDir, shouldExpectSuccessMarker());
+    assertNoMultipartUploadsPending(outDir);
+
   }
+
 
   @Test
   public void testCommitterWithDuplicatedCommit() throws Exception {
-    Job job = newJob();
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
+    describe("Call a task then job commit twice;" +
+        "expect the second task commit to fail.");
+    JobData jobData = startJob(1, true);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
 
-    // setup
-    setup(committer, jContext, tContext);
-
-    // write output
-    writeTextOutput(tContext);
     // do commit
     commit(committer, jContext, tContext);
 
@@ -485,8 +642,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
         TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer =
-        createFailingCommitter(tContext);
+    AbstractS3GuardCommitter committer = createFailingCommitter(tContext);
 
     // setup
     setup(committer, jContext, tContext);
@@ -503,7 +659,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // but the data got there, due to the order of operations.
     validateContent(outDir, shouldExpectSuccessMarker());
     expectSecondJobCommitToFail(jContext, committer);
-
   }
 
   /**
@@ -611,16 +766,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   @Test
   public void testMapFileOutputCommitter() throws Exception {
-    Job job = newJob();
-    FileOutputFormat.setOutputPath(job, outDir);
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
-
-    // setup
-    setup(committer, jContext, tContext);
+    describe("Test that the committer generates map output into a directory\n" +
+        "starting with the prefix part-0000");
+    JobData jobData = startJob(1, false);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
+    Configuration conf = jobData.conf;
 
     // write output
     writeMapFileOutput(new MapFileOutputFormat().getRecordWriter(tContext),
@@ -647,7 +799,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         1, filtered.length);
     FileStatus fileStatus = filtered[0];
     assertTrue("Not the part file: " + fileStatus,
-        fileStatus.getPath().toString().endsWith(PART_00000));
+        fileStatus.getPath().getName().startsWith(PART_00000));
 
     describe("getReaders()");
     assertEquals("Number of MapFile.Reader entries with shared FS "
@@ -674,10 +826,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       @Override
       public boolean accept(Path path) {
         String name = path.getName();
-        if (name.startsWith("_") || name.startsWith(".")) {
-          return false;
-        }
-        return true;
+        return !(name.startsWith("_") || name.startsWith("."));
       }
     };
     Path[] names = FileUtil.stat2Paths(fs.listStatus(dir, filter));
@@ -690,64 +839,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       parts[i] = new MapFile.Reader(fs, names[i].toString(), conf);
     }
     return parts;
-  }
-
-  /**
-   * Set up the job and task.
-   * @param committer committer
-   * @param jContext job context
-   * @param tContext task context
-   * @throws IOException problems
-   */
-  protected void setup(AbstractS3GuardCommitter committer,
-      JobContext jContext,
-      TaskAttemptContext tContext) throws IOException {
-    describe("\nsetup job");
-    try (DurationInfo d = new DurationInfo("setup job %s",
-        jContext.getJobID())) {
-      committer.setupJob(jContext);
-    }
-    try (DurationInfo d = new DurationInfo("setup task %s",
-        tContext.getTaskAttemptID())) {
-      committer.setupTask(tContext);
-    }
-    describe("setup complete\n");
-
-    // also: clean the test dir
-  }
-
-  protected void abort(AbstractS3GuardCommitter committer,
-      JobContext jContext,
-      TaskAttemptContext tContext) throws IOException {
-    describe("\naborting task");
-    try {
-      committer.abortTask(tContext);
-    } catch (IOException e) {
-      LOG.warn("Exception aborting task:", e);
-    }
-    describe("\naborting job");
-    try {
-      committer.abortJob(jContext, JobStatus.State.KILLED);
-    } catch (IOException e) {
-      LOG.warn("Exception aborting job", e);
-    }
-  }
-
-  /**
-   * Set up the task and then the job.
-   * @param committer committer
-   * @param jContext job context
-   * @param tContext task context
-   * @throws IOException problems
-   */
-  protected void commit(AbstractS3GuardCommitter committer,
-      JobContext jContext,
-      TaskAttemptContext tContext) throws IOException {
-    describe("\ncommitting task");
-    committer.commitTask(tContext);
-    describe("\ncommitting job");
-    committer.commitJob(jContext);
-    describe("commit complete\n");
   }
 
   public interface ActionToTest {
@@ -787,22 +878,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         }));
   }
 
-
   @Test
   public void testAbort() throws Exception {
-    Job job = newJob();
-    FileOutputFormat.setOutputPath(job, outDir);
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
-
-    // do setup
-    setup(committer, jContext, tContext);
-
-    // write output
-    writeTextOutput(tContext);
+    JobData jobData = startJob(1, true);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
+    Configuration conf = jobData.conf;
 
     // do abort
     committer.abortTask(tContext);
@@ -835,19 +917,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   @Test
   public void testFailAbort() throws Exception {
-    Job job = newJob();
-    Configuration conf = job.getConfiguration();
-    FileOutputFormat.setOutputPath(job, outDir);
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
-
-    // do setup
-    setup(committer, jContext, tContext);
-
-    // write output
-    writeTextOutput(tContext);
+    JobData jobData = startJob(1, true);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
+    Configuration conf = jobData.conf;
 
     // do abort
     committer.abortTask(tContext);
