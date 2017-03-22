@@ -60,7 +60,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
   private static final class CommitterWithFailedThenSucceed extends
       MagicS3GuardCommitter {
-    private final FailThenSucceed failure = new FailThenSucceed();
+    private final FaultInjection failure = new FaultInjection();
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
@@ -70,7 +70,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     @Override
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
-      failure.exec();
+      failure.commitJob();
     }
   }
 

@@ -468,6 +468,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return getWorkPath();
   }
 
+  /**
+   * For a job attempt path, the staging committer returns that of the
+   * wrapped committer.
+   * @param context the context of the job.
+   * @return a path in HDFS.
+   */
   @Override
   public Path getJobAttemptPath(JobContext context) {
     return wrappedCommitter.getJobAttemptPath(context);
@@ -489,6 +495,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return outputPath;
   }
 
+  /**
+   * Set up the job, including calling the same method on the
+   * wrapped committer.
+   * @param context job context
+   * @throws IOException IO failure.
+   */
   @Override
   public void setupJob(JobContext context) throws IOException {
     LOG.debug("Setting up job {}", context.getJobID());
@@ -664,6 +676,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void abortJob(JobContext context, JobStatus.State state)
       throws IOException {
+    IOException ex = null;
     try (DurationInfo d = new DurationInfo("Abort Job %s in state %s ",
         context.getJobID(), state)) {
       List<S3Util.PendingUpload> pending = getPendingUploadsIgnoreErrors(context);
@@ -671,7 +684,24 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       LOG.error("Exception when aborting job {} in state {}",
           context.getJobID(), state, e);
-      throw e;
+      ex = e;
+    }
+    Path workPath = getWorkPath();
+    if (workPath != null) {
+      LOG.debug("Cleaning up work path {}", workPath);
+      FileSystem fs = workPath.getFileSystem(getConf());
+      try {
+        fs.delete(workPath, true);
+      } catch (IOException e) {
+        LOG.error("Exception cleaning up work path of job {}",
+            context.getJobID(), e);
+        if (ex != null) {
+          ex = e;
+        }
+      }
+    }
+    if (ex != null) {
+      throw ex;
     }
   }
 

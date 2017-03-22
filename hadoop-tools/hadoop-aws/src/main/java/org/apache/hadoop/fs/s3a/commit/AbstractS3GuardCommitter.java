@@ -50,6 +50,11 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
   protected final FileCommitActions commitActions;
   private Path outputPath;
+
+  /**
+   * This is the directory for all intermediate work: where the output format
+   * will write data.
+   */
   private Path workPath;
   private Configuration conf;
   private FileSystem destFS;
@@ -130,6 +135,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     return workPath;
   }
 
+  /**
+   * Set the work path for this committer.
+   * @param workPath the work path to use.
+   */
   protected void setWorkPath(Path workPath) {
     LOG.debug("Setting work path to {}", workPath);
     this.workPath = workPath;

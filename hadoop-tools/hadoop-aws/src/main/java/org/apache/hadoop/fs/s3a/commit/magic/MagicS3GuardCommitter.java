@@ -125,7 +125,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d = new DurationInfo("Abort Job %s in state %s",
         context.getJobID(), state)) {
       if (commitActions != null) {
-        Path pending = magicSubdir(getOutputPath());
+        Path pending = getJobAttemptPath(context);
         FileCommitActions.CommitAllFilesOutcome outcome
             = commitActions.abortAllPendingFilesInPath(pending, true);
         outcome.maybeRethrow();

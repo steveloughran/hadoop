@@ -60,7 +60,7 @@ public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
    */
   private static final class CommitterWithFailedThenSucceed extends
       DirectoryStagingCommitter {
-    private final FailThenSucceed failure = new FailThenSucceed();
+    private final FaultInjection failure = new FaultInjection();
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
@@ -70,7 +70,7 @@ public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
     @Override
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
-      failure.exec();
+      failure.commitJob();
     }
   }
 }

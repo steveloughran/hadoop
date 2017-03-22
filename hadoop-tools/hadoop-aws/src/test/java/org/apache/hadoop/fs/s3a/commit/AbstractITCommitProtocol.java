@@ -138,8 +138,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public void teardown() throws Exception {
     describe("teardown");
     if (abortInTeardown != null) {
-      abortQuietly(abortInTeardown.committer, abortInTeardown.jContext,
-          abortInTeardown.tContext);
+      abortQuietly(abortInTeardown);
     }
     abortMultipartUploadsUnderPath(outDir);
     cleanupDestDir();
@@ -188,6 +187,34 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public abstract AbstractS3GuardCommitter createCommitter(
       JobContext context) throws IOException;
 
+  /**
+   * Lambda Interface for creating committers, designed to allow
+   * different factories to be used to create different failure modes.
+   */
+  public interface CommitterFactory {
+
+    /**
+     * Create a committer for a task.
+     * @param context task context
+     * @return new committer
+     * @throws IOException failure
+     */
+    AbstractS3GuardCommitter createCommitter(
+        TaskAttemptContext context) throws IOException;
+  }
+
+  /**
+   * The normal committer creation factory, uses the abstract methods
+   * in the class.
+   */
+  public class StandardCommitterFactory implements CommitterFactory {
+    @Override
+    public AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
+        throws IOException {
+      return AbstractITCommitProtocol.this.createCommitter(context);
+    }
+  }
+
   protected void writeTextOutput(TaskAttemptContext context)
       throws IOException, InterruptedException {
     describe("write output");
@@ -229,6 +256,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  /**
+   * Details on a job for use in {@code startJob} and elsewhere.
+   */
    protected static class JobData {
      final Job job;
      final JobContext jContext;
@@ -270,22 +300,39 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * do: it's setting things up, mixing functionality, registering for teardown.
    * Its aim is simple though: a common body of code for starting work
    * in test cases.
-   * @param attemptID attempt ID
    * @param writeText should the text be written?
    * @return the job data 4-tuple
    * @throws IOException IO problems
    * @throws InterruptedException interruption during write
    */
-   protected JobData startJob(int attemptID, boolean writeText)
+   protected JobData startJob(boolean writeText)
+       throws IOException, InterruptedException {
+     return startJob(new StandardCommitterFactory(), writeText);
+   }
+
+  /**
+   * Start a job with a committer; optionally write the test data.
+   * Always register the job to be aborted (quietly) in teardown.
+   * This is, from an "OO-purity perspective" the wrong kind of method to
+   * do: it's setting things up, mixing functionality, registering for teardown.
+   * Its aim is simple though: a common body of code for starting work
+   * in test cases.
+   * @param factory the committer factory to use
+   * @param writeText should the text be written?
+   * @return the job data 4-tuple
+   * @throws IOException IO problems
+   * @throws InterruptedException interruption during write
+   */
+   protected JobData startJob(CommitterFactory factory, boolean writeText)
        throws IOException, InterruptedException {
      Job job = newJob();
      Configuration conf = job.getConfiguration();
      conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-     conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, attemptID);
+     conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
      JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
      TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
          TASK_ATTEMPT_0);
-     AbstractS3GuardCommitter committer = createCommitter(tContext);
+     AbstractS3GuardCommitter committer = factory.createCommitter(tContext);
 
      // setup
      setup(committer, jContext, tContext);
@@ -322,6 +369,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("setup complete\n");
 
     // also: clean the test dir
+  }
+
+  protected void abortQuietly(JobData jobData) throws IOException {
+    abortQuietly(jobData.committer, jobData.jContext, jobData.tContext);
   }
 
   protected void abortQuietly(AbstractS3GuardCommitter committer,
@@ -361,9 +412,22 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  public void executeWork(String name, ActionToTest action) throws Exception {
+    JobData jobData = startJob(false);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
+    try (DurationInfo d =
+             new DurationInfo("Executing %s", name)) {
+      action.exec(jobData.job, jContext, tContext, committer);
+    } finally {
+      abortQuietly(jobData);
+    }
+  }
+
   @Test
   public void testRecovery() throws Exception {
-    JobData jobData = startJob(1, true);
+    JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -449,7 +513,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       // fail, with a listing of the parent dir
       assertPathExists("Output file", new Path(dir, PART_00000));
     }
-
     return statuses[0].getPath();
   }
 
@@ -564,7 +627,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         "* no files are visible after task commit\n" +
         "* the expected file is visible after job commit\n" +
         "* no outstanding MPUs after job commit");
-    JobData jobData = startJob(1, false);
+    JobData jobData = startJob(false);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -609,7 +672,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public void testCommitterWithDuplicatedCommit() throws Exception {
     describe("Call a task then job commit twice;" +
         "expect the second task commit to fail.");
-    JobData jobData = startJob(1, true);
+    JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -637,18 +700,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Test
   public void testCommitterWithFailure() throws Exception {
     describe("Fail the first job commit then retry");
-    Job job = newJob();
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createFailingCommitter(tContext);
-
-    // setup
-    setup(committer, jContext, tContext);
-
-    // write output
-    writeTextOutput(tContext);
+    JobData jobData = startJob(new FailingCommitterFactory(), true);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
 
     // do commit
     committer.commitTask(tContext);
@@ -691,7 +746,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Create a committer which fails; the class {@link FailThenSucceed}
+   * Create a committer which fails; the class {@link FaultInjection}
    * implements the logic.
    * @param tContext task context
    * @return committer instance
@@ -699,6 +754,18 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    */
   protected abstract AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException;
+
+
+  /**
+   * Factory for failing committers.
+   */
+  public class FailingCommitterFactory implements CommitterFactory {
+    @Override
+    public AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
+        throws IOException {
+      return createFailingCommitter(context);
+    }
+  }
 
   protected void expectFNFEonTaskCommit(AbstractS3GuardCommitter committer,
       TaskAttemptContext tContext) throws Exception {
@@ -727,18 +794,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Test
   public void testCommitterWithNoOutputs() throws Exception {
     describe("Have a task and job with no outputs: expect success");
-
-    Job job = newJob();
-    Configuration conf = job.getConfiguration();
-
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer =
-        createFailingCommitter(tContext);
-
-    // setup
-    setup(committer, jContext, tContext);
+    JobData jobData = startJob(new FailingCommitterFactory(), false);
+    JobContext jContext = jobData.jContext;
+    TaskAttemptContext tContext = jobData.tContext;
+    AbstractS3GuardCommitter committer = jobData.committer;
 
     // do commit
     committer.commitTask(tContext);
@@ -768,7 +827,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public void testMapFileOutputCommitter() throws Exception {
     describe("Test that the committer generates map output into a directory\n" +
         "starting with the prefix part-0000");
-    JobData jobData = startJob(1, false);
+    JobData jobData = startJob(false);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -846,23 +905,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         AbstractS3GuardCommitter committer) throws Exception;
   }
 
-  public void executeWork(String name, ActionToTest action) throws Exception{
-    Job job = newJob();
-    FileOutputFormat.setOutputPath(job, outDir);
-    Configuration conf = job.getConfiguration();
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
-    AbstractS3GuardCommitter committer = createCommitter(tContext);
-
-    // do setup
-    setup(committer, jContext, tContext);
-    try (DurationInfo d =
-             new DurationInfo("Executing %s", name)) {
-      action.exec(job, jContext, tContext, committer);
-    }
-  }
-
   @Test
   public void testAbortTaskNoWorkDone() throws Exception {
     executeWork("abort task no work",
@@ -879,8 +921,23 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   @Test
+  public void testCommitJobButNotTask() throws Exception {
+    executeWork("commit a job while a task works is pending, " +
+            "expect task writes to be cancelled.",
+        ((job, jContext, tContext, committer) -> {
+          // step 1: write the text
+          writeTextOutput(tContext);
+          // step 2: commit the job
+          AbstractS3GuardCommitter jobCommitter = createCommitter(jContext);
+          jobCommitter.commitJob(jContext);
+          assertPart0000DoesNotExist(outDir);
+          assertNoMultipartUploadsPending(outDir);
+        }));
+  }
+
+  @Test
   public void testAbort() throws Exception {
-    JobData jobData = startJob(1, true);
+    JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -890,7 +947,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer.abortTask(tContext);
     Path expectedPath = new Path(committer.getWorkPath(), PART_00000);
     assertPathNotFound(conf, expectedPath, "task temp dir ");
-
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
     Path pendingDir = new Path(outDir, MAGIC_DIR_NAME);
@@ -917,7 +973,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   @Test
   public void testFailAbort() throws Exception {
-    JobData jobData = startJob(1, true);
+    JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -928,8 +984,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     Path jtd = committer.getJobAttemptPath(jContext);
     Path ttd = committer.getTaskAttemptPath(tContext);
-    Path expectedFile = new Path(outDir, PART_00000);
-    assertPathDoesNotExist("expected output file", expectedFile);
+    assertPart0000DoesNotExist(outDir);
     assertSuccessMarkerDoesNotExist(outDir);
     describe("Aborting job into %s", outDir);
 
@@ -940,7 +995,17 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
     assertNoMultipartUploadsPending(outDir);
+  }
 
+  public void assertPart0000DoesNotExist(Path dir) throws IOException {
+    try {
+      Path p = getPart0000(dir);
+      // bad
+      fail("Unexpectedly found generated part-0000 output file "  + p);
+    } catch (FileNotFoundException e) {
+      // good
+    }
+    assertPathDoesNotExist("expected output file", new Path(dir, PART_00000));
   }
 
   @Test
@@ -950,6 +1015,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
           // write output
           writeTextOutput(tContext);
           committer.abortJob(jContext, JobStatus.State.RUNNING);
+          ContractTestUtils.assertPathDoesNotExist(
+              committer.getTaskAttemptFilesystem(tContext),
+              "Task attempt local working dir",
+              committer.getTaskAttemptPath(tContext));
           assertPathDoesNotExist("job temp dir",
               committer.getJobAttemptPath(jContext));
           assertNoMultipartUploadsPending(outDir);
@@ -1060,8 +1129,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("\nCommitting Job");
     amCommitter.commitJob(jContext);
     assertPathExists("base output directory", outDir);
-    assertPathDoesNotExist("Output ended up in base directory",
-        new Path(outDir, PART_00000));
+    assertPart0000DoesNotExist(outDir);
     Path outSubDir = new Path(outDir, SUB_DIR);
     assertPathDoesNotExist("Must not end up with sub_dir/sub_dir",
         new Path(outSubDir, SUB_DIR));
@@ -1077,14 +1145,14 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Helper class for the failure simulation.
-   * The first time {@link #exec()}
+   * The first time {@link #commitJob()}
    * is called it will thrown an exception containing the string
    * {@link #COMMIT_FAILURE_MESSAGE}. The second time it will succeed.
    */
-  public static class FailThenSucceed {
+  public static class FaultInjection {
     private final AtomicBoolean firstTimeFail = new AtomicBoolean(true);
 
-    public void exec() throws IOException {
+    public void commitJob() throws IOException {
       if (firstTimeFail.getAndSet(false)) {
         throw new IOException(COMMIT_FAILURE_MESSAGE);
       }

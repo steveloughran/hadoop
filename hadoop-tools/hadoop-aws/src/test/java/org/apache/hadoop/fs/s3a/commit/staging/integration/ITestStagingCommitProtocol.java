@@ -30,7 +30,6 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
@@ -103,7 +102,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
    */
   private static final class CommitterWithFailedThenSucceed extends
       StagingS3GuardCommitter {
-    private final FailThenSucceed failure = new FailThenSucceed();
+    private final FaultInjection failure = new FaultInjection();
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
@@ -113,7 +112,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     @Override
     public void commitJob(JobContext context) throws IOException {
       super.commitJob(context);
-      failure.exec();
+      failure.commitJob();
     }
   }
 }
