@@ -166,7 +166,7 @@ public final class Paths {
           StagingCommitterConstants.JAVA_IO_TMPDIR)));
       break;
     case "s3a":
-      temp = new Path(fs.getHomeDirectory(), "tmp");
+      temp = new Path("/tmp");
       break;
 
     // here assume that /tmp is valid
@@ -179,7 +179,7 @@ public final class Paths {
 
   /**
    * Get the Application Attempt Id for this job.
-   * @param context the context to look in
+   * @param conf the config to look in
    * @return the Application Attempt Id for a given job.
    */
   private static int getAppAttemptId(Configuration conf) {
@@ -201,7 +201,7 @@ public final class Paths {
     Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf)),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
-    return new Path(work, "pending-uploads");
+    return new Path(work, "staging-uploads");
   }
 
   // TODO: verify this is correct, it comes from dse-storage

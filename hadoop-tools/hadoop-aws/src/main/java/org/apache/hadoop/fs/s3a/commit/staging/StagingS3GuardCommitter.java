@@ -25,6 +25,7 @@ import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
@@ -180,7 +181,17 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // explicitly choose commit algorithm
     initFileOutputCommitterOptions(context);
     commitsDirectory = Paths.getMultipartUploadCommitsDirectory(conf, uuid);
-    return new FileOutputCommitter(commitsDirectory, context);
+    FileSystem stagingFS = commitsDirectory.getFileSystem(conf);
+    Path qualified = stagingFS.makeQualified(commitsDirectory);
+    if (stagingFS instanceof S3AFileSystem) {
+      // currently refuse to work with S3a for the working FS; you need
+      // a consistent FS. This isn't entirely true with s3guard and
+      // alternative S3 endpoints, but doing it now stops
+      // accidental use of S3
+      throw new PathIOException(qualified.toUri().toString(),
+          "Directory for intermediate work cannot be on S3");
+    }
+    return new FileOutputCommitter(qualified, context);
   }
 
   /**
@@ -201,6 +212,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     sb.append("constructorOutputPath=").append(constructorOutputPath);
     sb.append(", conflictResolution=").append(conflictResolution);
     sb.append(", finalOutputPath=").append(finalOutputPath);
+    if (wrappedCommitter != null) {
+      sb.append(", wrappedCommitter=").append(wrappedCommitter);
+    }
     sb.append(' ');
     sb.append(super.toString());
     sb.append('}');
