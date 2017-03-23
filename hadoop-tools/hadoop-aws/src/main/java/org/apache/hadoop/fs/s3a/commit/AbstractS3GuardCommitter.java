@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.slf4j.Logger;
@@ -48,8 +49,13 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
-  protected final FileCommitActions commitActions;
+  private final FileCommitActions commitActions;
   private Path outputPath;
+
+  /**
+   * Used in logging and reporting to help disentangle messages.
+   */
+  protected final String role;
 
   /**
    * This is the directory for all intermediate work: where the output format
@@ -66,16 +72,30 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @param context the job context
    * @throws IOException on a failure
    */
-  protected AbstractS3GuardCommitter(Path outputPath,
+  private AbstractS3GuardCommitter(
+      String role,
+      Path outputPath,
       JobContext context) throws IOException {
     Preconditions.checkArgument(outputPath != null, "null output path");
     Preconditions.checkArgument(context != null, "null job context");
     this.jobContext = context;
+    this.role = role;
     setConf(context.getConfiguration());
     initOutput(outputPath);
-    LOG.debug("Committer instantiated for job \"{}\" ID {} with destination {}",
-        context.getJobName(), context.getJobID(), outputPath);
+    LOG.debug("{} instantiated for job \"{}\" ID {} with destination {}",
+        role, context.getJobName(), context.getJobID(), outputPath);
     commitActions = new FileCommitActions(getDestS3AFS());
+  }
+
+ /**
+   * Create a committer.
+   * @param outputPath the job's output path: MUST NOT be null.
+   * @param context the job context
+   * @throws IOException on a failure
+   */
+  protected AbstractS3GuardCommitter(Path outputPath,
+      JobContext context) throws IOException {
+    this("Job committer " + context.getJobID(), outputPath,context);
   }
 
   /**
@@ -90,11 +110,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected AbstractS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    this(outputPath, (JobContext) context);
-    LOG.debug("Committer instantiated for task ID {} for job \"{}\" " +
-            "ID {}",
-        context.getTaskAttemptID(),
-        context.getJobName(), context.getJobID());
+    this("Task committer "+ context.getTaskAttemptID(),
+        outputPath, (JobContext) context);
+    LOG.debug("{}} instantiated for\"{}\" ID {}",
+        role, context.getJobName(), context.getJobID());
   }
 
   /** TESTING ONLY; allows mock FS to cheat. */
@@ -175,6 +194,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     return (S3AFileSystem) getDestFS();
   }
 
+  /**
+   * Set the destination FS: the FS of the final output.
+   * @param destFS destination FS.
+   */
   protected void setDestFS(FileSystem destFS) {
     this.destFS = destFS;
   }
@@ -217,6 +240,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "AbstractS3GuardCommitter{");
+    sb.append("role=").append(role);
     sb.append("outputPath=").append(getOutputPath());
     sb.append(", workPath=").append(workPath);
     sb.append('}');
@@ -251,7 +275,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   @Override
   public void recoverTask(TaskAttemptContext taskContext) throws IOException {
     LOG.warn("Cannot recover task {}", taskContext.getTaskAttemptID());
-    throw new IOException(String.format("Unable to recover task %s",
+    throw new PathCommitException(outputPath,
+        String.format("Unable to recover task %s",
         taskContext.getTaskAttemptID()));
   }
 
@@ -277,7 +302,6 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       Path taskAttemptPath = getTaskAttemptPath(context);
       FileSystem fs = getTaskAttemptFilesystem(context);
       fs.mkdirs(taskAttemptPath);
-
     }
   }
 
@@ -293,4 +317,25 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     return getTaskAttemptPath(context).getFileSystem(getConf());
   }
 
+  /**
+   * Abort the job: hand off to {@link #cleanupJob(JobContext)}.
+   * @param context job
+   * @param state final runstate of the job
+   * @throws IOException failure
+   */
+  @Override
+  public void abortJob(JobContext context, JobStatus.State state)
+      throws IOException {
+    LOG.info("{}: abort Job {} in state {}", role, context.getJobID(), state);
+    cleanupJob(context);
+  }
+
+  @Override
+  public void cleanupJob(JobContext jobContext) throws IOException {
+    super.cleanupJob(jobContext);
+  }
+
+  protected FileCommitActions getCommitActions() {
+    return commitActions;
+  }
 }

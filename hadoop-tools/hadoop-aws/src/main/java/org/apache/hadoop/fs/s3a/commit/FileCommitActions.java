@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,7 @@ public class FileCommitActions {
   private final S3AFileSystem fs;
 
   public FileCommitActions(S3AFileSystem fs) {
+    Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
   }
 
@@ -57,6 +59,7 @@ public class FileCommitActions {
    */
   public CommitFileOutcome commitPendingFile(Path pendingFile)
       throws IOException {
+    Preconditions.checkArgument(pendingFile != null, "null pendingFile");
     CommitFileOutcome outcome;
     String destKey = null;
     // really read it in and parse
@@ -108,6 +111,7 @@ public class FileCommitActions {
   public CommitAllFilesOutcome commitAllPendingFilesInPath(Path pendingDir,
       boolean recursive)
       throws IOException, FileNotFoundException {
+    Preconditions.checkArgument(pendingDir != null, "null pendingDir");
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
     FileStatus fileStatus = fs.getFileStatus(pendingDir);
     if (!fileStatus.isDirectory()) {
@@ -199,6 +203,7 @@ public class FileCommitActions {
   public CommitAllFilesOutcome abortAllPendingFilesInPath(Path pendingDir,
       boolean recursive)
       throws IOException {
+    Preconditions.checkArgument(pendingDir != null, "null pendingDir");
     CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
     RemoteIterator<LocatedFileStatus> pendingFiles;
     try {
@@ -222,11 +227,26 @@ public class FileCommitActions {
   }
 
   /**
+   * Abort all pending uploads to the destination FS under a path.
+   * @param dest destination path
+   * @return a count of the number of uploads aborted.
+   * @throws IOException IO failure
+   */
+  public int abortPendingUploadsUnderDestination(Path dest) throws IOException {
+    String destKey = fs.pathToKey(dest);
+    S3AFileSystem.WriteOperationHelper writer
+        = fs.createWriteOperationHelper(destKey);
+    return writer.abortMultipartUploadsUnderPath(destKey);
+  }
+
+  /**
    * Touch the success marker. This will overwrite it if it is already there.
    * @param outputPath output directory
    * @throws IOException IO problem
    */
   public void touchSuccessMarker(Path outputPath) throws IOException {
+    Preconditions.checkArgument(outputPath != null, "null outputPath");
+
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     LOG.debug("Touching success marker for job {}", markerPath);
     fs.create(markerPath, true).close();
@@ -304,6 +324,15 @@ public class FileCommitActions {
       }
     }
 
+    /**
+     * Get the first exception if there was one in the first failure.
+     * This is the same exception which {@link #maybeRethrow()} will throw.
+     * @return an exception or null.
+     */
+    public IOException getFirstException() {
+      return !failed.isEmpty() ? failed.get(0).getException() : null;
+    }
+
     @Override
     public String toString() {
       return String.format("successes=%d failures=%d, total=%d",
@@ -365,7 +394,7 @@ public class FileCommitActions {
       return pendingFile;
     }
 
-    public Exception getException() {
+    public IOException getException() {
       return exception;
     }
 

@@ -38,7 +38,8 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static com.google.common.base.Preconditions.*;
 
 /**
- * Static utility methods related to S3A commitment processing.
+ * Static utility methods related to S3A commitment processing, both
+ * staging and magic.
  */
 public final class CommitUtils {
 

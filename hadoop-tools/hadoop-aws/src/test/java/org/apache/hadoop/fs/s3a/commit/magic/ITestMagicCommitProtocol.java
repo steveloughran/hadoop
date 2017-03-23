@@ -19,12 +19,15 @@
 package org.apache.hadoop.fs.s3a.commit.magic;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_DIR_NAME;
 
 /**
  * Test the magic committer's commit protocol.
@@ -34,6 +37,16 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected String suitename() {
     return "ITestMagicCommitProtocol";
+  }
+
+  @Override
+  public void assertJobAbortCleanedUp(JobData jobData)
+      throws Exception {
+    // special handling of magic directory; harmless in staging
+    Path magicDir = new Path(outDir, MAGIC_DIR_NAME);
+    ContractTestUtils.assertPathDoesNotExist(getFileSystem(),
+        "magic dir ", magicDir);
+    super.assertJobAbortCleanedUp(jobData);
   }
 
   @Override

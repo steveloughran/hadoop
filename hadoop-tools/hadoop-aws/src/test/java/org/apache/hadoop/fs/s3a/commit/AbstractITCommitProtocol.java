@@ -97,10 +97,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected static final TaskAttemptID TASK_ATTEMPT_1 =
       TaskAttemptID.forName(ATTEMPT_1);
 
-  private Text key1 = new Text("key1");
-  private Text key2 = new Text("key2");
-  private Text val1 = new Text("val1");
-  private Text val2 = new Text("val2");
+  private static final Text KEY_1 = new Text("key1");
+  private static final Text KEY_2 = new Text("key2");
+  private static final Text VAL_1 = new Text("val1");
+  private static final Text VAL_2 = new Text("val2");
+
+  /** A job to abort in test case teardown. */
   private JobData abortInTeardown;
 
   private void cleanupDestDir() throws IOException {
@@ -131,6 +133,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     outDir = path(getMethodName());
     S3AFileSystem fileSystem = getFileSystem();
     bindFileSystem(fileSystem, outDir, fileSystem.getConf());
+    abortMultipartUploadsUnderPath(outDir);
     cleanupDestDir();
   }
 
@@ -215,6 +218,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  /**
+   * Write some text out.
+   * @param context task
+   * @throws IOException IO failure
+   * @throws InterruptedException write interrupted
+   */
   protected void writeTextOutput(TaskAttemptContext context)
       throws IOException, InterruptedException {
     describe("write output");
@@ -225,30 +234,64 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  /**
+   * Write the standard output.
+   * @param writer record write
+   * @param context task context
+   * @throws IOException IO failure
+   * @throws InterruptedException write interrupted
+   */
   private void writeOutput(RecordWriter theRecordWriter,
       TaskAttemptContext context) throws IOException, InterruptedException {
     NullWritable nullWritable = NullWritable.get();
     try {
-      theRecordWriter.write(key1, val1);
+      theRecordWriter.write(KEY_1, VAL_1);
       theRecordWriter.write(null, nullWritable);
-      theRecordWriter.write(null, val1);
-      theRecordWriter.write(nullWritable, val2);
-      theRecordWriter.write(key2, nullWritable);
-      theRecordWriter.write(key1, null);
+      theRecordWriter.write(null, VAL_1);
+      theRecordWriter.write(nullWritable, VAL_2);
+      theRecordWriter.write(KEY_2, nullWritable);
+      theRecordWriter.write(KEY_1, null);
       theRecordWriter.write(null, null);
-      theRecordWriter.write(key2, val2);
+      theRecordWriter.write(KEY_2, VAL_2);
     } finally {
       theRecordWriter.close(context);
     }
   }
 
+  /**
+   * Write the output.
+   * @param writer record write
+   * @param context task context
+   * @param key key to write
+   * @param val val to write
+   * @throws IOException IO failure
+   * @throws InterruptedException write interrupted
+   */
+  private void writeOutput(RecordWriter writer,
+      TaskAttemptContext context, Text key, Text val)
+      throws IOException, InterruptedException {
+    NullWritable nullWritable = NullWritable.get();
+    try {
+      writer.write(key, val);
+    } finally {
+      writer.close(context);
+    }
+  }
+
+  /**
+   * Write the output of a map.
+   * @param theRecordWriter
+   * @param context
+   * @throws IOException
+   * @throws InterruptedException
+   */
   private void writeMapFileOutput(RecordWriter theRecordWriter,
       TaskAttemptContext context) throws IOException, InterruptedException {
     describe("\nWrite map output");
     try (DurationInfo d = new DurationInfo("Writing Text output for task %s",
         context.getTaskAttemptID())) {
       for (int i = 0; i < 10; ++i) {
-        Text val = ((i & 1) == 1) ? val1 : val2;
+        Text val = ((i & 1) == 1) ? VAL_1 : VAL_2;
         theRecordWriter.write(new LongWritable(i), val);
       }
     } finally {
@@ -259,12 +302,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   /**
    * Details on a job for use in {@code startJob} and elsewhere.
    */
-   protected static class JobData {
-     final Job job;
-     final JobContext jContext;
-     final TaskAttemptContext tContext;
-     final AbstractS3GuardCommitter committer;
-     final Configuration conf;
+   public static class JobData {
+     public final Job job;
+     public final JobContext jContext;
+     public final TaskAttemptContext tContext;
+     public final AbstractS3GuardCommitter committer;
+     public final Configuration conf;
 
      public JobData(Job job,
          JobContext jContext,
@@ -277,7 +320,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
        conf = job.getConfiguration();
      }
    }
-
 
   /**
    * Create a a new job. Sets the task attempt ID.
@@ -346,7 +388,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
      return jobData;
    }
 
-
   /**
    * Set up the job and task.
    * @param committer committer
@@ -371,13 +412,23 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // also: clean the test dir
   }
 
-  protected void abortQuietly(JobData jobData) throws IOException {
+  /**
+   * Abort a job quietly.
+   * @param jobData job info
+   */
+  protected void abortQuietly(JobData jobData) {
     abortQuietly(jobData.committer, jobData.jContext, jobData.tContext);
   }
 
+  /**
+   * Abort a job quietly: first task, then job.
+   * @param committer committer
+   * @param jContext job context
+   * @param tContext task context
+   */
   protected void abortQuietly(AbstractS3GuardCommitter committer,
       JobContext jContext,
-      TaskAttemptContext tContext) throws IOException {
+      TaskAttemptContext tContext) {
     describe("\naborting task");
     try {
       committer.abortTask(tContext);
@@ -412,8 +463,31 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
-  public void executeWork(String name, ActionToTest action) throws Exception {
+  /**
+   * Execute work as part of a test, after creating the job.
+   * After the execution, {@link #abortQuietly(JobData)} is
+   * called for abort/cleanup.
+   * @param name name of work (for logging)
+   * @param action action to execute
+   * @throws Exception failure
+   */
+  protected void executeWork(String name, ActionToTest action) throws Exception {
     JobData jobData = startJob(false);
+    executeWork(name, jobData, action);
+  }
+
+  /**
+   * Execute work as part of a test, against the created job.
+   * After the execution, {@link #abortQuietly(JobData)} is
+   * called for abort/cleanup.
+   * @param name name of work (for logging)
+   * @param jobData job info
+   * @param action action to execute
+   * @throws Exception failure
+   */
+  public void executeWork(String name,
+      JobData jobData,
+      ActionToTest action) throws Exception {
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
@@ -425,8 +499,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  /**
+   * Verify that recovery doesn't work for these committers.
+   * @throws Exception
+   */
   @Test
-  public void testRecovery() throws Exception {
+  public void testRecoveryAndCleanup() throws Exception {
+    describe("Test (unsupported) task recovery.");
     JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
@@ -436,20 +515,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer.commitTask(tContext);
     Path attemptPath = committer.getTaskAttemptPath(tContext);
     assertPathDoesNotExist("commit dir", attemptPath);
-
- /*   Path jobTempDir1 = committer.getCommittedTaskPath(tContext);
-    File jtd = new File(jobTempDir1.toUri().getPath());
-    int commitVersion = 2;
-    int recoveryVersion = 2;
-    if (commitVersion == 1) {
-      assertTrue("Version 1 commits to temporary dir " + jtd, jtd.exists());
-      validateContent(jtd);
-    } else {
-      assertFalse("Version 2 commits to output dir " + jtd, jtd.exists());
-    }
-*/
-    //now while running the second app attempt,
-    //recover the task output from first attempt
 
     Configuration conf2 = jobData.job.getConfiguration();
     conf2.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
@@ -462,21 +527,20 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     assertFalse("recoverySupported in " + committer2,
         committer2.isRecoverySupported());
-    intercept(IOException.class,
+    intercept(PathCommitException.class, "recover",
         () -> committer2.recoverTask(tContext2));
 
     // at this point, task attempt 0 has failed to recover
     // it should be abortable though.
     committer2.abortTask(tContext2);
-/*
-
-    committer2.commitJob(jContext2);
-    validateContent(outDir, shouldExpectSuccessMarker());
-*/
+    committer2.abortJob(jContext2, JobStatus.State.KILLED);
+    // now, state of system may still have pending data
+    assertNoMultipartUploadsPending(outDir);
   }
 
   /**
-   * Verify the output of the directory. That includes the "part-m-00000"
+   * Verify the output of the directory.
+   * That includes the {@code part-m-00000-*}
    * file existence and contents, as well as optionally, the success marker.
    * @param dir directory to scan.
    * @param expectSuccessMarker check the success marker?
@@ -490,18 +554,26 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     Path expectedFile = getPart0000(dir);
     LOG.debug("Validating content in {}", expectedFile);
     StringBuffer expectedOutput = new StringBuffer();
-    expectedOutput.append(key1).append('\t').append(val1).append("\n");
-    expectedOutput.append(val1).append("\n");
-    expectedOutput.append(val2).append("\n");
-    expectedOutput.append(key2).append("\n");
-    expectedOutput.append(key1).append("\n");
-    expectedOutput.append(key2).append('\t').append(val2).append("\n");
+    expectedOutput.append(KEY_1).append('\t').append(VAL_1).append("\n");
+    expectedOutput.append(VAL_1).append("\n");
+    expectedOutput.append(VAL_2).append("\n");
+    expectedOutput.append(KEY_2).append("\n");
+    expectedOutput.append(KEY_1).append("\n");
+    expectedOutput.append(KEY_2).append('\t').append(VAL_2).append("\n");
     String output = slurp(expectedFile);
     assertEquals("Content of " + expectedFile,
         expectedOutput.toString(), output);
   }
 
-  private Path getPart0000(Path dir) throws IOException {
+  /**
+   * Identify any path under the directory which begins with the
+   * {@code "part-m-00000"} sequence.
+   * @param dir directory to scan
+   * @return the full path
+   * @throws FileNotFoundException the path is missing.
+   * @throws IOException failure.
+   */
+  protected Path getPart0000(Path dir) throws IOException {
     FileStatus[] statuses = getFileSystem().listStatus(dir,
         new PathFilter() {
           @Override
@@ -538,16 +610,29 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Dump all uploads.  */
+   * Dump all MPUs in the filesystem.
+   * @throws IOException IO failure
+   */
   protected void dumpMultipartUploads() throws IOException {
     countMultipartUploads("");
   }
 
+  /**
+   * Assert that there *are* pending MPUs.
+   * @param path path to look under
+   * @throws IOException IO failure
+   */
   protected void assertMultipartUploadsPending(Path path) throws IOException {
     int count = countMultipartUploads(path);
     assertTrue("No multipart uploads in progress under " + path, count > 0);
   }
 
+  /**
+   * Assert that there *are no* pending MPUs; assertion failure will include
+   * the list of pending writes.
+   * @param path path to look under
+   * @throws IOException IO failure
+   */
   protected void assertNoMultipartUploadsPending(Path path) throws IOException {
     List<String> uploads = listMultipartUploads(pathToPrefix(path));
     if (!uploads.isEmpty()) {
@@ -559,15 +644,22 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     }
   }
 
+  /**
+   * Count the number of MPUs under a path
+   * @param path path to scan
+   * @return count
+   * @throws IOException IO failure
+   */
   protected int countMultipartUploads(Path path) throws IOException {
     return countMultipartUploads(pathToPrefix(path));
   }
 
-  private String pathToPrefix(Path path) {
-    return path == null ? "" :
-        getFileSystem().pathToKey(path);
-  }
-
+  /**
+   * Count the number of MPUs under a prefix
+   * @param path path to scan
+   * @return count
+   * @throws IOException IO failure
+   */
   protected int countMultipartUploads(String prefix) throws IOException {
     int count = 0;
     for (MultipartUpload upload : getFileSystem().listMultipartUploads(
@@ -576,6 +668,16 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       LOG.info("Upload {} to {}", upload.getUploadId(), upload.getKey());
     }
     return count;
+  }
+
+  /**
+   * Map from a path to a prefix
+   * @param path path
+   * @return the key
+   */
+  private String pathToPrefix(Path path) {
+    return path == null ? "" :
+        getFileSystem().pathToKey(path);
   }
 
   /**
@@ -666,7 +768,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     assertNoMultipartUploadsPending(outDir);
 
   }
-
 
   @Test
   public void testCommitterWithDuplicatedCommit() throws Exception {
@@ -773,15 +874,29 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         () -> committer.commitTask(tContext));
   }
 
+  /**
+   * Assert that the output dir has the {@code _SUCCESS} marker.
+   * @throws IOException
+   */
   protected void assertSuccessMarkerExists() throws IOException {
     assertSuccessMarkerExists(outDir);
   }
 
+  /**
+   * Assert that the specified dir has the {@code _SUCCESS} marker.
+   * @param dir dir to scan
+   * @throws IOException IO Failure
+   */
   protected void assertSuccessMarkerExists(Path dir) throws IOException {
     assertPathExists("Success marker",
         new Path(dir, SUCCESS_FILE_NAME));
   }
 
+  /**
+   * Assert that the given dir does not have the {@code _SUCCESS} marker.
+   * @param dir dir to scan
+   * @throws IOException IO Failure
+   */
   protected void assertSuccessMarkerDoesNotExist(Path dir) throws IOException {
     assertPathDoesNotExist("Success marker",
         new Path(dir, SUCCESS_FILE_NAME));
@@ -936,7 +1051,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   @Test
-  public void testAbort() throws Exception {
+  public void testAbortTaskThenJob() throws Exception {
     JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
@@ -945,12 +1060,26 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // do abort
     committer.abortTask(tContext);
-    Path expectedPath = new Path(committer.getWorkPath(), PART_00000);
-    assertPathNotFound(conf, expectedPath, "task temp dir ");
+
+    intercept(FileNotFoundException.class, "",
+        () -> getPart0000(committer.getWorkPath()));
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
-    Path pendingDir = new Path(outDir, MAGIC_DIR_NAME);
-    assertPathNotFound(conf, pendingDir, "job temp dir ");
+    assertJobAbortCleanedUp(jobData);
+  }
+
+  /**
+   * Extension point: assert that the job was all cleaned up after an abort.
+   * Base assertions
+   * <ul>
+   *   <li>Output dir is absent or, if present, empty</li>
+   *   <li>No pending MPUs to/under the output dir</li>
+   * </ul>
+   * @param jobData job data
+   * @throws Exception failure
+   */
+  public void assertJobAbortCleanedUp(JobData jobData) throws Exception {
+    // special handling of magic directory; harmless in staging
     S3AFileSystem fs = getFileSystem();
     try {
       FileStatus[] children = listChildren(fs, outDir);
@@ -962,17 +1091,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     } catch (FileNotFoundException e) {
       // this is a valid failure mode; it means the dest dir doesn't exist yet.
     }
-  }
-
-  protected void assertPathNotFound(Configuration conf,
-      Path expectedPath,
-      String message) throws IOException {
-    ContractTestUtils.assertPathDoesNotExist(expectedPath.getFileSystem(conf),
-        message, expectedPath);
+    assertNoMultipartUploadsPending(outDir);
   }
 
   @Test
   public void testFailAbort() throws Exception {
+    describe("Abort the task, then job (failed), abort the job again");
     JobData jobData = startJob(true);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;

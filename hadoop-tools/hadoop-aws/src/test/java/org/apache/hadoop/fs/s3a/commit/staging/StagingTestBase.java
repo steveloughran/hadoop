@@ -80,7 +80,6 @@ public class StagingTestBase {
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
   public static final URI OUTPUT_PATH_URI = OUTPUT_PATH.toUri();
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
-  public static final Path ROOT_PATH = new Path(FS_URI);
 
   protected StagingTestBase() {
   }

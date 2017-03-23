@@ -30,7 +30,7 @@ public class DurationInfo extends Duration
   private static final Logger LOG = LoggerFactory.getLogger(DurationInfo.class);
   public DurationInfo(String format, Object... args) {
     this.text = String.format(format, args);
-    LOG.info("Starting {}", text);
+    LOG.info("Starting: {}", text);
   }
 
   @Override

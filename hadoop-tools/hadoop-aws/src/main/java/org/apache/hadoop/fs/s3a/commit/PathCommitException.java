@@ -34,7 +34,7 @@ public class PathCommitException extends PathIOException {
   }
 
   public PathCommitException(Path path, String error) {
-    super(path.toString(), error);
+    super(path != null ? path.toString() : "", error);
   }
 
   public PathCommitException(String path, String error, Throwable cause) {

@@ -72,7 +72,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
   private final int numThreads;
   private JobContext job = null;
-  private String uuid = null;
   private TaskAttemptContext tac = null;
   private Configuration conf = null;
   private MockedStagingCommitter jobCommitter = null;
@@ -104,8 +103,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
     this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job);
     jobCommitter.setupJob(job);
-
-    this.uuid = job.getConfiguration().get(UPLOAD_UUID);
 
     this.tac = new TaskAttemptContextImpl(
         new Configuration(job.getConfiguration()), AID);
@@ -162,7 +159,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     Path committedTaskPath = committer.getCommittedTaskPath(tac);
     assertEquals("Path should be in HDFS: " + committedTaskPath,
         "hdfs", committedTaskPath.toUri().getScheme());
-    String ending = "/pending-uploads/_temporary/0/task_job_0001_r_000002";
+    String ending = STAGING_UPLOADS + "/_temporary/0/task_job_0001_r_000002";
     assertTrue("Did not end with \"" + ending +"\" :" + committedTaskPath,
         committedTaskPath.toString().endsWith(
         ending));

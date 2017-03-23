@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,6 +110,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private String bucket = null;
   private String s3KeyPrefix = null;
   private Path bucketRoot = null;
+
 
   /** The directory in the cluster FS for commits to go to. */
   private Path commitsDirectory;
@@ -209,14 +211,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "StagingS3GuardCommitter{");
-    sb.append("constructorOutputPath=").append(constructorOutputPath);
-    sb.append(", conflictResolution=").append(conflictResolution);
+    sb.append(super.toString());
     sb.append(", finalOutputPath=").append(finalOutputPath);
+    sb.append(", conflictResolution=").append(conflictResolution);
     if (wrappedCommitter != null) {
       sb.append(", wrappedCommitter=").append(wrappedCommitter);
     }
-    sb.append(' ');
-    sb.append(super.toString());
     sb.append('}');
     return sb.toString();
   }
@@ -517,7 +517,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   @Override
   public void setupJob(JobContext context) throws IOException {
-    LOG.debug("Setting up job {}", context.getJobID());
+    LOG.debug("{}, Setting up job {}", role, context.getJobID());
     context.getConfiguration().set(UPLOAD_UUID, uuid);
     wrappedCommitter.setupJob(context);
   }
@@ -567,7 +567,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       // unable to work with endpoint, if suppressing errors decide our actions
       if (suppressExceptions) {
-        LOG.info("Failed to list pending upload dir", e);
+        LOG.info("{} failed to list pending upload dir", role, e);
         return pending;
       } else {
         throw e;
@@ -611,8 +611,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void commitJob(JobContext context) throws IOException {
     List<S3Util.PendingUpload> pending = Collections.emptyList();
-    try (DurationInfo d = new DurationInfo("Pre-commit Job %s",
-        context.getJobID())) {
+    try (DurationInfo d =
+             new DurationInfo("%s: preparing to commit Job", role)) {
       pending = getPendingUploads(context);
       preCommitJob(context, pending);
     } catch (IOException e) {
@@ -620,8 +620,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       abortJobInternal(context, pending, true);
       throw e;
     }
-    try (DurationInfo d = new DurationInfo("Commit Job %s",
-        context.getJobID())) {
+    try (DurationInfo d = new DurationInfo("%s: committing Job %s",
+        role, context.getJobID())) {
       commitJobInternal(context, pending);
     }
     maybeTouchSuccessMarker(context);
@@ -635,7 +635,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected void preCommitJob(JobContext context,
       List<S3Util.PendingUpload> pending) throws IOException {
-
   }
 
   protected void commitJobInternal(JobContext context,
@@ -645,9 +644,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         getOutputPath(context), context.getConfiguration());
 
     if (pending.isEmpty()) {
-      LOG.warn("No pending uploads to commit");
+      LOG.warn("{}: No pending uploads to commit", role);
     }
-    LOG.debug("Commiting the output of {} task(s)", pending.size());
+    LOG.debug("{}: committing the output of {} task(s)", role, pending.size());
     boolean threw = true;
     try {
       Tasks.foreach(pending)
@@ -691,14 +690,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void abortJob(JobContext context, JobStatus.State state)
       throws IOException {
     IOException ex = null;
-    try (DurationInfo d = new DurationInfo("Abort Job %s in state %s ",
-        context.getJobID(), state)) {
+    try (DurationInfo d = new DurationInfo("%s: aborting job in state %s ",
+        role, context.getJobID(), state)) {
       List<S3Util.PendingUpload> pending = getPendingUploadsIgnoreErrors(context);
       abortJobInternal(context, pending, false);
     } catch (IOException e) {
-      LOG.error("Exception when aborting job {} in state {}",
-          context.getJobID(), state, e);
+      LOG.error("{}: exception when aborting job {} in state {}",
+          role, context.getJobID(), state, e);
       ex = e;
+    }
+
+    try(DurationInfo d =
+            new DurationInfo("%s: aborting all pending commits", role)) {
+     int count = getCommitActions()
+          .abortPendingUploadsUnderDestination(getOutputPath(context));
+     if (count > 0) {
+       LOG.warn("{}: deleted {} extra pending upload(s)", role, count);
+     }
+    } catch (IOException e) {
+      ex = ex == null ? e : ex;
     }
     Path workPath = getWorkPath();
     if (workPath != null) {
@@ -707,8 +717,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       try {
         fs.delete(workPath, true);
       } catch (IOException e) {
-        LOG.error("Exception cleaning up work path of job {}",
-            context.getJobID(), e);
+        LOG.error("{}: exception cleaning up work path of job {}",
+            role, context.getJobID(), e);
         if (ex != null) {
           ex = e;
         }
@@ -723,9 +733,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       List<S3Util.PendingUpload> pending,
       boolean suppressExceptions)
       throws IOException {
-    LOG.warn("Aborting Job {}", context.getJobID());
+    LOG.warn("{}: aborting Job", role);
     if (pending == null || pending.isEmpty()) {
-      LOG.info("No pending commits to abort");
+      LOG.info("{}: ro pending commits to abort", role);
       return;
     }
     final AmazonS3 s3Client = getClient(
@@ -750,6 +760,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             }
           });
 
+      // and any other outstanding uploads
+
+      // at this point, no exceptions were raised
+
       threw = false;
 
     } finally {
@@ -760,35 +774,52 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private void cleanup(JobContext context, boolean suppressExceptions)
       throws IOException {
 
-    if (suppressExceptions) {
       try {
+
         wrappedCommitter.cleanupJob(context);
-      } catch (Exception e) {
-        LOG.error("Failed while cleaning up job", e);
+        deleteDestinationPaths(context);
+      } catch (IOException e) {
+        if (suppressExceptions) {
+          LOG.error("{}: failed while cleaning up job", role, e);
+        } else {
+          throw e;
+        }
       }
-    } else {
-      wrappedCommitter.cleanupJob(context);
-    }
-    deleteDestinationPaths(context);
   }
 
 
   @Override
   public void cleanupJob(JobContext context) throws IOException {
-    try (DurationInfo d = new DurationInfo("Cleanup Job %s",
-        context.getJobID())) {
-      cleanup(context, false);
+    LOG.warn("{}: using deprecated cleanupJob call for {}",
+        role, context.getJobID());
+    try (DurationInfo d = new DurationInfo("%s: cleanup Job %s",
+        role, context.getJobID())) {
+      cleanup(context, true);
     }
   }
 
+  /**
+   * Delete the destination paths of a job
+   * @param context job context
+   * @throws IOException
+   */
   protected void deleteDestinationPaths(JobContext context) throws IOException {
-    deleteWithWarning(getJobAttemptFileSystem(context),
-        getJobAttemptPath(context), true);
+    try {
+      deleteWithWarning(getJobAttemptFileSystem(context),
+          getJobAttemptPath(context), true);
+    } catch (IOException e) {
+      LOG.debug("{}: delete failure", role, e);
+    }
+
     // delete the __temporary directory. This will cause problems
     // if there is >1 task targeting the same dest dir
-    deleteWithWarning(getDestFS(),
-        new Path(getOutputPath(context), CommitConstants.PENDING_DIR_NAME),
-        true);
+    try {
+      deleteWithWarning(getDestFS(),
+          new Path(getOutputPath(context), CommitConstants.PENDING_DIR_NAME),
+          true);
+    } catch (IOException e) {
+      LOG.debug("delete failure", e);
+    }
     // and the working path
     deleteTaskWorkingPathQuietly(context);
   }
@@ -799,9 +830,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 // TODO
     Path taskAttemptPath = getTaskAttemptPath(context);
     try (DurationInfo d = new
-        DurationInfo("task %s: creating task attempt path %s ",
-        taskAttemptPath,
-        context.getTaskAttemptID())) {
+        DurationInfo("%s: creating task attempt path %s ",
+        role, taskAttemptPath)) {
       // create the local FS
       taskAttemptPath.getFileSystem(getConf()).mkdirs(taskAttemptPath);
       wrappedCommitter.setupTask(context);
@@ -811,8 +841,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public boolean needsTaskCommit(TaskAttemptContext context)
       throws IOException {
-    try (DurationInfo d = new DurationInfo("needsTaskCommit() Task %s",
-        context.getTaskAttemptID())) {
+    try (DurationInfo d = new DurationInfo("%s: needsTaskCommit() Task %s",
+        role, context.getTaskAttemptID())) {
       // check for files on the local FS in the attempt path
       Path attemptPath = getTaskAttemptPath(context);
       FileSystem fs = getTaskAttemptFilesystem(context);
@@ -832,15 +862,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public void commitTask(TaskAttemptContext context) throws IOException {
-    try (DurationInfo d = new DurationInfo("Commit task %s",
-        context.getTaskAttemptID())) {
+    try (DurationInfo d = new DurationInfo("%s: commit task %s",
+        role, context.getTaskAttemptID())) {
       try {
         List<FileStatus> filesToCommit = getTaskOutput(context);
         int count = commitTaskInternal(context, filesToCommit);
-        LOG.info("Committed file count: {}", count);
+        LOG.info("{}: upload file count: {}", role, count);
       } catch (IOException e) {
-        LOG.error("Commit of task {} failed",
-            context.getTaskAttemptID(), e);
+        LOG.error("{}: commit of task {} failed",
+            role, context.getTaskAttemptID(), e);
         throw e;
       }
     }
@@ -856,11 +886,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   protected int commitTaskInternal(final TaskAttemptContext context,
       List<FileStatus> taskOutput)
       throws IOException {
+    LOG.debug("{}: commitTaskInternal", role);
     Configuration conf = context.getConfiguration();
 
     final Path attemptPath = getTaskAttemptPath(context);
     FileSystem attemptFS = getTaskAttemptFilesystem(context);
-    LOG.debug("Attempt path is {}", attemptPath);
+    LOG.debug("{}: attempt path is {}", role, attemptPath);
 
 
     // add the commits file to the wrapped committer's task attempt location.
@@ -873,12 +904,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // we will try to abort the ones that had already succeeded.
     final List<S3Util.PendingUpload> commits = Lists.newArrayList();
 
-    LOG.info("Uploading from staging directory to destination filesystem");
-    LOG.info("Saving pending data information to {}", commitsAttemptPath);
+    LOG.info("{}: uploading from staging directory to S3", role);
+    LOG.info("{}: Saving pending data information to {}",
+        role, commitsAttemptPath);
     if (taskOutput.isEmpty()) {
       // there is nothing to write. needsTaskCommit() should have caught
       // this, so warn that there is some kind of problem in the protocol.
-      LOG.warn("No files to commit");
+      LOG.warn("{}: No files to commit", role);
       return 0;
     }
 
@@ -908,7 +940,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
                   localFile, partition,
                   getBucket(context), key,
                   uploadPartSize);
-              LOG.debug("Adding pending commit {}", commit);
+              LOG.debug("{}: adding pending commit {}", role, commit);
               commits.add(commit);
             }
           });
@@ -921,8 +953,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     } finally {
       if (threw) {
-        LOG.error("Exception during commit process, aborting {} commit(s)",
-            commits.size());
+        LOG.error("{}: Exception during commit process, aborting {} commit(s)",
+            role, commits.size());
         Tasks.foreach(commits)
             .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
               @Override
@@ -952,8 +984,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       deleteTaskWorkingPathQuietly(context);
       wrappedCommitter.abortTask(context);
     } catch (IOException e) {
-      LOG.error("Exception when aborting task {}",
-          context.getTaskAttemptID(), e);
+      LOG.error("{}: exception when aborting task {}",
+          role, context.getTaskAttemptID(), e);
       throw e;
     }
   }
@@ -989,7 +1021,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       FileSystem taskFS = getTaskAttemptFilesystem(context);
       deleteQuietly(taskFS, attemptPath, true);
     } catch (IOException e) {
-      LOG.debug("Failed to delete task attempt path {}", attemptPath, e);
+      LOG.debug("{}: failed to delete task attempt path {}",
+          role, attemptPath, e);
     }
   }
 
@@ -1000,7 +1033,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       try {
         deleteQuietly(path.getFileSystem(getConf()), path, true);
       } catch (IOException e) {
-        LOG.debug("Failed to delete path {}", path, e);
+        LOG.debug("{}: Failed to delete path {}", role, path, e);
       }
     }
   }
@@ -1025,7 +1058,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
           context.getConfiguration(), false);
       this.bucket = fs.getBucket();
       this.s3KeyPrefix = fs.pathToKey(finalOutputPath);
-      LOG.debug("Final output path is {}", finalOutputPath);
+      LOG.debug("{}: final output path is {}", role, finalOutputPath);
     }
     return finalOutputPath;
   }
@@ -1062,7 +1095,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     if (threadPool == null) {
       int numThreads = context.getConfiguration().getInt(
           COMMITTER_THREADS, DEFAULT_COMMITTER_THREADS);
-      LOG.debug("Creating thread pool of size {}", numThreads);
+      LOG.debug("{}: creating thread pool of size {}", role, numThreads);
       if (numThreads > 0) {
         this.threadPool = Executors.newFixedThreadPool(numThreads,
             new ThreadFactoryBuilder()

@@ -89,11 +89,12 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
       // do nothing
       break;
     case REPLACE:
-      LOG.debug("Removing output path to be replaced: {}", outputPath);
+      LOG.debug("{}: removing output path to be replaced: {}",
+          role, outputPath);
       fs.delete(outputPath, true /* recursive */);
       break;
     default:
-      throw new IOException("Unknown conflict resolution mode: "
+      throw new IOException(role + ": unknown conflict resolution mode: "
           + getConfictModeOption(context));
     }
   }

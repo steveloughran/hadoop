@@ -32,14 +32,12 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * This is a dedicated committer which only works with consistent
@@ -119,24 +117,23 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     maybeTouchSuccessMarker(context);
   }
 
-  @Override
-  public void abortJob(JobContext context, JobStatus.State state)
-      throws IOException {
-    try (DurationInfo d = new DurationInfo("Abort Job %s in state %s",
-        context.getJobID(), state)) {
-      if (commitActions != null) {
-        Path pending = getJobAttemptPath(context);
-        FileCommitActions.CommitAllFilesOutcome outcome
-            = commitActions.abortAllPendingFilesInPath(pending, true);
-        outcome.maybeRethrow();
-      }
-    } finally {
-      cleanupJob(context);
-    }
-  }
-
+  /**
+   * Cleanup job: abort uploads, delete directories
+   * @param context
+   * @throws IOException
+   */
   @Override
   public void cleanupJob(JobContext context) throws IOException {
+    try (DurationInfo d =
+             new DurationInfo("Aborting outstanding uploads for Job %s",
+        context.getJobID())) {
+      if (getCommitActions() != null) {
+        Path pending = getJobAttemptPath(context);
+        FileCommitActions.CommitAllFilesOutcome outcome
+            = getCommitActions().abortAllPendingFilesInPath(pending, true);
+        outcome.maybeRethrow();
+      }
+    }
     try (DurationInfo d = new DurationInfo("Cleanup job %s",
         context.getJobID())) {
       deleteWithWarning(getDestFS(),
@@ -212,7 +209,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @VisibleForTesting
   FileCommitActions.CommitAllFilesOutcome innerCommitTask(
       TaskAttemptContext context) throws IOException {
-    return commitActions.commitAllPendingFilesInPath(
+    return getCommitActions().commitAllPendingFilesInPath(
         getTaskAttemptPath(context), true);
   }
 
@@ -222,7 +219,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d =
              new DurationInfo("Abort task %s", context.getTaskAttemptID())) {
       FileCommitActions.CommitAllFilesOutcome outcome
-          = commitActions.abortAllPendingFilesInPath(
+          = getCommitActions().abortAllPendingFilesInPath(
           attemptPath, true);
       outcome.maybeRethrow();
     } finally {

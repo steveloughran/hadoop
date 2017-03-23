@@ -22,7 +22,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.util.Progressable;
@@ -161,6 +163,14 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
+  public RemoteIterator<LocatedFileStatus> listFiles(Path f, boolean recursive)
+      throws IOException {
+    event("listFiless(%s, %s)", f, recursive);
+    return new EmptyIterator();
+//    return mock.listFiles(f, recursive);
+  }
+
+  @Override
   public void setWorkingDirectory(Path newDir) {
     mock.setWorkingDirectory(newDir);
   }
@@ -185,5 +195,18 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public long getDefaultBlockSize() {
     return mock.getDefaultBlockSize();
+  }
+
+  private static class EmptyIterator implements
+      RemoteIterator<LocatedFileStatus> {
+    @Override
+    public boolean hasNext() throws IOException {
+      return false;
+    }
+
+    @Override
+    public LocatedFileStatus next() throws IOException {
+      return null;
+    }
   }
 }

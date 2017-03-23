@@ -201,7 +201,7 @@ public final class Paths {
     Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf)),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
-    return new Path(work, "staging-uploads");
+    return new Path(work, StagingCommitterConstants.STAGING_UPLOADS);
   }
 
   // TODO: verify this is correct, it comes from dse-storage

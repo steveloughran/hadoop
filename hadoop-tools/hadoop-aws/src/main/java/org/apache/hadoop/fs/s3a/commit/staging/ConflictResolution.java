@@ -22,7 +22,12 @@ package org.apache.hadoop.fs.s3a.commit.staging;
  * Enum of conflict resolution algorithms.
  */
 public enum ConflictResolution {
+  /** Fail. */
   FAIL,
+
+  /** Merge new data with existing data. */
   APPEND,
+
+  /** Overwrite existing data. */
   REPLACE
 }

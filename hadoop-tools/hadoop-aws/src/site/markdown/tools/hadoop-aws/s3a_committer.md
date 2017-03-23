@@ -97,6 +97,17 @@ communicate its final status to the Job Driver, it MUST NOT commit is work.
 This is very important when working with S3, as some network partitions could
 isolate a task from the Job Driver, while the task retains access to S3.
 
+## The execution workflow
+
+
+**setup**: 
+
+* A job is created, assigned a Job ID (YARN?).
+* For each attempt, and attempt ID is created, to build the job attempt ID.
+* `Driver`: a `JobContext` is created/configured
+* A committer instance is instantiated with the `JobContext`; `setupJob()` invoked.
+
+
 
 ## Problem: Efficient, reliable commits of work to consistent S3 buckets
 
@@ -1013,10 +1024,16 @@ Data is left on local systems, in the temporary directories.
 * A multipart PUT request will be outstanding for every pending write.
 * A temporary directory in HDFS will list all known pending requests.
 
-### Job complete/abort after >1 task failure
+#### Job complete/abort after >1 task failure
 
-1. All pending data in local dirs need to be identified and deleted
-2. Any/all pending writes to the dest dir need to be enumerated and aborted.
+1. All pending put data listed in the job completion directory needs to be loaded
+and then cancelled.
+1. Any other pending writes to the dest dir need to be enumerated and aborted.
+This catches the situation of a task failure before the output is written.
+1. All pending data in local dirs need to be deleted.
+
+Issue: what about the destination directory: overwrite or not? It could well
+depend upon the merge policy.
 
 
 

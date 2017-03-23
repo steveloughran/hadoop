@@ -24,6 +24,8 @@ package org.apache.hadoop.fs.s3a.commit.staging;
  */
 public final class StagingCommitterConstants {
 
+  public static final String STAGING_UPLOADS = "staging-uploads";
+
   private StagingCommitterConstants() {
   }
 

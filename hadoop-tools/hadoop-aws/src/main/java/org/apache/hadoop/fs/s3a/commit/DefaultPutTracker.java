@@ -67,7 +67,6 @@ public class DefaultPutTracker {
       List<PartETag> parts,
       long bytesWritten)
       throws IOException {
-
     return true;
   }
 
@@ -83,7 +82,7 @@ public class DefaultPutTracker {
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
-        "MultipartPutTracker{");
+        "DefaultPutTracker{");
     sb.append("destKey='").append(destKey).append('\'');
     sb.append('}');
     return sb.toString();
