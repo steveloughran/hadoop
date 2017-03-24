@@ -54,7 +54,7 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.COMMITTER_UNIQUE_FILENAMES;
 
 /** Test suite.*/
-public class AbstractITCommitMRJob extends AbstractS3ATestBase {
+public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   private static MiniDFSTestCluster hdfs;
   private static MiniMRYarnCluster yarn = null;
