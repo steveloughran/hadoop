@@ -794,4 +794,6 @@ public final class S3ATestUtils {
     }
   }
 
+  public final static PathFilter TEMP_FILE_FILTER = new FilterTempFiles();
+
 }

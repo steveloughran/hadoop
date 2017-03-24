@@ -20,8 +20,11 @@ package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.FaultInjection;
+import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
@@ -58,8 +61,8 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
    * causes the commit failed for the first time then succeed.
    */
   private static final class CommitterWithFailedThenSucceed extends
-      DirectoryStagingCommitter {
-    private final FaultInjection failure = new FaultInjection();
+      DirectoryStagingCommitter implements FaultInjection {
+    private final FaultInjectionImpl injection = new FaultInjectionImpl(true);
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
@@ -67,9 +70,58 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
     }
 
     @Override
+    public void setupJob(JobContext context) throws IOException {
+      injection.setupJob(context);
+      super.setupJob(context);
+    }
+
+    @Override
+    public void abortJob(JobContext context, JobStatus.State state)
+        throws IOException {
+      injection.abortJob(context, state);
+      super.abortJob(context, state);
+    }
+
+    @Override
+    public void cleanupJob(JobContext context) throws IOException {
+      injection.cleanupJob(context);
+      super.cleanupJob(context);
+    }
+
+    @Override
+    public void setupTask(TaskAttemptContext context) throws IOException {
+      injection.setupTask(context);
+      super.setupTask(context);
+    }
+
+    @Override
+    public void commitTask(TaskAttemptContext context) throws IOException {
+      injection.commitTask(context);
+      super.commitTask(context);
+    }
+
+    @Override
+    public void abortTask(TaskAttemptContext context) throws IOException {
+      injection.abortTask(context);
+      super.abortTask(context);
+    }
+
+    @Override
     public void commitJob(JobContext context) throws IOException {
+      injection.commitJob(context);
       super.commitJob(context);
-      failure.commitJob();
+    }
+
+    @Override
+    public boolean needsTaskCommit(TaskAttemptContext context)
+        throws IOException {
+      injection.needsTaskCommit(context);
+      return super.needsTaskCommit(context);
+    }
+
+    @Override
+    public void setFaults(FaultInjection.Faults... faults) {
+      injection.setFaults(faults);
     }
   }
 }

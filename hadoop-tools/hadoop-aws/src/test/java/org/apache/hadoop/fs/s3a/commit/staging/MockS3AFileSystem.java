@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import com.amazonaws.services.s3.model.MultipartUpload;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -34,6 +36,8 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Relays FS calls to the mocked FS, allows for some extra logging with
@@ -168,6 +172,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
     event("listFiless(%s, %s)", f, recursive);
     return new EmptyIterator();
 //    return mock.listFiles(f, recursive);
+  }
+
+  @Override
+  public List<MultipartUpload> listMultipartUploads(String prefix)
+      throws IOException {
+    return Collections.emptyList();
   }
 
   @Override

@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.apache.hadoop.fs.s3a.commit.MiniDFSTestCluster;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -48,6 +49,7 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+import org.apache.hadoop.service.ServiceOperations;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -74,7 +76,7 @@ import static org.mockito.Mockito.*;
  */
 public class StagingTestBase {
 
-  public static final String BUCKET = "bucket-name";
+  public static final String BUCKET = MockS3AFileSystem.BUCKET;
   public static final String OUTPUT_PREFIX = "output/path";
   public static final Path OUTPUT_PATH = new Path(
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
@@ -191,48 +193,56 @@ public class StagingTestBase {
    * Provides setup/teardown of a MiniDFSCluster for tests that need one.
    */
   public static class MiniDFSTest extends Assert {
+
+    private static MiniDFSTestCluster hdfs;
+
     private static JobConf conf = null;
-    private static MiniDFSCluster cluster = null;
-    private static FileSystem dfs = null;
-    private static FileSystem lfs = null;
 
     protected static JobConf getConfiguration() {
       return conf;
     }
 
     protected static FileSystem getDFS() {
-      return dfs;
-    }
-
-    protected static FileSystem getFS() {
-      return lfs;
+      return hdfs.getClusterFS();
     }
 
     @BeforeClass
     @SuppressWarnings("deprecation")
     public static void setupFS() throws IOException {
-      if (cluster == null) {
-        Configuration c = new JobConf();
-        c.setBoolean("dfs.webhdfs.enabled", false);
-        // if this fails with "directory is already locked" set umask to 0022
-        cluster = new MiniDFSCluster(c, 1, true, null);
-        //cluster = new MiniDFSCluster.Builder(new Configuration()).build();
-        dfs = cluster.getFileSystem();
-        conf = new JobConf(dfs.getConf());
-        lfs = FileSystem.getLocal(conf);
+      if (hdfs == null) {
+        JobConf c = new JobConf();
+        hdfs = new MiniDFSTestCluster();
+        hdfs.init(c);
+        hdfs.start();
+        conf = c;
       }
     }
 
     @AfterClass
     public static void teardownFS() throws IOException {
-      dfs = null;
-      lfs = null;
       conf = null;
-      if (cluster != null) {
-        cluster.shutdown();
-        cluster = null;
+      if (hdfs != null) {
+        ServiceOperations.stopQuietly(hdfs);
+        hdfs = null;
       }
     }
+
+    public static JobConf getConf() {
+      return conf;
+    }
+
+    public static void setConf(JobConf conf) {
+      MiniDFSTest.conf = conf;
+    }
+
+    public static MiniDFSCluster getHdfs() {
+      return hdfs.getCluster();
+    }
+
+    public static FileSystem getLocalFS() {
+      return hdfs.getLocalFS();
+    }
+
   }
 
   /**
