@@ -287,7 +287,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     String data = read(fs, pendingDataPath);
     LOG.info("Contents of {}: \n{}", pendingDataPath, data);
     // really read it in and parse
-    PersistentCommitData persisted = PersistentCommitData.getSerializer()
+    SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
         .load(fs, pendingDataPath);
     persisted.validate();
     assertTrue("created timestamp wrong in " + persisted,

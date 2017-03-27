@@ -30,8 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -45,19 +43,23 @@ public class DelayedCommitTracker extends DefaultPutTracker {
   private final String pendingPartKey;
   private final Path path;
   private final S3AFileSystem.WriteOperationHelper writer;
+  private final String bucket;
 
   /**
    * Delayed commit tracker.
    * @param path path nominally being written to
+   * @param bucket dest bucket
    * @param destKey key for the destination
    * @param pendingPartKey key of the pending part
    * @param writer writer instance to use for operations
    */
   public DelayedCommitTracker(Path path,
+      String bucket,
       String destKey,
       String pendingPartKey,
       S3AFileSystem.WriteOperationHelper writer) {
     super(destKey);
+    this.bucket = bucket;
     this.path = path;
     this.pendingPartKey = pendingPartKey;
     this.writer = writer;
@@ -95,27 +97,15 @@ public class DelayedCommitTracker extends DefaultPutTracker {
         "No uploaded parts list");
     Preconditions.checkArgument(!parts.isEmpty(),
         "No uploaded parts to save");
-    PersistentCommitData commitData = new PersistentCommitData();
+    SinglePendingCommit commitData = new SinglePendingCommit();
+    commitData.touch(System.currentTimeMillis());
     commitData.destinationKey = getDestKey();
     commitData.uri = path.toUri().toString();
     commitData.uploadId = uploadId;
-    commitData.notes = "";
-    long time = System.currentTimeMillis();
-    commitData.created = time;
-    commitData.saved = time;
-    commitData.date = new Date(time).toString();
+    commitData.text = "";
     commitData.size = bytesWritten;
-    List<String> etags = new ArrayList<>(parts.size());
-    int counter = 1;
-    for (PartETag part : parts) {
-      Preconditions.checkState(part.getPartNumber() == counter,
-          "Expected part number %s but got %s", counter, part.getPartNumber());
-      etags.add(part.getETag());
-      counter++;
-    }
-    commitData.etags = etags;
-    commitData.validate();
-    byte[] bytes = PersistentCommitData.getSerializer().toBytes(commitData);
+    commitData.bindCommitData(parts);
+    byte[] bytes = commitData.toBytes();
     PutObjectRequest put = writer.newPutRequest(
         new ByteArrayInputStream(bytes), bytes.length);
     writer.putObjectAndFinalize(put, bytes.length);

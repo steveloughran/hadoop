@@ -71,6 +71,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
       new TaskID(JOB_ID, TaskType.REDUCE, 2), 3);
 
   private final int numThreads;
+  private final boolean uniqueFilenames;
   private JobContext job = null;
   private TaskAttemptContext tac = null;
   private Configuration conf = null;
@@ -82,24 +83,26 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     createAndBindMockFSInstance(getConfiguration());
   }
 
-  // TODO: expand once the tests are working for "0"
   @Parameterized.Parameters
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
-        {0},
-        {1},
-        {3},
+        {0, false},
+        {1, true},
+        {3, true},
     });
   }
 
-  public TestStagingCommitter(int numThreads) {
+  public TestStagingCommitter(int numThreads, boolean uniqueFilenames) {
     this.numThreads = numThreads;
+    this.uniqueFilenames = uniqueFilenames;
   }
 
   @Before
   public void setupCommitter() throws Exception {
     getConfiguration().setInt(COMMITTER_THREADS, numThreads);
+    getConfiguration().setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames );
     getConfiguration().set(UPLOAD_UUID, UUID.randomUUID().toString());
+
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
     this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job);
     jobCommitter.setupJob(job);
@@ -552,7 +555,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertPathDoesNotExist(fs, "jobAttemptPath not deleted", jobAttemptPath);
   }
 
-  private static Set<String> runTasks(JobContext job, int numTasks, int numFiles)
+  private Set<String> runTasks(JobContext job, int numTasks, int numFiles)
       throws IOException {
     Set<String> uploads = Sets.newHashSet();
 
@@ -589,8 +592,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     return committedUploads;
   }
 
-  private static Set<String> commitTask(StagingS3GuardCommitter committer,
-                                        TaskAttemptContext tac, int numFiles)
+  private Set<String> commitTask(StagingS3GuardCommitter committer,
+      TaskAttemptContext tac, int numFiles)
       throws IOException {
     Path attemptPath = committer.getTaskAttemptPath(tac);
 
@@ -598,9 +601,10 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     for (int i = 0; i < numFiles; i += 1) {
       Path outPath = writeOutputFile(
           tac.getTaskAttemptID(), attemptPath, UUID.randomUUID().toString(),
-          10 * (i+1));
+          10 * (i + 1));
       files.add(OUTPUT_PREFIX +
-          "/" + outPath.getName() + "-" + committer.getUUID());
+          "/" + outPath.getName()
+          + (uniqueFilenames ? ( "-" + committer.getUUID()) : ""));
     }
 
     committer.commitTask(tac);

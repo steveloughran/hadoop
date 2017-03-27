@@ -89,7 +89,9 @@ public class DelayedCommitFSIntegration {
     if (isDelayedCommitPath(elements)) {
       final String destKey = keyOfFinalDestination(elements, key);
       String pendingKey = key + PENDING_SUFFIX;
-      tracker = new DelayedCommitTracker(path, destKey, pendingKey,
+      tracker = new DelayedCommitTracker(path,
+          owner.getBucket(),
+          destKey, pendingKey,
           owner.createWriteOperationHelper(pendingKey));
     } else {
       // standard multipart tracking
@@ -131,6 +133,11 @@ public class DelayedCommitFSIntegration {
     return isDelayedCommitPath(splitPathToElements(path));
   }
 
+  /**
+   * Is this path a delayed commit path in this filesystem
+   * @param elements element list
+   * @return true if the path is for delayed commits
+   */
   private boolean isDelayedCommitPath(List<String> elements) {
     return delayedCommitEnabled && isMagicPath(elements);
   }

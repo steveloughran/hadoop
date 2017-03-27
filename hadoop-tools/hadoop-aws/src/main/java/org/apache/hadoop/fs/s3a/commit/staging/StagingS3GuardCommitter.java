@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
+import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
 import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -773,9 +774,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   private void cleanup(JobContext context, boolean suppressExceptions)
       throws IOException {
-
       try {
-
         wrappedCommitter.cleanupJob(context);
         deleteDestinationPaths(context);
       } catch (IOException e) {
@@ -921,8 +920,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     // although overwrite=false, there's still a risk of > 1 entry being
     // committed if the FS doesn't have create-no-overwrite consistency.
+    MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
+        taskOutput.size());
     ObjectOutputStream completeUploadRequests = new ObjectOutputStream(
         commitsFS.create(commitsAttemptPath, false));
+    final String commitBucket = getBucket(context);
     try {
       Tasks.foreach(taskOutput)
           .stopOnFailure()
@@ -936,9 +938,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
               String relative = Paths.getRelativePath(attemptPath, stat.getPath());
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
+              String destURI = String.format("s3a://%s/%s", commitBucket, key);
               S3Util.PendingUpload commit = S3Util.multipartUpload(amazonS3,
                   localFile, partition,
-                  getBucket(context), key,
+                  commitBucket, key, destURI,
                   uploadPartSize);
               LOG.debug("{}: adding pending commit {}", role, commit);
               commits.add(commit);

@@ -1083,7 +1083,7 @@ to keep ensure S3Guard is included in the operation path, alongside our logging
 and metrics.
 
 The committer should be able to persist data via an array'd version of the
-single file JSON data structure `org.apache.hadoop.fs.s3a.commit.PersistentCommitData`.
+single file JSON data structure `org.apache.hadoop.fs.s3a.commit.SinglePendingCommit`.
 Serialized object data has too many vulnerabilities to be trusted when someone
 party could potentially create a malicious object stream read by the job committer.
 

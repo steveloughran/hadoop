@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.PartETag;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -408,4 +409,12 @@ public final class CommitUtils {
         String.valueOf(context.getTaskAttemptID()));
   }
 
+  static void validateCollectionClass(Iterable it, Class classname) {
+
+    for (Object o : it) {
+      checkState(o.getClass().equals(classname),
+          "Collection element is not a %s: %s", classname, o.getClass());
+    }
+
+  }
 }

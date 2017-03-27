@@ -50,6 +50,7 @@ import com.google.common.io.Closeables;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AUtils;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +60,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +108,17 @@ public final class S3Util {
     }
   }
 
+  private static CompleteMultipartUploadRequest newCompleteRequest(
+      PendingUpload commit) {
+    List<PartETag> etags = Lists.newArrayList();
+    for (Map.Entry<Integer, String> entry : commit.parts.entrySet()) {
+      etags.add(new PartETag(entry.getKey(), entry.getValue()));
+    }
+
+    return new CompleteMultipartUploadRequest(
+        commit.bucket, commit.key, commit.uploadId, etags);
+  }
+
   /**
    * Abort a pending commit.
    * @param client client
@@ -143,13 +156,13 @@ public final class S3Util {
    * @param partition partition/subdir. Not used
    * @param bucket dest bucket
    * @param key dest key
-   * @param uploadPartSize size of upload
-   * @return a pending upload entry
+   * @param destURI
+   *@param uploadPartSize size of upload  @return a pending upload entry
    * @throws IOException failure
    */
   public static PendingUpload multipartUpload(
       AmazonS3 client, File localFile, String partition,
-      String bucket, String key, long uploadPartSize)
+      String bucket, String key, String destURI, long uploadPartSize)
       throws IOException {
 
     LOG.debug("Initiating multipart upload from {} to s3a://{}/{} partition={}",
@@ -168,22 +181,33 @@ public final class S3Util {
       InitiateMultipartUploadResult initiate = client.initiateMultipartUpload(
           new InitiateMultipartUploadRequest(bucket, key));
       uploadId = initiate.getUploadId();
+      long length = localFile.length();
+
+      SinglePendingCommit commitData = new SinglePendingCommit();
+      commitData.destinationKey = key;
+      commitData.touch(System.currentTimeMillis());
+      commitData.uploadId = uploadId;
+      commitData.uri = destURI;
+      commitData.text = partition != null ? "partition: " + partition :  "";
+      commitData.size = length;
+
       Map<Integer, String> etags = Maps.newLinkedHashMap();
 
       long offset = 0;
-      long numParts = (localFile.length() / uploadPartSize +
-          ((localFile.length() % uploadPartSize) > 0 ? 1 : 0));
+      long numParts = (length / uploadPartSize +
+          ((length % uploadPartSize) > 0 ? 1 : 0));
+
+      List<PartETag> parts = new ArrayList<>((int)numParts);
 
       LOG.debug("File size is {}, number of parts to upload = {}",
-          localFile.length(), numParts);
+          length, numParts);
 /*
       Preconditions.checkArgument(numParts > 0,
           "Cannot upload 0 byte file: " + localFile);
 */
 
-
       for (int partNumber = 1; partNumber <= numParts; partNumber += 1) {
-        long size = Math.min(localFile.length() - offset, uploadPartSize);
+        long size = Math.min(length - offset, uploadPartSize);
         UploadPartRequest part = new UploadPartRequest()
             .withBucketName(bucket)
             .withKey(key)
@@ -197,9 +221,11 @@ public final class S3Util {
         UploadPartResult partResult = client.uploadPart(part);
         PartETag etag = partResult.getPartETag();
         etags.put(etag.getPartNumber(), etag.getETag());
-
         offset += uploadPartSize;
+        parts.add(etag);
       }
+
+      commitData.bindCommitData(parts);
 
       PendingUpload pending = new PendingUpload(
           partition, bucket, key, uploadId, etags);

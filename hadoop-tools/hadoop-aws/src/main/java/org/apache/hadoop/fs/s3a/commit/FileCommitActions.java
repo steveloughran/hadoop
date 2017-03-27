@@ -64,7 +64,7 @@ public class FileCommitActions {
     String destKey = null;
     // really read it in and parse
     try {
-      PersistentCommitData persisted = PersistentCommitData.getSerializer()
+      SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
           .load(fs, pendingFile);
       persisted.validate();
       destKey = persisted.destinationKey;
@@ -148,7 +148,7 @@ public class FileCommitActions {
     String destKey = null;
     try {
       // really read it in and parse
-      PersistentCommitData persisted = PersistentCommitData.getSerializer()
+      SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
           .load(fs, pendingFile);
       persisted.validate();
       destKey = persisted.destinationKey;
