@@ -19,11 +19,12 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.JsonSerDeser;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,7 +39,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClas
  * Contains 0 or more {@link SinglePendingCommit} entries; validation logic
  * checks those values on load.
  */
-public class MultiplePendingCommits implements Serializable {
+public class MultiplePendingCommits extends PersistentCommitData {
 
   public MultiplePendingCommits() {
     this(0);
@@ -71,6 +72,10 @@ public class MultiplePendingCommits implements Serializable {
    */
   public List<SinglePendingCommit> commits;
 
+
+  public void add(SinglePendingCommit commit) {
+    commits.add(commit);
+  }
   /**
    * Any custom extra data committer subclasses may choose to add.
    */
@@ -113,6 +118,26 @@ public class MultiplePendingCommits implements Serializable {
 
   }
 
+  @Override
+  public byte[] toBytes() throws IOException {
+    return serializer.toBytes(this);
+  }
+
+  /**
+   * Number of commits
+   * @return the number of commits in this structure.
+   */
+
+  public int size() {
+    return commits.size();
+  }
+
+  @Override
+  public void save(FileSystem fs, Path path, boolean overwrite)
+      throws IOException {
+    serializer.save(fs, path, this, overwrite);
+  }
+
   /**
    * Get the singleton JSON serializer for this class.
    * @return the serializer.
@@ -121,4 +146,8 @@ public class MultiplePendingCommits implements Serializable {
     return serializer;
   }
 
+  public static MultiplePendingCommits load(FileSystem fs, Path path)
+      throws IOException {
+    return MultiplePendingCommits.getSerializer().load(fs, path);
+  }
 }

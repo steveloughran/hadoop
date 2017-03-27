@@ -120,11 +120,7 @@ public class TestStagingPartitionedTaskCommit
     assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
-    Set<String> expected = Sets.newHashSet();
-    for (String relative : relativeFiles) {
-      expected.add(OUTPUT_PREFIX +
-          "/" + Paths.addUUID(relative, committer.getUUID()));
-    }
+    Set<String> expected = buildExpectedList(committer);
 
     assertEquals("Should have correct paths", expected, files);
   }
@@ -169,11 +165,7 @@ public class TestStagingPartitionedTaskCommit
     assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
-    Set<String> expected = Sets.newHashSet();
-    for (String relative : relativeFiles) {
-      expected.add(OUTPUT_PREFIX +
-          "/" + Paths.addUUID(relative, committer.getUUID()));
-    }
+    Set<String> expected = buildExpectedList(committer);
 
     assertEquals("Should have correct paths", expected, files);
   }
@@ -205,11 +197,7 @@ public class TestStagingPartitionedTaskCommit
     assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
-    Set<String> expected = Sets.newHashSet();
-    for (String relative : relativeFiles) {
-      expected.add(OUTPUT_PREFIX +
-          "/" + Paths.addUUID(relative, committer.getUUID()));
-    }
+    Set<String> expected = buildExpectedList(committer);
 
     assertEquals("Should have correct paths", expected, files);
   }
@@ -243,12 +231,19 @@ public class TestStagingPartitionedTaskCommit
     assertEquals("Should have the right number of uploads",
         relativeFiles.size(), files.size());
 
-    Set<String> expected = Sets.newHashSet();
-    for (String relative : relativeFiles) {
-      expected.add(OUTPUT_PREFIX +
-          "/" + Paths.addUUID(relative, committer.getUUID()));
-    }
+    Set<String> expected = buildExpectedList(committer);
 
     assertEquals("Should have correct paths", expected, files);
+  }
+
+  public Set<String> buildExpectedList(StagingS3GuardCommitter committer) {
+    Set<String> expected = Sets.newHashSet();
+    boolean unique = committer.useUniqueFilenames();
+    for (String relative : relativeFiles) {
+      expected.add(OUTPUT_PREFIX +
+          "/" +
+          (unique ? Paths.addUUID(relative, committer.getUUID()) : relative));
+    }
+    return expected;
   }
 }

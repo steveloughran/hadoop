@@ -21,14 +21,13 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.io.Closeables;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +48,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -100,7 +99,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private final Path constructorOutputPath;
   private final long uploadPartSize;
   private final String uuid;
-  private final Boolean uniqueFilenames;
+  private final boolean uniqueFilenames;
   private final FileOutputCommitter wrappedCommitter;
 
   // lazy variables
@@ -265,6 +264,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
+   * Is this committer using unique filenames?
+   * @return true if unique filenames are used.
+   */
+  public Boolean useUniqueFilenames() {
+    return uniqueFilenames;
+  }
+
+  /**
    * Get the filesystem for the job attempt.
    * @param context the context of the job.  This is used to get the
    * application attempt id.
@@ -377,7 +384,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     throw new UnsupportedOperationException("Unimplemented");
   }
 
-  /**
+    /**
    * Getter for the cached {@link AmazonS3} client. Subclasses should call this
    * method to get a client instance.
    *
@@ -529,7 +536,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return a list of pending uploads.
    * @throws IOException Any IO failure
    */
-  protected List<S3Util.PendingUpload> getPendingUploads(JobContext context)
+  protected List<SinglePendingCommit> getPendingUploads(JobContext context)
       throws IOException {
     return getPendingUploads(context, false);
   }
@@ -542,7 +549,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * then this may not match the actual set of pending operations
    * @throws IOException shouldn't be raised, but retained for compiler
    */
-  protected List<S3Util.PendingUpload> getPendingUploadsIgnoreErrors(
+  protected List<SinglePendingCommit> getPendingUploadsIgnoreErrors(
       JobContext context) throws IOException {
     return getPendingUploads(context, true);
   }
@@ -555,12 +562,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * then this may not match the actual set of pending operations
    * @throws IOException Any IO failure which wasn't swallowed.
    */
-  private List<S3Util.PendingUpload> getPendingUploads(
+  private List<SinglePendingCommit> getPendingUploads(
       JobContext context, boolean suppressExceptions) throws IOException {
     Path jobAttemptPath = wrappedCommitter.getJobAttemptPath(context);
     final FileSystem attemptFS = jobAttemptPath.getFileSystem(
         context.getConfiguration());
-    final List<S3Util.PendingUpload> pending = Lists.newArrayList();
+    final List<SinglePendingCommit> pending = Collections.synchronizedList(
+        Lists.newArrayList());
     FileStatus[] pendingCommitFiles;
     try {
       pendingCommitFiles = attemptFS.listStatus(
@@ -584,8 +592,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         .run(new Tasks.Task<FileStatus, IOException>() {
           @Override
           public void run(FileStatus pendingCommitFile) throws IOException {
-            pending.addAll(S3Util.readPendingCommits(
-                attemptFS, pendingCommitFile.getPath()));
+            MultiplePendingCommits commits = S3Util.readPendingCommits(
+                attemptFS, pendingCommitFile.getPath());
+            pending.addAll(commits.commits);
           }
         });
 
@@ -611,7 +620,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   @Override
   public void commitJob(JobContext context) throws IOException {
-    List<S3Util.PendingUpload> pending = Collections.emptyList();
+    List<SinglePendingCommit> pending = Collections.emptyList();
     try (DurationInfo d =
              new DurationInfo("%s: preparing to commit Job", role)) {
       pending = getPendingUploads(context);
@@ -635,11 +644,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @throws IOException any failure
    */
   protected void preCommitJob(JobContext context,
-      List<S3Util.PendingUpload> pending) throws IOException {
+      List<SinglePendingCommit> pending) throws IOException {
   }
 
   protected void commitJobInternal(JobContext context,
-                                   List<S3Util.PendingUpload> pending)
+                                   List<SinglePendingCommit> pending)
       throws IOException {
     final AmazonS3 s3Client = getClient(
         getOutputPath(context), context.getConfiguration());
@@ -654,28 +663,28 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
           .stopOnFailure().throwFailureWhenFinished()
           .executeWith(getThreadPool(context))
           .onFailure(
-              new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
+              new Tasks.FailureTask<SinglePendingCommit, IOException>() {
                 @Override
-                public void run(S3Util.PendingUpload commit,
+                public void run(SinglePendingCommit commit,
                     Exception exception) throws IOException {
                   S3Util.abortCommit(s3Client, commit);
                 }
               })
-          .abortWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
+          .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) throws IOException {
+            public void run(SinglePendingCommit commit) throws IOException {
               S3Util.abortCommit(s3Client, commit);
             }
           })
-          .revertWith(new Tasks.Task<S3Util.PendingUpload, IOException>() {
+          .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) throws IOException {
+            public void run(SinglePendingCommit commit) throws IOException {
               S3Util.revertCommit(s3Client, commit);
             }
           })
-          .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
+          .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) throws IOException {
+            public void run(SinglePendingCommit commit) throws IOException {
               S3Util.finishCommit(s3Client, commit);
             }
           });
@@ -693,7 +702,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     IOException ex = null;
     try (DurationInfo d = new DurationInfo("%s: aborting job in state %s ",
         role, context.getJobID(), state)) {
-      List<S3Util.PendingUpload> pending = getPendingUploadsIgnoreErrors(context);
+      List<SinglePendingCommit> pending = getPendingUploadsIgnoreErrors(context);
       abortJobInternal(context, pending, false);
     } catch (IOException e) {
       LOG.error("{}: exception when aborting job {} in state {}",
@@ -731,7 +740,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   protected void abortJobInternal(JobContext context,
-      List<S3Util.PendingUpload> pending,
+      List<SinglePendingCommit> pending,
       boolean suppressExceptions)
       throws IOException {
     LOG.warn("{}: aborting Job", role);
@@ -747,16 +756,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Tasks.foreach(pending)
           .throwFailureWhenFinished(!suppressExceptions)
           .executeWith(getThreadPool(context))
-          .onFailure(new Tasks.FailureTask<S3Util.PendingUpload, IOException>() {
+          .onFailure(new Tasks.FailureTask<SinglePendingCommit, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit,
+            public void run(SinglePendingCommit commit,
                             Exception exception) throws IOException {
               S3Util.abortCommit(s3Client, commit);
             }
           })
-          .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
+          .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
-            public void run(S3Util.PendingUpload commit) throws IOException {
+            public void run(SinglePendingCommit commit) throws IOException {
               S3Util.abortCommit(s3Client, commit);
             }
           });
@@ -901,7 +910,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     // keep track of unfinished commits in case one fails. if something fails,
     // we will try to abort the ones that had already succeeded.
-    final List<S3Util.PendingUpload> commits = Lists.newArrayList();
+    int commitCount = taskOutput.size();
+    final List<SinglePendingCommit> commits =
+        Collections.synchronizedList(new ArrayList<>(commitCount));
 
     LOG.info("{}: uploading from staging directory to S3", role);
     LOG.info("{}: Saving pending data information to {}",
@@ -918,12 +929,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // before the uploads, report some progress
     context.progress();
 
-    // although overwrite=false, there's still a risk of > 1 entry being
-    // committed if the FS doesn't have create-no-overwrite consistency.
     MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
-        taskOutput.size());
+        commitCount);
+/*
     ObjectOutputStream completeUploadRequests = new ObjectOutputStream(
         commitsFS.create(commitsAttemptPath, false));
+*/
     final String commitBucket = getBucket(context);
     try {
       Tasks.foreach(taskOutput)
@@ -939,7 +950,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
               String destURI = String.format("s3a://%s/%s", commitBucket, key);
-              S3Util.PendingUpload commit = S3Util.multipartUpload(amazonS3,
+              SinglePendingCommit commit = S3Util.multipartUpload(amazonS3,
                   localFile, partition,
                   commitBucket, key, destURI,
                   uploadPartSize);
@@ -948,9 +959,17 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             }
           });
 
-      for (S3Util.PendingUpload commit : commits) {
-        completeUploadRequests.writeObject(commit);
+      for (SinglePendingCommit commit : commits) {
+        pendingCommits.add(commit);
       }
+
+      // save the data
+      // although overwrite=false, there's still a risk of > 1 entry being
+      // committed if the FS doesn't have create-no-overwrite consistency.
+
+      LOG.debug("Saving {} commits to file {}",
+          pendingCommits.size(), commitsAttemptPath);
+      pendingCommits.save(commitsFS, commitsAttemptPath, false);
 
       threw = false;
 
@@ -959,20 +978,21 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         LOG.error("{}: Exception during commit process, aborting {} commit(s)",
             role, commits.size());
         Tasks.foreach(commits)
-            .run(new Tasks.Task<S3Util.PendingUpload, IOException>() {
+            .run(new Tasks.Task<SinglePendingCommit, IOException>() {
               @Override
-              public void run(S3Util.PendingUpload commit) throws IOException {
+              public void run(SinglePendingCommit commit) throws IOException {
                 S3Util.abortCommit(amazonS3, commit);
               }
             });
         deleteTaskAttemptPathQuietly(context);
       }
-      Closeables.close(completeUploadRequests, threw);
     }
 
     // TODO: what else is needed here?
+    LOG.debug("Committing wrapped task");
     wrappedCommitter.commitTask(context);
 
+    LOG.debug("Cleaning up attempt dir");
     attemptFS.delete(attemptPath, true);
     return commits.size();
   }

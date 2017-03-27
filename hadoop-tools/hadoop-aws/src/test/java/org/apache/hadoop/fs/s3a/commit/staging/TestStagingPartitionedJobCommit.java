@@ -20,7 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assume;
 import org.junit.Test;
@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -76,17 +77,21 @@ public class TestStagingPartitionedJobCommit
     }
 
     @Override
-    protected List<S3Util.PendingUpload> getPendingUploads(JobContext context)
+    protected List<SinglePendingCommit> getPendingUploads(JobContext context)
         throws IOException {
-      List<S3Util.PendingUpload> pending = Lists.newArrayList();
+      List<SinglePendingCommit> pending = Lists.newArrayList();
 
       for (String dateint : Arrays.asList("20161115", "20161116")) {
         for (String hour : Arrays.asList("13", "14")) {
           String key = OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
               "/" + UUID.randomUUID().toString() + ".parquet";
-          pending.add(new S3Util.PendingUpload(null,
-              BUCKET, key, UUID.randomUUID().toString(),
-              Maps.newHashMap()));
+          SinglePendingCommit commit = new SinglePendingCommit();
+          commit.bucket = BUCKET;
+          commit.destinationKey = key;
+          commit.uri = "s3a://" + BUCKET + "/" + key;
+          commit.uploadId = UUID.randomUUID().toString();
+          commit.etags = new ArrayList<>();
+          pending.add(commit);
         }
       }
 
@@ -97,7 +102,7 @@ public class TestStagingPartitionedJobCommit
 
     @Override
     protected void abortJobInternal(JobContext context,
-        List<S3Util.PendingUpload> pending,
+        List<SinglePendingCommit> pending,
         boolean suppressExceptions) throws IOException {
       this.aborted = true;
       super.abortJobInternal(context, pending, suppressExceptions);

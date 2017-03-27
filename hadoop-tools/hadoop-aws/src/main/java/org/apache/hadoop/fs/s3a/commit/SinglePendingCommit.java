@@ -28,14 +28,19 @@ import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.JsonSerDeser;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -54,17 +59,10 @@ import static org.apache.hadoop.util.StringUtils.join;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public final class SinglePendingCommit implements Serializable {
+public class SinglePendingCommit extends PersistentCommitData implements Iterable<String> {
 
   private static JsonSerDeser<SinglePendingCommit> serializer
       = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
-
-  /**
-   * Supported version value: {@value}.
-   * If this is changed the value of {@link #serialVersionUID} will change,
-   * to avoid deserialization problems.
-   */
-  public static final int VERSION = 1;
 
   /**
    * Serialization ID: {@value}.
@@ -155,20 +153,19 @@ public final class SinglePendingCommit implements Serializable {
     }
   }
 
-  /**
-   * Validate the data: those fields which must be non empty, must be set.
-   * @throws IllegalStateException if the data is invalid
-   */
+  @Override
   public void validate() {
     Preconditions.checkState(version == VERSION, "Wrong version: %s", version);
+    Preconditions.checkState(StringUtils.isNotEmpty(bucket),
+        "Empty bucket");
     Preconditions.checkState(StringUtils.isNotEmpty(destinationKey),
         "Empty destination");
     Preconditions.checkState(StringUtils.isNotEmpty(uploadId),
         "Empty uploadId");
     Preconditions.checkState(size >= 0, "Invalid size: " + size);
-    Preconditions.checkState(StringUtils.isNotEmpty(uri), "Empty uri");
+    destinationPath();
     Preconditions.checkState(etags != null, "No etag list");
-    Preconditions.checkState(!etags.isEmpty(), "Empty etag list");
+//    Preconditions.checkState(!etags.isEmpty(), "Empty etag list");
     CommitUtils.validateCollectionClass(etags, String.class);
     for (String etag : etags) {
       Preconditions.checkState(StringUtils.isNotEmpty(etag), "Empty etag");
@@ -195,7 +192,7 @@ public final class SinglePendingCommit implements Serializable {
     sb.append(", taskId='").append(taskId).append('\'');
     sb.append(", notes='").append(text).append('\'');
     if (etags != null) {
-      sb.append('[');
+      sb.append(", etags=[");
       sb.append(join(",", etags));
       sb.append(']');
     } else {
@@ -205,16 +202,15 @@ public final class SinglePendingCommit implements Serializable {
     return sb.toString();
   }
 
-  /**
-   * Serialize to JSON and then to a byte array, after performaing a
-   * preflight validation of the data to be saved.
-   * @return the data in a persistable form.
-   * @throws IOException serialization problem
-   * @throws IllegalStateException validation failure.
-   */
+  @Override
   public byte[] toBytes() throws IOException {
     validate();
     return getSerializer().toBytes(this);
+  }
+
+  @Override
+  public void save(FileSystem fs, Path path, boolean overwrite) throws IOException {
+    getSerializer().save(fs, path, this, overwrite);
   }
 
   /**
@@ -231,14 +227,14 @@ public final class SinglePendingCommit implements Serializable {
    * @return the rewuest
    */
   public CompleteMultipartUploadRequest newCompleteRequest() {
+    validate();
     List<PartETag> parts = Lists.newArrayList();
     for (int i = 0; i < etags.size(); i++) {
-      parts.add(new PartETag(i, etags.get(i)));
+      parts.add(new PartETag(i + 1, etags.get(i)));
     }
     return new CompleteMultipartUploadRequest(
         bucket, destinationKey, uploadId, parts);
   }
-
 
   public DeleteObjectRequest newDeleteRequest() {
     return new DeleteObjectRequest(bucket, destinationKey);
@@ -247,4 +243,41 @@ public final class SinglePendingCommit implements Serializable {
   public AbortMultipartUploadRequest newAbortRequest() {
     return new AbortMultipartUploadRequest(bucket, destinationKey, uploadId);
   }
+
+  public String getKey() {
+    return destinationKey;
+  }
+
+  public String getBucketName() {
+    return bucket;
+  }
+
+  public String getUploadId() {
+    return uploadId;
+  }
+
+  /**
+   * Build the destination path of the object.
+   * @return the path
+   * @throws IllegalStateException if the URI is invalid
+   */
+  public Path destinationPath() {
+    Preconditions.checkState(StringUtils.isNotEmpty(uri), "Empty uri");
+
+    try {
+      return new Path(new URI(uri));
+    } catch (URISyntaxException e) {
+      throw new IllegalStateException("Cannot parse URI " + uri);
+    }
+  }
+
+  public int size() {
+    return etags.size();
+  }
+
+  @Override
+  public Iterator<String> iterator() {
+    return etags.iterator();
+  }
+
 }

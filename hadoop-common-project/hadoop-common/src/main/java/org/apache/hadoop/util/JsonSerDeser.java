@@ -176,19 +176,37 @@ public class JsonSerDeser<T> {
    */
   public T load(FileSystem fs, Path path)
       throws IOException, JsonParseException, JsonMappingException {
+    return load(fs, path, true);
+  }
+
+  /**
+   * Load from a Hadoop filesystem, optionally skip verifying the length of
+   * the data exactly matches the expected length. That can work around an
+   * issue where object store encryption (specifically: S3 client side
+   * encryption) returns less bytes on a stream read than the declared length.
+   * @param fs filesystem
+   * @param path path
+   * @return a loaded CD
+   * @throws IOException IO problems
+   * @throws EOFException if not enough bytes were read in
+   * @throws JsonParseException parse problems
+   * @throws JsonMappingException O/J mapping problems
+   */
+  public T load(FileSystem fs, Path path, boolean verifyLength)
+      throws IOException, JsonParseException, JsonMappingException {
     FileStatus status = fs.getFileStatus(path);
     long len = status.getLen();
     byte[] b = new byte[(int) len];
     FSDataInputStream dataInputStream = fs.open(path);
     int count = dataInputStream.read(b);
-    if (count != len) {
+    if (verifyLength && count != len) {
       throw new EOFException(path.toString() + ": read finished prematurely");
     }
     return fromBytes(path.toString(), b);
   }
 
   /**
-   * Save a cluster description to a hadoop filesystem.
+   * Save to a hadoop filesystem.
    * @param fs filesystem
    * @param path path
    * @param overwrite should any existing file be overwritten

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +75,7 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
    */
   @Override
   protected void preCommitJob(JobContext context,
-      List<S3Util.PendingUpload> pending) throws IOException {
+      List<SinglePendingCommit> pending) throws IOException {
     Path outputPath = getOutputPath(context);
     FileSystem fs = outputPath.getFileSystem(context.getConfiguration());
     switch (getConflictResolutionMode(context)) {

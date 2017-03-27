@@ -100,6 +100,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
     SinglePendingCommit commitData = new SinglePendingCommit();
     commitData.touch(System.currentTimeMillis());
     commitData.destinationKey = getDestKey();
+    commitData.bucket = bucket;
     commitData.uri = path.toUri().toString();
     commitData.uploadId = uploadId;
     commitData.text = "";

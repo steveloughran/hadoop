@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.PathIsDirectoryException;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,13 +100,13 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
    */
   @Override
   protected void preCommitJob(JobContext context,
-      List<S3Util.PendingUpload> pending) throws IOException {
+      List<SinglePendingCommit> pending) throws IOException {
 
     FileSystem s3 = getDestFS();
     Set<Path> partitions = Sets.newLinkedHashSet();
-    for (S3Util.PendingUpload commit : pending) {
-      Path filePath = new Path(
-          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
+    for (SinglePendingCommit commit : pending) {
+      Path filePath = commit.destinationPath();
+//          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
       partitions.add(filePath.getParent());
     }
 
