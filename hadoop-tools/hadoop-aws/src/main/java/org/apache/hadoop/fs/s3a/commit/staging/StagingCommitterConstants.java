@@ -57,7 +57,7 @@ public final class StagingCommitterConstants {
   /**
    * Default value for {@link #COMMITTER_UNIQUE_FILENAMES}: {@value}.
    */
-  public static final boolean DEFAULT_COMMITTER_UNIQUE_FILENAMES = true;
+  public static final boolean DEFAULT_COMMITTER_UNIQUE_FILENAMES = false;
 
   // Spark configuration keys
   public static final String SPARK_WRITE_UUID =

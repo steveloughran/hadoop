@@ -16,12 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging.integration;
+package org.apache.hadoop.fs.s3a.commit;
 
-import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
-
-/**
- * Full integration test for the staging committer.
- */
-public class ITStagingCommitMRJob extends AbstractITCommitMRJob {
+public class MultiplePendingCommitData {
 }

@@ -923,7 +923,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Test
   public void testMapFileOutputCommitter() throws Exception {
     describe("Test that the committer generates map output into a directory\n" +
-        "starting with the prefix part-0000");
+        "starting with the prefix part-");
     JobData jobData = startJob(false);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;

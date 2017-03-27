@@ -53,7 +53,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
         DIRECTORY_COMMITTER_FACTORY);
     // disable unique filenames so that the protocol tests of FileOutputFormat
     // and this test generate consistent names.
-    conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, true);
+    //conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, true);
     return conf;
   }
 

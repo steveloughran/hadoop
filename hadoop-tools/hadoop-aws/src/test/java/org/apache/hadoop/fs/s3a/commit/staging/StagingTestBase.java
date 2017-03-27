@@ -127,7 +127,6 @@ public class StagingTestBase {
     verify(mockS3).delete(path, true);
   }
 
-
   public static void verifyDeleted(FileSystem mockS3, String child)
       throws IOException {
     verifyDeleted(mockS3, new Path(OUTPUT_PATH, child));
@@ -139,7 +138,6 @@ public class StagingTestBase {
         new Path(OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME));
   }
 
-
   protected static void assertConflictResolution(
       StagingS3GuardCommitter committer,
       JobContext job,
@@ -147,7 +145,6 @@ public class StagingTestBase {
     Assert.assertEquals("Conflict resolution mode in " + committer,
         mode, committer.getConflictResolutionMode(job));
   }
-
 
   public static void pathsExist(FileSystem mockS3, String... children)
       throws IOException {
