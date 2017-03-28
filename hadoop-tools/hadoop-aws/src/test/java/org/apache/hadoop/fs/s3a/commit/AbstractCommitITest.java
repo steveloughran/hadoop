@@ -41,14 +41,11 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    enableMultipartPurge(conf, PURGE_DELAY_SECONDS);
+//    enableMultipartPurge(conf, PURGE_DELAY_SECONDS);
     conf.setLong(MIN_MULTIPART_THRESHOLD, MULTIPART_MIN_SIZE);
     conf.setInt(MULTIPART_SIZE, MULTIPART_MIN_SIZE);
     conf.setBoolean(FAST_UPLOAD, true);
     conf.set(FAST_UPLOAD_BUFFER, FAST_UPLOAD_BUFFER_ARRAY);
-    conf.setBoolean(COMMITTER_ENABLED, true);
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        MagicS3GuardCommitterFactory.NAME);
     return conf;
   }
 }

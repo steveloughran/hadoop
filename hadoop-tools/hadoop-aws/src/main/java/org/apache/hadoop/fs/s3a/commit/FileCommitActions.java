@@ -108,8 +108,8 @@ public class FileCommitActions {
       LOG.debug("Destination entry: {}", status);
       outcome = commitSuccess(origin, destKey);
     } catch (IOException e) {
-      String msg = String.format("Failed to commit upload against %s: ",
-          destKey, e.toString(), e);
+      String msg = String.format("Failed to commit upload against %s: %s",
+          destKey, e);
       LOG.warn(msg, e);
       outcome = commitFailure(origin, destKey, e);
     } catch (Exception e) {
@@ -167,7 +167,7 @@ public class FileCommitActions {
    * @return the outcome
    */
   public CommitFileOutcome abortPendingFile(Path pendingFile,
-      boolean ignoreLoadFailue) {
+      boolean ignoreLoadFailure) {
     CommitFileOutcome outcome;
     String destKey = null;
     String origin = pendingFile.toString();
@@ -179,7 +179,7 @@ public class FileCommitActions {
     } catch (IOException e) {
       // file isn't found, log
       LOG.info("File {} not found; no operation to abort", origin);
-      if (ignoreLoadFailue) {
+      if (ignoreLoadFailure) {
         LOG.debug("Ignoring missing file; marking as success");
         outcome = commitSuccess(origin, destKey);
       } else {

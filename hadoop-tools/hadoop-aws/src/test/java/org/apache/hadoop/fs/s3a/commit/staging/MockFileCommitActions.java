@@ -20,10 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
-
-import java.io.IOException;
 
 /**
  * Extension of {@link FileCommitActions} for mocking S3A in tests.

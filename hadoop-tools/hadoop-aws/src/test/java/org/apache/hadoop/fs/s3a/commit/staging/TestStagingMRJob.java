@@ -50,7 +50,11 @@ import java.util.UUID;
 import static org.mockito.Mockito.mock;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 
-/** Test suite.*/
+/**
+ * Run an actual MR job in a mini YARN cluster backed by a mini HDFS cluster.
+ * Troublespot here: forcing filesystems into the FS cache doesn't work for
+ * the remote processes.
+ */
 public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
 
   private static MiniMRYarnCluster cluster = null;
@@ -133,6 +137,7 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     String committerPath = "file:" + mockResultsFile;
     conf.set("mock-results-file", committerPath);
     conf.set(StagingCommitterConstants.UPLOAD_UUID, commitUUID);
+    conf.setBoolean(StagingCommitterConstants.COMMITTER_UNIQUE_FILENAMES, true);
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     TextInputFormat.addInputPath(mrJob,

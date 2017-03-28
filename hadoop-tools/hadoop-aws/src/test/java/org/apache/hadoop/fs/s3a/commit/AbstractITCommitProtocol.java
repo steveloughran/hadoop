@@ -31,7 +31,6 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.S3ATestUtils;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -140,7 +139,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public void teardown() throws Exception {
     describe("teardown");
     if (abortInTeardown != null) {
-      abortQuietly(abortInTeardown);
+      abortJobQuietly(abortInTeardown);
     }
     abortMultipartUploadsUnderPath(outDir);
     cleanupDestDir();
@@ -413,8 +412,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * Abort a job quietly.
    * @param jobData job info
    */
-  protected void abortQuietly(JobData jobData) {
-    abortQuietly(jobData.committer, jobData.jContext, jobData.tContext);
+  protected void abortJobQuietly(JobData jobData) {
+    abortJobQuietly(jobData.committer, jobData.jContext, jobData.tContext);
   }
 
   /**
@@ -423,7 +422,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @param jContext job context
    * @param tContext task context
    */
-  protected void abortQuietly(AbstractS3GuardCommitter committer,
+  protected void abortJobQuietly(AbstractS3GuardCommitter committer,
       JobContext jContext,
       TaskAttemptContext tContext) {
     describe("\naborting task");
@@ -462,7 +461,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Execute work as part of a test, after creating the job.
-   * After the execution, {@link #abortQuietly(JobData)} is
+   * After the execution, {@link #abortJobQuietly(JobData)} is
    * called for abort/cleanup.
    * @param name name of work (for logging)
    * @param action action to execute
@@ -475,7 +474,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Execute work as part of a test, against the created job.
-   * After the execution, {@link #abortQuietly(JobData)} is
+   * After the execution, {@link #abortJobQuietly(JobData)} is
    * called for abort/cleanup.
    * @param name name of work (for logging)
    * @param jobData job info
@@ -491,7 +490,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     try (DurationInfo d = new DurationInfo("Executing %s", name)) {
       action.exec(jobData.job, jContext, tContext, committer);
     } finally {
-      abortQuietly(jobData);
+      abortJobQuietly(jobData);
     }
   }
 
@@ -707,13 +706,17 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    */
   protected int abortMultipartUploadsUnderPath(Path path) throws IOException {
     S3AFileSystem fs = getFileSystem();
-    String key = fs.pathToKey(path);
-    S3AFileSystem.WriteOperationHelper writeOps = fs.createWriteOperationHelper(key);
-    int count = writeOps.abortMultipartUploadsUnderPath(key);
-    if (count > 0) {
-      LOG.info("Multipart uploads deleted: {}", count);
+    if (fs != null) {
+      String key = fs.pathToKey(path);
+      S3AFileSystem.WriteOperationHelper writeOps = fs.createWriteOperationHelper(key);
+      int count = writeOps.abortMultipartUploadsUnderPath(key);
+      if (count > 0) {
+        LOG.info("Multipart uploads deleted: {}", count);
+      }
+      return count;
+    } else {
+      return 0;
     }
-    return count;
   }
 
   /**

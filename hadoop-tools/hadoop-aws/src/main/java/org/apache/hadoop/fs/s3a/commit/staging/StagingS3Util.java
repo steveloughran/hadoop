@@ -58,14 +58,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * TODO: All this needs to be replaced by delegating to S3AFS.
+ * Low level S3 integration.
+ * This is slowly moving towards delegating work to the S3A FS by way of
+ * {@link FileCommitActions}.
  */
-public final class S3Util {
+public final class StagingS3Util {
 
-  private S3Util() {
+  private StagingS3Util() {
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(S3Util.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StagingS3Util.class);
 
   /**
    * Revert a pending commit by deleting the destination.
@@ -112,7 +114,7 @@ public final class S3Util {
   }
 
   /**
-   * Abort an MPU.
+   * Abort an MPU; translate the failure into an IOE.
    * @param client S3 client
    * @param key dest key
    * @param request MPU request

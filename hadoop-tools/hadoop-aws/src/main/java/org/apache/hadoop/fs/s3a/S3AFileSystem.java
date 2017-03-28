@@ -2820,11 +2820,13 @@ public class S3AFileSystem extends FileSystem {
   public List<MultipartUpload> listMultipartUploads(String prefix)
       throws IOException {
     try {
-      MultipartUploadListing l = s3.listMultipartUploads(
-          new ListMultipartUploadsRequest(bucket));
+      ListMultipartUploadsRequest request = new ListMultipartUploadsRequest(
+          bucket);
       if (!prefix.isEmpty()) {
-        l.setPrefix(prefix);
+        request.setPrefix(prefix);
       }
+      MultipartUploadListing l = s3.listMultipartUploads(
+          request);
       return l.getMultipartUploads();
     } catch (AmazonClientException e) {
       throw translateException("listMultipartUpoloads", prefix, e);

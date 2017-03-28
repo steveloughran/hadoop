@@ -63,7 +63,7 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 /**
- * Parameterized on thread count.
+ * Parameterized on thread count and unique filename policy.
  */
 @RunWith(Parameterized.class)
 public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
@@ -89,8 +89,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
         {0, false},
-//        {1, true},
-//        {3, true},
+        {1, true},
+        {3, true},
     });
   }
 
@@ -192,7 +192,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = S3Util.readPendingCommits(dfs, stats[0].getPath());
+    MultiplePendingCommits pending = StagingS3Util.readPendingCommits(dfs, stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
     SinglePendingCommit commit = pending.commits.get(0);
     assertEquals("Should write to the correct bucket",
@@ -232,7 +232,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = S3Util.
+    MultiplePendingCommits pending = StagingS3Util.
         readPendingCommits(dfs, stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
   }
@@ -256,7 +256,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
     List<SinglePendingCommit> pending =
-        S3Util.readPendingCommits(dfs, stats[0].getPath()).commits;
+        StagingS3Util.readPendingCommits(dfs, stats[0].getPath()).commits;
     assertEquals("Should have correct number of pending commits",
         files.size(), pending.size());
 

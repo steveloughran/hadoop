@@ -592,7 +592,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         .run(new Tasks.Task<FileStatus, IOException>() {
           @Override
           public void run(FileStatus pendingCommitFile) throws IOException {
-            MultiplePendingCommits commits = S3Util.readPendingCommits(
+            MultiplePendingCommits commits = StagingS3Util.readPendingCommits(
                 attemptFS, pendingCommitFile.getPath());
             pending.addAll(commits.commits);
           }
@@ -665,25 +665,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
                 @Override
                 public void run(SinglePendingCommit commit,
                     Exception exception) throws IOException {
-                  S3Util.abortCommit(getCommitActions(), commit);
+                  StagingS3Util.abortCommit(getCommitActions(), commit);
                 }
               })
           .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              S3Util.abortCommit(getCommitActions(), commit);
+              StagingS3Util.abortCommit(getCommitActions(), commit);
             }
           })
           .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              S3Util.revertCommit(getCommitActions(), commit);
+              StagingS3Util.revertCommit(getCommitActions(), commit);
             }
           })
           .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              S3Util.finishCommit(getCommitActions(), commit);
+              StagingS3Util.finishCommit(getCommitActions(), commit);
             }
           });
 
@@ -756,13 +756,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             @Override
             public void run(SinglePendingCommit commit,
                             Exception exception) throws IOException {
-              S3Util.abortCommit(getCommitActions(), commit);
+              StagingS3Util.abortCommit(getCommitActions(), commit);
             }
           })
           .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              S3Util.abortCommit(getCommitActions(), commit);
+              StagingS3Util.abortCommit(getCommitActions(), commit);
             }
           });
 
@@ -940,7 +940,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
               String destURI = String.format("s3a://%s/%s", commitBucket, key);
-              SinglePendingCommit commit = S3Util.multipartUpload(
+              SinglePendingCommit commit = StagingS3Util.multipartUpload(
                   getCommitActions(),
                   localFile,
                   partition,
@@ -974,7 +974,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             .run(new Tasks.Task<SinglePendingCommit, IOException>() {
               @Override
               public void run(SinglePendingCommit commit) throws IOException {
-                S3Util.abortCommit(getCommitActions(), commit);
+                StagingS3Util.abortCommit(getCommitActions(), commit);
               }
             });
         deleteTaskAttemptPathQuietly(context);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit.magic;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
@@ -27,9 +28,11 @@ import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
 
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_DIR_NAME;
 
 /**
@@ -40,6 +43,15 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected String suitename() {
     return "ITestMagicCommitProtocol";
+  }
+
+  @Override
+  protected Configuration createConfiguration() {
+    Configuration conf = super.createConfiguration();
+    conf.setBoolean(COMMITTER_ENABLED, true);
+    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+        MagicS3GuardCommitterFactory.NAME);
+    return conf;
   }
 
   @Override
