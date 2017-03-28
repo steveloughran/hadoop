@@ -49,7 +49,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
-  private final FileCommitActions commitActions;
+  private FileCommitActions commitActions;
   private Path outputPath;
 
   /**
@@ -177,7 +177,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @throws IOException if the FS cannot be instantiated.
    */
 
-  protected FileSystem getDestFS() throws IOException {
+  public FileSystem getDestFS() throws IOException {
     if (destFS == null) {
       FileSystem fs = getDestination(outputPath, getConf());
       setDestFS(fs);
@@ -190,7 +190,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @return the dest S3A FS.
    * @throws IOException if the FS cannot be instantiated.
    */
-  protected S3AFileSystem getDestS3AFS() throws IOException {
+  public S3AFileSystem getDestS3AFS() throws IOException {
     return (S3AFileSystem) getDestFS();
   }
 
@@ -335,7 +335,20 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     super.cleanupJob(jobContext);
   }
 
+  /**
+   * Get the commit actions instance.
+   * Subclasses may provide a mock version of this.
+   * @return the commit actions instance to use for operations.
+   */
   protected FileCommitActions getCommitActions() {
     return commitActions;
+  }
+
+  /**
+   * For testing: set a new commit action
+   * @param commitActions commit actions instance
+   */
+  protected void setCommitActions(FileCommitActions commitActions) {
+    this.commitActions = commitActions;
   }
 }

@@ -44,6 +44,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AUtils;
+import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.slf4j.Logger;
@@ -72,11 +73,11 @@ public final class S3Util {
    * @param commit pending
    * @throws IOException failure
    */
-  public static void revertCommit(AmazonS3 client,
+  public static void revertCommit(FileCommitActions actions,
       SinglePendingCommit commit) throws IOException {
     LOG.debug("Revert {}", commit);
     try {
-      client.deleteObject(commit.newDeleteRequest());
+      actions.getS3Client().deleteObject(commit.newDeleteRequest());
     } catch (AmazonClientException e) {
       throw S3AUtils.translateException("revert commit", commit.getKey(), e);
     }
@@ -88,11 +89,11 @@ public final class S3Util {
    * @param commit pending
    * @throws IOException failure
    */
-  public static void finishCommit(AmazonS3 client,
+  public static void finishCommit(FileCommitActions actions,
       SinglePendingCommit commit) throws IOException {
     LOG.debug("Finish {}", commit);
     try {
-      client.completeMultipartUpload(commit.newCompleteRequest());
+      actions.getS3Client().completeMultipartUpload(commit.newCompleteRequest());
     } catch (AmazonClientException e) {
       throw S3AUtils.translateException("complete commit", commit.getKey(), e);
     }
@@ -104,10 +105,10 @@ public final class S3Util {
    * @param pending pending commit to abort
    * @throws IOException failure
    */
-  public static void abortCommit(AmazonS3 client,
+  public static void abortCommit(FileCommitActions actions,
       SinglePendingCommit pending) throws IOException {
     LOG.debug("Abort {}", pending);
-    abort(client, pending.getKey(), pending.newAbortRequest());
+    abort(actions.getS3Client(), pending.getKey(), pending.newAbortRequest());
   }
 
   /**
@@ -141,7 +142,7 @@ public final class S3Util {
    * @throws IOException failure
    */
   public static SinglePendingCommit multipartUpload(
-      AmazonS3 client, File localFile, String partition,
+      FileCommitActions actions, File localFile, String partition,
       String bucket, String key, String destURI, long uploadPartSize)
       throws IOException {
 
@@ -153,7 +154,7 @@ public final class S3Util {
     if (!localFile.isFile()) {
       throw new IOException("Not a file: " + localFile);
     }
-
+    AmazonS3 client = actions.getS3Client();
     String uploadId = null;
 
     boolean threw = true;

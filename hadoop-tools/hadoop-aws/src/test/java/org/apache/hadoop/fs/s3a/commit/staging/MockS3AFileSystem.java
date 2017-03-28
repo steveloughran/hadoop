@@ -169,7 +169,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public RemoteIterator<LocatedFileStatus> listFiles(Path f, boolean recursive)
       throws IOException {
-    event("listFiless(%s, %s)", f, recursive);
+    event("listFiles(%s, %s)", f, recursive);
     return new EmptyIterator();
 //    return mock.listFiles(f, recursive);
   }
@@ -177,6 +177,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public List<MultipartUpload> listMultipartUploads(String prefix)
       throws IOException {
+    event("listMultipartUploads(%s)", prefix);
     return Collections.emptyList();
   }
 

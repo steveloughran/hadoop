@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,15 @@ public class FileCommitActions {
   public FileCommitActions(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
+  }
+
+  /**
+   * Get the S3 client.
+   * Only temporarily available.
+   * @return
+   */
+  public AmazonS3 getS3Client() {
+     return fs.getAmazonS3Client();
   }
 
   /**

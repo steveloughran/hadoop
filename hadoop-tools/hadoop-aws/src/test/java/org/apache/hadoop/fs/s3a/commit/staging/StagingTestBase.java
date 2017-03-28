@@ -278,7 +278,7 @@ public class StagingTestBase {
       this.mockClient = newMockClient(results, errors);
     }
 
-    public FileSystem getMockS3() {
+    public S3AFileSystem getMockS3() {
       return mockFS;
     }
 

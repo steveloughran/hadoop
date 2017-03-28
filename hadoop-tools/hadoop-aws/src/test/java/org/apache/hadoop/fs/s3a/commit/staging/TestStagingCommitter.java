@@ -89,8 +89,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
         {0, false},
-        {1, true},
-        {3, true},
+//        {1, true},
+//        {3, true},
     });
   }
 
@@ -155,8 +155,13 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     config.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
         "hdfs://nn:8020/tmp/mr-local-0,hdfs://nn:8020/tmp/mr-local-1");
     intercept(IllegalArgumentException.class, "Wrong FS",
-        () -> getLocalTaskAttemptTempDir(config, jobUUID,
-            tac.getTaskAttemptID()));
+        new Callable<Path>() {
+          @Override
+          public Path call() throws Exception {
+            return getLocalTaskAttemptTempDir(config, jobUUID,
+                tac.getTaskAttemptID());
+          }
+        });
   }
 
   @Test

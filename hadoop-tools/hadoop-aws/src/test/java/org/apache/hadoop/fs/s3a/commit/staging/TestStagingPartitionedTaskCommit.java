@@ -47,7 +47,9 @@ public class TestStagingPartitionedTaskCommit
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedCommitterForTesting(OUTPUT_PATH,
         getJob(),
-        getMockClient());
+        getMockClient(),
+        getMockS3()
+    );
   }
 
   @Override
@@ -55,7 +57,8 @@ public class TestStagingPartitionedTaskCommit
     return new PartitionedCommitterForTesting(
         OUTPUT_PATH,
         getTAC(),
-        getMockClient());
+        getMockClient(),
+        getMockS3());
   }
 
   // The set of files used by this test
@@ -71,7 +74,6 @@ public class TestStagingPartitionedTaskCommit
       }
     }
   }
-
 
   @Test
   public void testBadConflictMode() throws Throwable {

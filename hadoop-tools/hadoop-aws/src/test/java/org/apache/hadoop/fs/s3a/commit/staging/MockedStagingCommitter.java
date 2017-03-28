@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 
+import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientErrors;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientResults;
 import org.apache.hadoop.conf.Configuration;
@@ -36,19 +37,23 @@ import java.io.ObjectOutputStream;
  */
 class MockedStagingCommitter extends StagingS3GuardCommitter {
 
-  private final ClientResults results = new ClientResults();
-  private final ClientErrors errors = new ClientErrors();
-  private final AmazonS3 mockClient = StagingTestBase.newMockClient(
-      getResults(), getErrors());
+  private MockFileCommitActions mockCommitActions;
 
   MockedStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
     super(outputPath, context);
+    createMockCommitActions();
   }
 
   MockedStagingCommitter(Path outputPath, TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
+    createMockCommitActions();
+  }
+
+  private void createMockCommitActions() throws IOException {
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), null);
+    setCommitActions(mockCommitActions);
   }
 
   /**
@@ -104,14 +109,14 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   public ClientResults getResults() {
-    return results;
+    return mockCommitActions.getResults();
   }
 
   public ClientErrors getErrors() {
-    return errors;
+    return mockCommitActions.getErrors();
   }
 
   public AmazonS3 getMockClient() {
-    return mockClient;
+    return mockCommitActions.getS3Client();
   }
 }

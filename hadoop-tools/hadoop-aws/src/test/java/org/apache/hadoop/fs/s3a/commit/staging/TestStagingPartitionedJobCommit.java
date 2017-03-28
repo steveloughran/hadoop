@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assume;
@@ -55,19 +56,19 @@ public class TestStagingPartitionedJobCommit
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedStagingCommitterForTesting(getJob(),
-        mock(AmazonS3.class));
+        mock(AmazonS3.class), getMockS3());
   }
 
   /**
    * Subclass of the Partitioned Staging committer used in the test cases.
    */
   private static final class PartitionedStagingCommitterForTesting
-      extends PartitionedStagingCommitter {
+      extends PartitionedCommitterForTesting {
     private final AmazonS3 client;
 
     private PartitionedStagingCommitterForTesting(JobContext context,
-        AmazonS3 client) throws IOException {
-      super(OUTPUT_PATH, context);
+        AmazonS3 client, S3AFileSystem fs) throws IOException {
+      super(OUTPUT_PATH, context, client, fs);
       this.client = client;
     }
 
