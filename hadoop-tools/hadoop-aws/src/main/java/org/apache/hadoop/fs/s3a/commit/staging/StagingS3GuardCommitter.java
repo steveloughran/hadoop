@@ -162,6 +162,12 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     postCreationActions();
   }
 
+  /**
+   * Actions called by all constructors after creation.
+   * Private/non-subclassable as subclasses will not have been instantiated
+   * at the time this method is invoked
+   * @throws IOException on a failure
+   */
   private void postCreationActions() throws IOException {
     // forces evaluation and caching of the resolution mode.
     ConflictResolution mode = getConflictResolutionMode(getJobContext());

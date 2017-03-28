@@ -280,4 +280,20 @@ public class SinglePendingCommit extends PersistentCommitData implements Iterabl
     return etags.iterator();
   }
 
+
+  /**
+   * Load an instance from a file, then validate it.
+   * @param fs filesystem
+   * @param path path
+   * @return the loaded instance
+   * @throws IOException IO failure
+   * @throws IllegalStateException if the data is invalid
+   */
+  public static SinglePendingCommit load(FileSystem fs, Path path)
+      throws IOException {
+    SinglePendingCommit instance = getSerializer().load(fs, path);
+    instance.validate();
+    return instance;
+  }
+
 }

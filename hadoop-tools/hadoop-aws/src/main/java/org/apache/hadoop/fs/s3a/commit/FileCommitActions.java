@@ -60,42 +60,55 @@ public class FileCommitActions {
   public CommitFileOutcome commitPendingFile(Path pendingFile)
       throws IOException {
     Preconditions.checkArgument(pendingFile != null, "null pendingFile");
+    // really read it in and parse
+    try {
+      SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
+      CommitFileOutcome outcome
+          = commit(commit, pendingFile.toString());
+      LOG.debug("Commit outcome: {}", outcome);
+      return outcome;
+    } finally {
+      LOG.debug("Deleting file {}", pendingFile);
+      deleteQuietly(fs, pendingFile, false);
+    }
+  }
+
+  /**
+   * Commit a single pending commit; exceptions are caught
+   * and converted to an outcome.
+   * @param commit entry to commit
+   * @param origin origin path/string for outcome text
+   * @return the outcome
+   */
+  public CommitFileOutcome commit(SinglePendingCommit commit, String origin) {
     CommitFileOutcome outcome;
     String destKey = null;
     // really read it in and parse
     try {
-      SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
-          .load(fs, pendingFile);
-      persisted.validate();
-      destKey = persisted.destinationKey;
-      LOG.info("Committing to key {} defined in {}",
-          destKey, pendingFile);
+      destKey = commit.destinationKey;
       S3AFileSystem.WriteOperationHelper writer
           = fs.createWriteOperationHelper(destKey);
-      writer.finalizeMultipartCommit(destKey, persisted.uploadId,
-          CommitUtils.toPartEtags(persisted.etags),
-          persisted.size);
+      writer.finalizeMultipartCommit(destKey, commit.uploadId,
+          CommitUtils.toPartEtags(commit.etags),
+          commit.size);
       LOG.debug("Successfull commit");
       // now do a low level get to verify it is there
       Path destPath = fs.keyToQualifiedPath(destKey);
       FileStatus status = fs.getFileStatus(destPath);
       LOG.debug("Destination entry: {}", status);
-      outcome = commitSuccess(pendingFile, destKey);
+      outcome = commitSuccess(origin, destKey);
     } catch (IOException e) {
-      String msg = String.format("Failed to commit upload against %s," +
-          " described in %s: %s", destKey, pendingFile, e);
+      String msg = String.format("Failed to commit upload against %s: ",
+          destKey, e.toString(), e);
       LOG.warn(msg, e);
-      outcome = commitFailure(pendingFile, destKey, e);
+      outcome = commitFailure(origin, destKey, e);
     } catch (Exception e) {
       String msg = String.format("Failed to commit upload against %s," +
-          " described in %s: %s", destKey, pendingFile, e);
+          " described in %s: %s", destKey, origin, e);
       LOG.warn(msg, e);
-      outcome = commitFailure(pendingFile, destKey,
-          new PathCommitException(pendingFile.toString(), msg,
+      outcome = commitFailure(origin, destKey,
+          new PathCommitException(origin.toString(), msg,
               e));
-    } finally {
-      LOG.debug("Deleting file {}", pendingFile);
-      deleteQuietly(fs, pendingFile, false);
     }
     LOG.debug("Commit outcome: {}", outcome);
     return outcome;
@@ -139,58 +152,75 @@ public class FileCommitActions {
    * This operation is designed to always
    * succeed; failures are caught and logged.
    * @param pendingFile path
-   * @param ignoreMissingFile treat FNFEs as ignored.
+   * @param ignoreLoadFailure treat FNFEs and other load failures as commit
+   * successes anyway.
    * @return the outcome
    */
   public CommitFileOutcome abortPendingFile(Path pendingFile,
-      boolean ignoreMissingFile) {
+      boolean ignoreLoadFailue) {
     CommitFileOutcome outcome;
     String destKey = null;
+    String origin = pendingFile.toString();
     try {
       // really read it in and parse
-      SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
-          .load(fs, pendingFile);
-      persisted.validate();
-      destKey = persisted.destinationKey;
-      LOG.info("Aborting commit to file {} defined in {}",
-          destKey, pendingFile);
-      S3AFileSystem.WriteOperationHelper writer
-          = fs.createWriteOperationHelper(destKey);
-      writer.abortMultipartCommit(destKey, persisted.uploadId);
-      outcome = commitSuccess(pendingFile, destKey);
-    } catch (FileNotFoundException e) {
-      // file isn't found, log
-      LOG.info("File {} not found; no operation to abort", pendingFile);
-      if (ignoreMissingFile) {
-        LOG.debug("Ignoring missing file; marking as success");
-        outcome = commitSuccess(pendingFile, destKey);
-      } else {
-        outcome = commitFailure(pendingFile, destKey, e);
-      }
-    } catch (IllegalArgumentException | IllegalStateException e) {
-      String msg = String.format("Failed to abort upload against %s," +
-          " described in %s: %s", destKey, pendingFile, e);
-      LOG.warn(msg, e);
-      outcome = commitFailure(pendingFile, destKey,
-          new PathCommitException(pendingFile.toString(), msg, e));
+      SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
+      destKey = commit.destinationKey;
+      outcome = abort(pendingFile.toString(), commit);
     } catch (IOException e) {
-      LOG.warn("Failed to abort upload against {}," +
-          " described in {}", destKey, pendingFile, e);
-      outcome = commitFailure(pendingFile, destKey, e);
+      // file isn't found, log
+      LOG.info("File {} not found; no operation to abort", origin);
+      if (ignoreLoadFailue) {
+        LOG.debug("Ignoring missing file; marking as success");
+        outcome = commitSuccess(origin, destKey);
+      } else {
+        outcome = commitFailure(origin, destKey, e);
+      }
     } finally {
       deleteQuietly(fs, pendingFile, false);
     }
     return outcome;
   }
 
-  public static CommitFileOutcome commitSuccess(Path pendingFile,
-      String destKey) {
-    return new CommitFileOutcome(pendingFile, destKey);
+  /**
+   * Abort a pending commit.
+   * This operation is designed to always
+   * succeed; failures are caught and logged.
+   * @param pendingFile path
+   * @return the outcome
+   */
+  public CommitFileOutcome abort(String origin,
+      SinglePendingCommit commit) {
+    CommitFileOutcome outcome;
+    String destKey = commit.destinationKey;
+    try {
+      LOG.info("Aborting commit to file {} defined in {}",
+          destKey, origin);
+      S3AFileSystem.WriteOperationHelper writer
+          = fs.createWriteOperationHelper(destKey);
+      writer.abortMultipartCommit(destKey, commit.uploadId);
+      outcome = commitSuccess(origin, destKey);
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      String msg = String.format("Failed to abort upload against %s," +
+          " described in %s: %s", destKey, origin, e);
+      LOG.warn(msg, e);
+      outcome = commitFailure(origin, destKey,
+          new PathCommitException(origin, msg, e));
+    } catch (IOException e) {
+      LOG.warn("Failed to abort upload against {}," +
+          " described in {}", destKey, origin, e);
+      outcome = commitFailure(origin, destKey, e);
+    }
+    return outcome;
   }
 
-  public static CommitFileOutcome commitFailure(Path pendingFile,
+  public static CommitFileOutcome commitSuccess(String origin,
+      String destKey) {
+    return new CommitFileOutcome(origin, destKey);
+  }
+
+  public static CommitFileOutcome commitFailure(String origin,
       String destKey, IOException e) {
-    return new CommitFileOutcome(pendingFile, destKey, e);
+    return new CommitFileOutcome(origin, null, e);
   }
 
   /**
@@ -281,7 +311,7 @@ public class FileCommitActions {
      * @param destination destination path
      */
     public void success(Path pending, String destination) {
-      succeeded.add(commitSuccess(pending, destination));
+      succeeded.add(commitSuccess(pending.toString(), destination));
     }
 
     /**
@@ -291,7 +321,7 @@ public class FileCommitActions {
      */
     public void failure(Path pending, String destination,
         IOException exception) {
-      failed.add(commitFailure(pending, destination, exception));
+      failed.add(commitFailure(pending.toString(), destination, exception));
     }
 
     /**
@@ -340,49 +370,39 @@ public class FileCommitActions {
     }
   }
 
-
   /**
    * Outcome of a commit to a single file.
    */
   public static class CommitFileOutcome {
     private final boolean succeeded;
-    private final Path pendingFile;
+    private final String origin;
     private final String destination;
     private final IOException exception;
 
     /**
      * Success outcome.
-     * @param pendingFile pending file
+     * @param origin pending file
      * @param destination destination of commit
      */
-    public CommitFileOutcome(Path pendingFile, String destination) {
+    public CommitFileOutcome(String origin, String destination) {
       this.succeeded = true;
       this.destination = destination;
-      this.pendingFile = pendingFile;
+      this.origin = origin;
       this.exception = null;
     }
 
     /**
      * Failure outcome.
-     * @param pendingFile pending file
-     * @param exception failure cause
-     */
-    public CommitFileOutcome(Path pendingFile, IOException exception) {
-      this(pendingFile, null, exception);
-    }
-
-    /**
-     * Failure outcome.
-     * @param pendingFile pending file
+     * @param origin pending file
      * @param destination destination of commit
      * @param exception failure cause
      */
-    public CommitFileOutcome(Path pendingFile,
+    public CommitFileOutcome(String origin,
         String destination,
         IOException exception) {
       this.succeeded = exception == null;
       this.destination = destination;
-      this.pendingFile = pendingFile;
+      this.origin = origin;
       this.exception = exception;
     }
 
@@ -390,8 +410,8 @@ public class FileCommitActions {
       return succeeded;
     }
 
-    public Path getPendingFile() {
-      return pendingFile;
+    public String getOrigin() {
+      return origin;
     }
 
     public IOException getException() {
@@ -404,7 +424,7 @@ public class FileCommitActions {
           "CommitFileOutcome{");
       sb.append(succeeded ? "success" : "failure");
       sb.append(", destination=").append(destination);
-      sb.append(", pendingFile=").append(pendingFile);
+      sb.append(", pendingFile=").append(origin);
       if (!succeeded) {
         sb.append(", exception=").append(exception);
       }
