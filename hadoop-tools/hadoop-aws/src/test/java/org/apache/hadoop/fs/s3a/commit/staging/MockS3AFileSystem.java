@@ -19,7 +19,6 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;

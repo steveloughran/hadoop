@@ -31,6 +31,7 @@ import java.io.IOException;
  */
 public class DirectoryStagingCommitterFactory
     extends Abstract3GuardCommitterFactory {
+
   /**
    * Name of this class: {@value}.
    */

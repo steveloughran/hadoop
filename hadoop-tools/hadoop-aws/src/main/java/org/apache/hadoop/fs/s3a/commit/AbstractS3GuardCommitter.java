@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
@@ -54,9 +53,9 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private Path outputPath;
 
   /**
-   * Used in logging and reporting to help disentangle messages.
+   * Role: used in log/text messages.
    */
-  protected final String role;
+  private final String role;
 
   /**
    * This is the directory for all intermediate work: where the output format
@@ -96,7 +95,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected AbstractS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
-    this("Job committer " + jobIdString(context), outputPath,context);
+    this("Job committer " + jobIdString(context), outputPath, context);
   }
 
   /**
@@ -332,8 +331,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   @Override
-  public void cleanupJob(JobContext jobContext) throws IOException {
-    super.cleanupJob(jobContext);
+  public void cleanupJob(JobContext context) throws IOException {
+    super.cleanupJob(context);
   }
 
   /**
@@ -346,10 +345,18 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * For testing: set a new commit action
+   * For testing: set a new commit action.
    * @param commitActions commit actions instance
    */
   protected void setCommitActions(FileCommitActions commitActions) {
     this.commitActions = commitActions;
+  }
+
+  /**
+   * Used in logging and reporting to help disentangle messages.
+   * @return the committer's role.
+   */
+  protected String getRole() {
+    return role;
   }
 }

@@ -134,7 +134,7 @@ public class DelayedCommitFSIntegration {
   }
 
   /**
-   * Is this path a delayed commit path in this filesystem
+   * Is this path a delayed commit path in this filesystem?
    * @param elements element list
    * @return true if the path is for delayed commits
    */

@@ -124,12 +124,12 @@ public class MultiplePendingCommits extends PersistentCommitData {
   }
 
   /**
-   * Number of commits
+   * Number of commits.
    * @return the number of commits in this structure.
    */
 
   public int size() {
-    return commits.size();
+    return commits != null ? commits.size() : 0;
   }
 
   @Override

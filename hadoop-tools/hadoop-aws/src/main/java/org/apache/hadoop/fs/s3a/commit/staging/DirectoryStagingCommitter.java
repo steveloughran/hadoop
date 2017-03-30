@@ -70,7 +70,7 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
    * Here: look at the conflict resolution mode and choose
    * an action based on the current policy.
    * @param context job context
-   * @param pending
+   * @param pending pending commits
    * @throws IOException any failure
    */
   @Override
@@ -91,11 +91,11 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
       break;
     case REPLACE:
       LOG.debug("{}: removing output path to be replaced: {}",
-          role, outputPath);
+          getRole(), outputPath);
       fs.delete(outputPath, true /* recursive */);
       break;
     default:
-      throw new IOException(role + ": unknown conflict resolution mode: "
+      throw new IOException(getRole() + ": unknown conflict resolution mode: "
           + getConfictModeOption(context));
     }
   }

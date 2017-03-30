@@ -121,12 +121,12 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     case REPLACE:
       for (Path partitionPath : partitions) {
         LOG.info("{}: removing partition path to be replaced: " +
-            role, partitionPath);
+            getRole(), partitionPath);
         s3.delete(partitionPath, true);
       }
       break;
     default:
-      throw new IOException(role + ": unknown conflict resolution mode: "
+      throw new IOException(getRole() + ": unknown conflict resolution mode: "
           + getConflictResolutionMode(context));
     }
   }

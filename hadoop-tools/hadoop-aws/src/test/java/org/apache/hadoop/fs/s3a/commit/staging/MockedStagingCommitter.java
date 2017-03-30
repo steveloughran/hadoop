@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.AmazonS3;
 
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientErrors;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.ClientResults;
 import org.apache.hadoop.conf.Configuration;

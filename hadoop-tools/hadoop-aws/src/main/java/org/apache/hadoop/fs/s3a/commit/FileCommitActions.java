@@ -56,10 +56,10 @@ public class FileCommitActions {
   /**
    * Get the S3 client.
    * Only temporarily available.
-   * @return
+   * @return the client
    */
   public AmazonS3 getS3Client() {
-     return fs.getAmazonS3Client();
+    return fs.getAmazonS3Client();
   }
 
   /**

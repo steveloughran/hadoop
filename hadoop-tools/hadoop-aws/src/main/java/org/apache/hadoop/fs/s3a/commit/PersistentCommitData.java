@@ -18,18 +18,19 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IOUtils;
 
 import java.io.IOException;
 import java.io.Serializable;
 
+/**
+ * Class for single/multiple commit data structures.
+ */
 public abstract class PersistentCommitData implements Serializable {
   /**
    * Supported version value: {@value}.
-   * If this is changed the value of {@link #serialVersionUID} will change,
+   * If this is changed the value of {@code serialVersionUID} will change,
    * to avoid deserialization problems.
    */
   public static final int VERSION = 1;
@@ -41,7 +42,7 @@ public abstract class PersistentCommitData implements Serializable {
   public abstract void validate();
 
   /**
-   * Serialize to JSON and then to a byte array, after performaing a
+   * Serialize to JSON and then to a byte array, after performing a
    * preflight validation of the data to be saved.
    * @return the data in a persistable form.
    * @throws IOException serialization problem
@@ -58,6 +59,5 @@ public abstract class PersistentCommitData implements Serializable {
    */
   public abstract void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException;
-
 
 }

@@ -102,7 +102,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   @Before
   public void setupCommitter() throws Exception {
     getConfiguration().setInt(COMMITTER_THREADS, numThreads);
-    getConfiguration().setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames );
+    getConfiguration().setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames);
     getConfiguration().set(UPLOAD_UUID, UUID.randomUUID().toString());
 
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
@@ -192,7 +192,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = StagingS3Util.readPendingCommits(dfs, stats[0].getPath());
+    MultiplePendingCommits pending = StagingS3Util.readPendingCommits(dfs,
+        stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
     SinglePendingCommit commit = pending.commits.get(0);
     assertEquals("Should write to the correct bucket",
@@ -475,12 +476,14 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         5, jobCommitter.getResults().getDeletes().size());
 
     Set<String> commits = Sets.newHashSet();
-    for (CompleteMultipartUploadRequest commit : jobCommitter.getResults().getCommits()) {
+    for (CompleteMultipartUploadRequest commit:
+        jobCommitter.getResults().getCommits()) {
       commits.add(commit.getBucketName() + commit.getKey());
     }
 
     Set<String> deletes = Sets.newHashSet();
-    for (DeleteObjectRequest delete : jobCommitter.getResults().getDeletes()) {
+    for (DeleteObjectRequest delete:
+        jobCommitter.getResults().getDeletes()) {
       deletes.add(delete.getBucketName() + delete.getKey());
     }
 
@@ -490,7 +493,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should have aborted the remaining uploads",
         7, jobCommitter.getResults().getAborts().size());
 
-    Set<String> uploadIds = getCommittedIds(jobCommitter.getResults().getCommits());
+    Set<String> uploadIds =
+        getCommittedIds(jobCommitter.getResults().getCommits());
     uploadIds.addAll(getAbortedIds(jobCommitter.getResults().getAborts()));
 
     assertEquals("Should have committed/deleted or aborted all uploads",
@@ -530,7 +534,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should have aborted all uploads",
         12, jobCommitter.getResults().getAborts().size());
 
-    Set<String> uploadIds = getCommittedIds(jobCommitter.getResults().getCommits());
+    Set<String> uploadIds =
+        getCommittedIds(jobCommitter.getResults().getCommits());
     uploadIds.addAll(getAbortedIds(jobCommitter.getResults().getAborts()));
 
     assertEquals("Should have committed or aborted all uploads",
@@ -562,7 +567,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertPathDoesNotExist(fs, "jobAttemptPath not deleted", jobAttemptPath);
   }
 
-  private Set<String> runTasks(JobContext job, int numTasks, int numFiles)
+  private Set<String> runTasks(JobContext jobContext,
+      int numTasks, int numFiles)
       throws IOException {
     Set<String> uploads = Sets.newHashSet();
 
@@ -571,7 +577,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
           new TaskID(JOB_ID, TaskType.REDUCE, taskId),
           (taskId * 37) % numTasks);
       TaskAttemptContext attempt = new TaskAttemptContextImpl(
-          new Configuration(job.getConfiguration()), attemptID);
+          new Configuration(jobContext.getConfiguration()), attemptID);
       MockedStagingCommitter taskCommitter = new MockedStagingCommitter(
           OUTPUT_PATH, attempt);
       commitTask(taskCommitter, attempt, numFiles);
@@ -599,22 +605,23 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     return committedUploads;
   }
 
-  private Set<String> commitTask(StagingS3GuardCommitter committer,
-      TaskAttemptContext tac, int numFiles)
+  private Set<String> commitTask(StagingS3GuardCommitter staging,
+      TaskAttemptContext attempt,
+      int numFiles)
       throws IOException {
-    Path attemptPath = committer.getTaskAttemptPath(tac);
+    Path attemptPath = staging.getTaskAttemptPath(attempt);
 
     Set<String> files = Sets.newHashSet();
     for (int i = 0; i < numFiles; i += 1) {
       Path outPath = writeOutputFile(
-          tac.getTaskAttemptID(), attemptPath, UUID.randomUUID().toString(),
+          attempt.getTaskAttemptID(), attemptPath, UUID.randomUUID().toString(),
           10 * (i + 1));
       files.add(OUTPUT_PREFIX +
           "/" + outPath.getName()
-          + (uniqueFilenames ? ( "-" + committer.getUUID()) : ""));
+          + (uniqueFilenames ? ("-" + staging.getUUID()) : ""));
     }
 
-    committer.commitTask(tac);
+    staging.commitTask(attempt);
 
     return files;
   }

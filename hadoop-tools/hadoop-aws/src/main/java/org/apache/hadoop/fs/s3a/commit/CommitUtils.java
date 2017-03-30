@@ -420,7 +420,7 @@ public final class CommitUtils {
 
 
   /**
-   * Get a string value of a job ID; returns meaningful text if there is no ID
+   * Get a string value of a job ID; returns meaningful text if there is no ID.
    * @param context job context
    * @return a string for logs
    */
@@ -430,7 +430,7 @@ public final class CommitUtils {
   }
 
   /**
-   * Get a job name; returns meaningful text if there is no ID
+   * Get a job name; returns meaningful text if there is no name.
    * @param context job context
    * @return a string for logs
    */

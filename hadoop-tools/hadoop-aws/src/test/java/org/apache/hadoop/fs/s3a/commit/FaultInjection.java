@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+/**
+ * Support for adding fault injection: all the failing committers in the IT
+ * tests must implement this.
+ */
 public interface FaultInjection {
   String COMMIT_FAILURE_MESSAGE = "oops";
 

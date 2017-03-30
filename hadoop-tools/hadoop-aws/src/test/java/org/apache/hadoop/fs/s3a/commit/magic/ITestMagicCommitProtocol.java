@@ -58,7 +58,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   public void assertJobAbortCleanedUp(JobData jobData)
       throws Exception {
     // special handling of magic directory; harmless in staging
-    Path magicDir = new Path(outDir, MAGIC_DIR_NAME);
+    Path magicDir = new Path(getOutDir(), MAGIC_DIR_NAME);
     ContractTestUtils.assertPathDoesNotExist(getFileSystem(),
         "magic dir ", magicDir);
     super.assertJobAbortCleanedUp(jobData);
@@ -67,18 +67,18 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
-    return new MagicS3GuardCommitter(outDir, context);
+    return new MagicS3GuardCommitter(getOutDir(), context);
   }
 
   @Override
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new MagicS3GuardCommitter(outDir, context);
+    return new MagicS3GuardCommitter(getOutDir(), context);
   }
 
   public AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException {
-    return new CommitterWithFailedThenSucceed(outDir, tContext);
+    return new CommitterWithFailedThenSucceed(getOutDir(), tContext);
   }
 
   /**

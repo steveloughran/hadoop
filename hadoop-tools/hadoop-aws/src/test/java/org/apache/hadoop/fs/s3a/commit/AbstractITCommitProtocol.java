@@ -76,7 +76,7 @@ import static org.apache.hadoop.test.LambdaTestUtils.*;
  */
 @SuppressWarnings({"unchecked", "ThrowableNotThrown"})
 public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
-  protected Path outDir;
+  private Path outDir;
 
   private static final String SUB_DIR = "SUB_DIR";
 
@@ -186,6 +186,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    */
   public abstract AbstractS3GuardCommitter createCommitter(
       JobContext context) throws IOException;
+
+  protected Path getOutDir() {
+    return outDir;
+  }
 
   /**
    * Lambda Interface for creating committers, designed to allow
@@ -299,24 +303,24 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   /**
    * Details on a job for use in {@code startJob} and elsewhere.
    */
-   public static class JobData {
-     public final Job job;
-     public final JobContext jContext;
-     public final TaskAttemptContext tContext;
-     public final AbstractS3GuardCommitter committer;
-     public final Configuration conf;
+  public static class JobData {
+    public final Job job;
+    public final JobContext jContext;
+    public final TaskAttemptContext tContext;
+    public final AbstractS3GuardCommitter committer;
+    public final Configuration conf;
 
-     public JobData(Job job,
-         JobContext jContext,
-         TaskAttemptContext tContext,
-         AbstractS3GuardCommitter committer) {
-       this.job = job;
-       this.jContext = jContext;
-       this.tContext = tContext;
-       this.committer = committer;
-       conf = job.getConfiguration();
-     }
-   }
+    public JobData(Job job,
+        JobContext jContext,
+        TaskAttemptContext tContext,
+        AbstractS3GuardCommitter committer) {
+      this.job = job;
+      this.jContext = jContext;
+      this.tContext = tContext;
+      this.committer = committer;
+      conf = job.getConfiguration();
+    }
+  }
 
   /**
    * Create a a new job. Sets the task attempt ID.
@@ -344,10 +348,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @throws IOException IO problems
    * @throws InterruptedException interruption during write
    */
-   protected JobData startJob(boolean writeText)
-       throws IOException, InterruptedException {
-     return startJob(new StandardCommitterFactory(), writeText);
-   }
+  protected JobData startJob(boolean writeText)
+      throws IOException, InterruptedException {
+    return startJob(new StandardCommitterFactory(), writeText);
+  }
 
   /**
    * Start a job with a committer; optionally write the test data.
@@ -362,28 +366,28 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @throws IOException IO problems
    * @throws InterruptedException interruption during write
    */
-   protected JobData startJob(CommitterFactory factory, boolean writeText)
-       throws IOException, InterruptedException {
-     Job job = newJob();
-     Configuration conf = job.getConfiguration();
-     conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
-     conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
-     JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
-     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-         TASK_ATTEMPT_0);
-     AbstractS3GuardCommitter committer = factory.createCommitter(tContext);
+  protected JobData startJob(CommitterFactory factory, boolean writeText)
+      throws IOException, InterruptedException {
+    Job job = newJob();
+    Configuration conf = job.getConfiguration();
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
+    conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
+    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+        TASK_ATTEMPT_0);
+    AbstractS3GuardCommitter committer = factory.createCommitter(tContext);
 
-     // setup
-     setup(committer, jContext, tContext);
-     JobData jobData = new JobData(job, jContext, tContext, committer);
-     abortInTeardown(jobData);
+    // setup
+    setup(committer, jContext, tContext);
+    JobData jobData = new JobData(job, jContext, tContext, committer);
+    abortInTeardown(jobData);
 
-     if (writeText) {
-       // write output
-       writeTextOutput(tContext);
-     }
-     return jobData;
-   }
+    if (writeText) {
+      // write output
+      writeTextOutput(tContext);
+    }
+    return jobData;
+  }
 
   /**
    * Set up the job and task.
@@ -467,7 +471,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @param action action to execute
    * @throws Exception failure
    */
-  protected void executeWork(String name, ActionToTest action) throws Exception {
+  protected void executeWork(String name, ActionToTest action)
+      throws Exception {
     JobData jobData = startJob(false);
     executeWork(name, jobData, action);
   }
@@ -645,7 +650,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Count the number of MPUs under a path
+   * Count the number of MPUs under a path.
    * @param path path to scan
    * @return count
    * @throws IOException IO failure
@@ -655,8 +660,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Count the number of MPUs under a prefix
-   * @param path path to scan
+   * Count the number of MPUs under a prefix.
+   * @param prefix prefix to scan
    * @return count
    * @throws IOException IO failure
    */
@@ -671,7 +676,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Map from a path to a prefix
+   * Map from a path to a prefix.
    * @param path path
    * @return the key
    */
@@ -686,7 +691,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @return possibly empty list
    * @throws IOException IO failure.
    */
-  protected List<String> listMultipartUploads(String prefix) throws IOException {
+  protected List<String> listMultipartUploads(String prefix)
+      throws IOException {
     List<MultipartUpload> uploads = getFileSystem().listMultipartUploads(
         prefix);
     List<String> result = new ArrayList<>(uploads.size());
@@ -708,7 +714,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     S3AFileSystem fs = getFileSystem();
     if (fs != null) {
       String key = fs.pathToKey(path);
-      S3AFileSystem.WriteOperationHelper writeOps = fs.createWriteOperationHelper(key);
+      S3AFileSystem.WriteOperationHelper writeOps =
+          fs.createWriteOperationHelper(key);
       int count = writeOps.abortMultipartUploadsUnderPath(key);
       if (count > 0) {
         LOG.info("Multipart uploads deleted: {}", count);
@@ -860,7 +867,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
 
-  protected static void expectFNFEonTaskCommit(AbstractS3GuardCommitter committer,
+  protected static void expectFNFEonTaskCommit(
+      AbstractS3GuardCommitter committer,
       TaskAttemptContext tContext) throws Exception {
     intercept(FileNotFoundException.class,
         new VoidCallable() {
@@ -999,6 +1007,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return parts;
   }
 
+  /**
+   * An interface which an action to test must implement.
+   */
   public interface ActionToTest {
     void exec(Job job, JobContext jContext, TaskAttemptContext tContext,
         AbstractS3GuardCommitter committer) throws Exception;

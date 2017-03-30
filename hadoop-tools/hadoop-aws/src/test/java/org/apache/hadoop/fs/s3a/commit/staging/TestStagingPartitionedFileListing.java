@@ -53,7 +53,8 @@ public class TestStagingPartitionedFileListing
 
     // create files in the attempt path that should be found by getTaskOutput
     Path attemptPath = committer.getTaskAttemptPath(getTAC());
-    FileSystem attemptFS = attemptPath.getFileSystem(getTAC().getConfiguration());
+    FileSystem attemptFS = attemptPath.getFileSystem(
+        getTAC().getConfiguration());
     attemptFS.delete(attemptPath, true);
 
     try {
@@ -88,7 +89,8 @@ public class TestStagingPartitionedFileListing
 
     // create files in the attempt path that should be found by getTaskOutput
     Path attemptPath = committer.getTaskAttemptPath(getTAC());
-    FileSystem attemptFS = attemptPath.getFileSystem(getTAC().getConfiguration());
+    FileSystem attemptFS = attemptPath.getFileSystem(
+        getTAC().getConfiguration());
     attemptFS.delete(attemptPath, true);
 
     try {

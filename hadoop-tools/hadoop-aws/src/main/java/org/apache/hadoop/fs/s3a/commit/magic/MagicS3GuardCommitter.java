@@ -118,9 +118,9 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Cleanup job: abort uploads, delete directories
-   * @param context
-   * @throws IOException
+   * Cleanup job: abort uploads, delete directories.
+   * @param context Job context
+   * @throws IOException IO failure
    */
   @Override
   public void cleanupJob(JobContext context) throws IOException {

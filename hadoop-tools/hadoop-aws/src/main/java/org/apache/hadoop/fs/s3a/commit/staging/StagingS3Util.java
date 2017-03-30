@@ -71,7 +71,7 @@ public final class StagingS3Util {
 
   /**
    * Revert a pending commit by deleting the destination.
-   * @param client client
+   * @param actions commit actions to use
    * @param commit pending
    * @throws IOException failure
    */
@@ -87,7 +87,7 @@ public final class StagingS3Util {
 
   /**
    * Finish the pending commit.
-   * @param client client
+   * @param actions commit actions to use
    * @param commit pending
    * @throws IOException failure
    */
@@ -103,7 +103,7 @@ public final class StagingS3Util {
 
   /**
    * Abort a pending commit.
-   * @param client client
+   * @param actions commit actions to use
    * @param pending pending commit to abort
    * @throws IOException failure
    */
@@ -133,7 +133,7 @@ public final class StagingS3Util {
   /**
    * Upload all the data in the local file, returning the information
    * needed to commit the work.
-   * @param client S3 client
+   * @param actions commit actions to use
    * @param localFile local file (be  a file)
    * @param partition partition/subdir. Not used
    * @param bucket dest bucket

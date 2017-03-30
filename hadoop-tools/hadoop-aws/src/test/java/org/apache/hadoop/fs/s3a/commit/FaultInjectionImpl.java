@@ -124,6 +124,9 @@ public final class FaultInjectionImpl extends PathOutputCommitter implements
     maybeFail(Faults.abortJob);
   }
 
+  /**
+   * The exception raised on failure.
+   */
   public static class Failure extends IOException {
     public Failure() {
       super(COMMIT_FAILURE_MESSAGE);

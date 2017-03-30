@@ -64,12 +64,12 @@ final class Tasks {
     private Task<I, ?> abortTask = null;
     private boolean stopAbortsOnFailure = false;
 
-    public Builder(Iterable<I> items) {
+    Builder(Iterable<I> items) {
       this.items = items;
     }
 
-    public Builder<I> executeWith(ExecutorService service) {
-      this.service = service;
+    public Builder<I> executeWith(ExecutorService executorService) {
+      this.service = executorService;
       return this;
     }
 

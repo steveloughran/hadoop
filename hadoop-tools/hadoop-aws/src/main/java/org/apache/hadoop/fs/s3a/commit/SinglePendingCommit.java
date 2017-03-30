@@ -55,11 +55,11 @@ import static org.apache.hadoop.util.StringUtils.join;
  * it must also be serialized. Jackson expects lists, and it is used
  * to persist to disk.
  *
- * Also: checkstyle can STFU.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class SinglePendingCommit extends PersistentCommitData implements Iterable<String> {
+public class SinglePendingCommit extends PersistentCommitData
+    implements Iterable<String> {
 
   private static JsonSerDeser<SinglePendingCommit> serializer
       = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
@@ -78,7 +78,7 @@ public class SinglePendingCommit extends PersistentCommitData implements Iterabl
   /** ID of the upload. */
   public String uploadId;
 
-  /** Dest bucket */
+  /** Destination bucket. */
   public String bucket;
 
   /** Destination key in the bucket. */
@@ -131,11 +131,14 @@ public class SinglePendingCommit extends PersistentCommitData implements Iterabl
     validate();
   }
 
+  /**
+   * Set the various timestamp fields to the supplied value.
+   * @param millis time in milliseconds
+   */
   public void touch(long millis) {
-    long time = System.currentTimeMillis();
-    created = time;
-    saved = time;
-    date = new Date(time).toString();
+    created = millis;
+    saved = millis;
+    date = new Date(millis).toString();
   }
 
   /**
@@ -209,7 +212,8 @@ public class SinglePendingCommit extends PersistentCommitData implements Iterabl
   }
 
   @Override
-  public void save(FileSystem fs, Path path, boolean overwrite) throws IOException {
+  public void save(FileSystem fs, Path path, boolean overwrite)
+      throws IOException {
     getSerializer().save(fs, path, this, overwrite);
   }
 

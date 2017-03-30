@@ -27,9 +27,10 @@ import org.apache.hadoop.fs.s3a.commit.staging.PartitionedStagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.junit.Assume;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
 
 /** ITest of the low level protocol methods. */
 public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
@@ -43,24 +44,24 @@ public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
   protected AbstractS3GuardCommitter createCommitter(
       TaskAttemptContext context)
       throws IOException {
-    return new PartitionedStagingCommitter(outDir, context);
+    return new PartitionedStagingCommitter(getOutDir(), context);
   }
 
   @Override
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new PartitionedStagingCommitter(outDir, context);
+    return new PartitionedStagingCommitter(getOutDir(), context);
   }
 
   @Override
   public AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException {
-    return new CommitterWithFailedThenSucceed(outDir, tContext);
+    return new CommitterWithFailedThenSucceed(getOutDir(), tContext);
   }
 
   @Override
   public void testMapFileOutputCommitter() throws Exception {
-    Assume.assumeTrue("Partioning committer is not suitable for Map Output", false);
+    skip("Partioning committer is not suitable for Map Output");
   }
 
   /**

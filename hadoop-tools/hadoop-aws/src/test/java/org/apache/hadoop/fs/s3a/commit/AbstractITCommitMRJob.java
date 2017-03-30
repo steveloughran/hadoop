@@ -100,7 +100,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   }
 
   /** Test Mapper. */
-  public static class MapClass extends Mapper<LongWritable, Text, LongWritable, Text> {
+  public static class MapClass
+      extends Mapper<LongWritable, Text, LongWritable, Text> {
     @Override
     protected void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
@@ -135,8 +136,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     }
 
     Job mrJob = Job.getInstance(yarn.getConfig(), "test-committer-job");
-    Configuration conf = mrJob.getConfiguration();
-    conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames);
+    Configuration jobConf = mrJob.getConfiguration();
+    jobConf.setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames);
 
 
     mrJob.setOutputFormatClass(LoggingTextOutputFormat.class);
@@ -145,8 +146,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     File mockResultsFile = temp.newFile("committer.bin");
     mockResultsFile.delete();
     String committerPath = "file:" + mockResultsFile;
-    conf.set("mock-results-file", committerPath);
-    conf.set(StagingCommitterConstants.UPLOAD_UUID, commitUUID);
+    jobConf.set("mock-results-file", committerPath);
+    jobConf.set(StagingCommitterConstants.UPLOAD_UUID, commitUUID);
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     FileInputFormat.addInputPath(mrJob,
