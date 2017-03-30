@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
@@ -83,7 +84,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     setConf(context.getConfiguration());
     initOutput(outputPath);
     LOG.debug("{} instantiated for job \"{}\" ID {} with destination {}",
-        role, context.getJobName(), context.getJobID(), outputPath);
+        role, jobName(context), jobIdString(context), outputPath);
     commitActions = new FileCommitActions(getDestS3AFS());
   }
 
@@ -95,7 +96,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected AbstractS3GuardCommitter(Path outputPath,
       JobContext context) throws IOException {
-    this("Job committer " + context.getJobID(), outputPath,context);
+    this("Job committer " + jobIdString(context), outputPath,context);
   }
 
   /**
@@ -112,8 +113,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       TaskAttemptContext context) throws IOException {
     this("Task committer "+ context.getTaskAttemptID(),
         outputPath, (JobContext) context);
-    LOG.debug("{}} instantiated for\"{}\" ID {}",
-        role, context.getJobName(), context.getJobID());
+    LOG.debug("{}} instantiated for {} ID {}",
+        role, jobName(context), jobIdString(context));
   }
 
   /** TESTING ONLY; allows mock FS to cheat. */
@@ -326,7 +327,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   @Override
   public void abortJob(JobContext context, JobStatus.State state)
       throws IOException {
-    LOG.info("{}: abort Job {} in state {}", role, context.getJobID(), state);
+    LOG.info("{}: abort Job {} in state {}", role, jobIdString(context), state);
     cleanupJob(context);
   }
 

@@ -20,12 +20,12 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.PartETag;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.StringUtils;
@@ -418,5 +418,25 @@ public final class CommitUtils {
 
   }
 
+
+  /**
+   * Get a string value of a job ID; returns meaningful text if there is no ID
+   * @param context job context
+   * @return a string for logs
+   */
+  public static String jobIdString(JobContext context) {
+    JobID jobID = context.getJobID();
+    return jobID != null ? jobID.toString() : "(no job ID)";
+  }
+
+  /**
+   * Get a job name; returns meaningful text if there is no ID
+   * @param context job context
+   * @return a string for logs
+   */
+  public static String jobName(JobContext context) {
+    String name = context.getJobName();
+    return (name != null && !name.isEmpty()) ? name : "(anonymous)";
+  }
 
 }

@@ -631,7 +631,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       throw e;
     }
     try (DurationInfo d = new DurationInfo("%s: committing Job %s",
-        role, context.getJobID())) {
+        role, jobIdString(context))) {
       commitJobInternal(context, pending);
     }
     maybeTouchSuccessMarker(context);

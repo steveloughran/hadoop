@@ -94,7 +94,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void setupJob(JobContext context) throws IOException {
     try (DurationInfo d =
-             new DurationInfo("Setup Job %s", context.getJobID())) {
+             new DurationInfo("Setup Job %s", jobIdString(context))) {
       Path jobAttemptPath = getJobAttemptPath(context);
       FileSystem fs = getDestination(jobAttemptPath,
           context.getConfiguration());
@@ -107,7 +107,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public void commitJob(JobContext context) throws IOException {
-    LOG.debug("Committing job {}", context.getJobID());
+    LOG.debug("Committing job {}", jobIdString(context));
     // force a check for the job attempt to exist. If it
     // doesn't then either the job wasn't set up, its finished.
     // or something got in the way
@@ -126,7 +126,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public void cleanupJob(JobContext context) throws IOException {
     try (DurationInfo d =
              new DurationInfo("Aborting outstanding uploads for Job %s",
-        context.getJobID())) {
+                 jobIdString(context))) {
       if (getCommitActions() != null) {
         Path pending = getJobAttemptPath(context);
         FileCommitActions.CommitAllFilesOutcome outcome
@@ -135,7 +135,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       }
     }
     try (DurationInfo d = new DurationInfo("Cleanup job %s",
-        context.getJobID())) {
+        jobIdString(context))) {
       deleteWithWarning(getDestFS(),
           getMagicJobAttemptsPath(getOutputPath()), true);
       deleteWithWarning(getDestFS(),
