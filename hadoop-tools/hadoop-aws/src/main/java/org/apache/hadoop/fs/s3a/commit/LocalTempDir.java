@@ -43,7 +43,7 @@ final class LocalTempDir {
       Configuration conf, String key) {
     if (directoryAllocator != null) {
       String bufferDir = conf.get(key) != null
-          ? key : "hadoop.tmp.dir";
+          ? key : Constants.HADOOP_TMP_DIR;
       directoryAllocator = new LocalDirAllocator(bufferDir);
     }
     return directoryAllocator;
