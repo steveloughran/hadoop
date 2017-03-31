@@ -197,9 +197,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should have one pending commit", 1, pending.size());
     SinglePendingCommit commit = pending.commits.get(0);
     assertEquals("Should write to the correct bucket",
-        BUCKET, commit.getBucketName());
+        BUCKET, commit.bucket);
     assertEquals("Should write to the correct key",
-        OUTPUT_PREFIX + "/" + file.getName(), commit.getKey());
+        OUTPUT_PREFIX + "/" + file.getName(), commit.destinationKey);
 
     assertValidUpload(committer.getResults().getTagsByUpload(), commit);
   }
@@ -264,9 +264,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     Set<String> keys = Sets.newHashSet();
     for (SinglePendingCommit commit : pending) {
       assertEquals("Should write to the correct bucket: " + commit,
-          BUCKET, commit.getBucketName());
+          BUCKET, commit.bucket);
       assertValidUpload(committer.getResults().getTagsByUpload(), commit);
-      keys.add(commit.getKey());
+      keys.add(commit.destinationKey);
     }
 
     assertEquals("Should write to the correct key",
@@ -629,9 +629,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private static void assertValidUpload(Map<String, List<String>> parts,
                                         SinglePendingCommit commit) {
     assertTrue("Should commit a valid uploadId",
-        parts.containsKey(commit.getUploadId()));
+        parts.containsKey(commit.uploadId));
 
-    List<String> tags = parts.get(commit.getUploadId());
+    List<String> tags = parts.get(commit.uploadId);
     assertEquals("Should commit the correct number of file parts",
         tags.size(), commit.size());
 

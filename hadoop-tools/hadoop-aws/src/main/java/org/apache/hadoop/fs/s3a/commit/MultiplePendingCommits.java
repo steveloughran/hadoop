@@ -73,9 +73,14 @@ public class MultiplePendingCommits extends PersistentCommitData {
   public List<SinglePendingCommit> commits;
 
 
+  /**
+   * Add a commit.
+   * @param commit the single commit
+   */
   public void add(SinglePendingCommit commit) {
     commits.add(commit);
   }
+
   /**
    * Any custom extra data committer subclasses may choose to add.
    */

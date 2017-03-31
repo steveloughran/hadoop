@@ -63,8 +63,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testDelayedCompleteIntegrationNotPending() throws Throwable {
     S3AFileSystem fs = getFileSystem();
     DelayedCommitFSIntegration integration
-        = new DelayedCommitFSIntegration(fs,
-        true);
+        = new DelayedCommitFSIntegration(fs, true);
     String filename = "notdelayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
@@ -77,8 +76,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testDelayedCompleteIntegration() throws Throwable {
     S3AFileSystem fs = getFileSystem();
     DelayedCommitFSIntegration integration
-        = new DelayedCommitFSIntegration(fs,
-        true);
+        = new DelayedCommitFSIntegration(fs, true);
     String filename = "delayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
@@ -169,7 +167,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to commit a pending directory that does not exist");
     Path destFile = methodPath("testCommitNonexistentDir");
     newActions()
-        .commitAllPendingFilesInPath(destFile, true);
+        .commitSinglePendingCommits(destFile, true);
   }
 
   @Test(expected = PathCommitException.class)
@@ -178,7 +176,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path destFile = methodPath("testCommitPendingFilesinSimpleFile");
     touch(getFileSystem(), destFile);
     newActions()
-        .commitAllPendingFilesInPath(destFile, true);
+        .commitSinglePendingCommits(destFile, true);
   }
 
   @Test
@@ -188,7 +186,8 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     FileCommitActions.CommitAllFilesOutcome outcome = newActions()
         .abortAllPendingFilesInPath(destFile, true);
     outcome.maybeRethrow();
-    assertEquals(0, outcome.getSucceeded().size());
+    assertFalse("outcome includes successes",
+        outcome.hasOutcome(FileCommitActions.CommitOutcomes.SUCCEEDED));
   }
 
   @Test

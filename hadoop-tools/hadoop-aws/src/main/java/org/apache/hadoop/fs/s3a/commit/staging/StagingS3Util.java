@@ -81,7 +81,7 @@ public final class StagingS3Util {
     try {
       actions.getS3Client().deleteObject(commit.newDeleteRequest());
     } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("revert commit", commit.getKey(), e);
+      throw S3AUtils.translateException("revert commit", commit.destinationKey, e);
     }
   }
 
@@ -97,7 +97,8 @@ public final class StagingS3Util {
     try {
       actions.getS3Client().completeMultipartUpload(commit.newCompleteRequest());
     } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("complete commit", commit.getKey(), e);
+      throw S3AUtils.translateException("complete commit",
+          commit.destinationKey, e);
     }
   }
 
@@ -110,7 +111,7 @@ public final class StagingS3Util {
   public static void abortCommit(FileCommitActions actions,
       SinglePendingCommit pending) throws IOException {
     LOG.debug("Abort {}", pending);
-    abort(actions.getS3Client(), pending.getKey(), pending.newAbortRequest());
+    abort(actions.getS3Client(), pending.destinationKey, pending.newAbortRequest());
   }
 
   /**

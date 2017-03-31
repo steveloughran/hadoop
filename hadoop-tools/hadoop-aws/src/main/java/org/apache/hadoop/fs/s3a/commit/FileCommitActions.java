@@ -76,8 +76,7 @@ public class FileCommitActions {
     // really read it in and parse
     try {
       SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
-      CommitFileOutcome outcome
-          = commit(commit, pendingFile.toString());
+      CommitFileOutcome outcome = commit(commit, pendingFile.toString());
       LOG.debug("Commit outcome: {}", outcome);
       return outcome;
     } finally {
@@ -120,8 +119,7 @@ public class FileCommitActions {
           " described in %s: %s", destKey, origin, e);
       LOG.warn(msg, e);
       outcome = commitFailure(origin, destKey,
-          new PathCommitException(origin.toString(), msg,
-              e));
+          new PathCommitException(origin, msg, e));
     }
     LOG.debug("Commit outcome: {}", outcome);
     return outcome;
@@ -134,11 +132,32 @@ public class FileCommitActions {
    * @return the outcome of all the operations
    * @throws IOException if there is a problem listing the path.
    */
-  public CommitAllFilesOutcome commitAllPendingFilesInPath(Path pendingDir,
-      boolean recursive)
-      throws IOException, FileNotFoundException {
+  public CommitAllFilesOutcome commitSinglePendingCommits(Path pendingDir,
+      boolean recursive) throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
+    LoadResults loadResults = loadSinglePendingCommits(
+        pendingDir, recursive);
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
+    for (SinglePendingCommit singlePendingCommit :
+        loadResults.multiplePendingCommits.commits) {
+      CommitFileOutcome commit = commit(singlePendingCommit,
+          singlePendingCommit.filename);
+      outcome.add(commit);
+    }
+    LOG.info("Committed operations: {}", outcome);
+    return outcome;
+  }
+
+  /**
+   * Locate all files with the pending suffix under a directory.
+   * @param pendingDir directory
+   * @param recursive recursive listing?
+   * @return the list of all located entries
+   * @throws IOException if there is a problem listing the path.
+   */
+  public List<LocatedFileStatus> locateAllSinglePendingCommits(Path pendingDir,
+      boolean recursive) throws IOException {
+    final List<LocatedFileStatus> result = new ArrayList<>();
     FileStatus fileStatus = fs.getFileStatus(pendingDir);
     if (!fileStatus.isDirectory()) {
       throw new PathCommitException(pendingDir,
@@ -151,13 +170,52 @@ public class FileCommitActions {
     }
     while (pendingFiles.hasNext()) {
       LocatedFileStatus next = pendingFiles.next();
-      Path pending = next.getPath();
-      if (pending.getName().endsWith(PENDING_SUFFIX)) {
-        outcome.add(commitPendingFile(pending));
+      if (next.getPath().getName().endsWith(PENDING_SUFFIX) && next.isFile()) {
+        result.add(next);
       }
     }
-    LOG.info("Committed operations: {}", outcome);
-    return outcome;
+    return result;
+  }
+
+  /**
+   * Load all single pending commits in the directory. All load failures are
+   * logged and then added the failures part of the results.
+   * @param pendingDir
+   * @param recursive
+   * @return tuple of loaded entries and those pending files which would
+   * not load/validate.
+   * @throws IOException
+   */
+  public LoadResults loadSinglePendingCommits(Path pendingDir,
+      boolean recursive) throws IOException {
+    List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
+        pendingDir, recursive);
+    MultiplePendingCommits commits = new MultiplePendingCommits(
+        statusList.size());
+    List<LocatedFileStatus> failures = new ArrayList<>(1);
+    for (LocatedFileStatus status : statusList) {
+      try {
+        commits.add(SinglePendingCommit.load(fs, status.getPath()));
+      } catch (IOException | IllegalStateException e) {
+        LOG.warn("Failed to load commit file {}", status.getPath(), e);
+        failures.add(status);
+      }
+    }
+    return new LoadResults(commits, failures);
+  }
+
+  /**
+   * Result tuple.
+   */
+  public static class LoadResults {
+    public final MultiplePendingCommits multiplePendingCommits;
+    public final List<LocatedFileStatus> loadFailures;
+
+    public LoadResults(MultiplePendingCommits multiplePendingCommits,
+        List<LocatedFileStatus> loadFailures) {
+      this.multiplePendingCommits = multiplePendingCommits;
+      this.loadFailures = loadFailures;
+    }
   }
 
   /**
@@ -211,17 +269,20 @@ public class FileCommitActions {
       S3AFileSystem.WriteOperationHelper writer
           = fs.createWriteOperationHelper(destKey);
       writer.abortMultipartCommit(destKey, commit.uploadId);
-      outcome = commitSuccess(origin, destKey);
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED, origin, destKey, null);
     } catch (IllegalArgumentException | IllegalStateException e) {
       String msg = String.format("Failed to abort upload against %s," +
           " described in %s: %s", destKey, origin, e);
       LOG.warn(msg, e);
-      outcome = commitFailure(origin, destKey,
+      // TODO: best way to handle a failure to abort. Treat as a no-op?
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED, origin, destKey,
           new PathCommitException(origin, msg, e));
     } catch (IOException e) {
+      // TODO: again, download to an abort + exception
       LOG.warn("Failed to abort upload against {}," +
           " described in {}", destKey, origin, e);
-      outcome = commitFailure(origin, destKey, e);
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
+          origin, destKey, e);
     }
     return outcome;
   }
@@ -301,7 +362,6 @@ public class FileCommitActions {
   public static class CommitAllFilesOutcome {
     private final List<CommitFileOutcome> outcomes = new ArrayList<>();
     private final List<CommitFileOutcome> succeeded = new ArrayList<>();
-    private final List<CommitFileOutcome> failed = new ArrayList<>();
 
     /**
      * Get the list of succeeded operations.
@@ -317,7 +377,7 @@ public class FileCommitActions {
      * @param destination destination path
      */
     public void success(Path pending, String destination) {
-      succeeded.add(commitSuccess(pending.toString(), destination));
+      outcomes.add(commitSuccess(pending.toString(), destination));
     }
 
     /**
@@ -327,7 +387,7 @@ public class FileCommitActions {
      */
     public void failure(Path pending, String destination,
         IOException exception) {
-      failed.add(commitFailure(pending.toString(), destination, exception));
+      outcomes.add(commitFailure(pending.toString(), destination, exception));
     }
 
     /**
@@ -343,6 +403,16 @@ public class FileCommitActions {
               return input.outcome == expected;
             }
           });
+    }
+
+    /**
+     * Predicate: does the outcome list include an entry of the given type
+     * @param expected expected value
+     * @return true if such an outcome exists
+     */
+    public boolean hasOutcome(final CommitOutcomes expected) {
+      Iterator<CommitFileOutcome> iterator = select(expected).iterator();
+      return iterator.hasNext();
     }
 
     /**

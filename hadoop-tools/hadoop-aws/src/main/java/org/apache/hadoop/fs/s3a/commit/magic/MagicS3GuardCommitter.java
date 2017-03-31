@@ -209,7 +209,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @VisibleForTesting
   FileCommitActions.CommitAllFilesOutcome innerCommitTask(
       TaskAttemptContext context) throws IOException {
-    return getCommitActions().commitAllPendingFilesInPath(
+    return getCommitActions().commitSinglePendingCommits(
         getTaskAttemptPath(context), true);
   }
 

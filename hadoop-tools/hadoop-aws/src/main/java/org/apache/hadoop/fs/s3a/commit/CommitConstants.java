@@ -78,7 +78,13 @@ public final class CommitConstants {
   /**
    * Suffix applied to pending commit data: {@value}.
    */
-  public static final String PENDING_SUFFIX = ".pending";
+  public static final String PENDING_SUFFIX = ".pending-one";
+
+
+  /**
+   * Suffix applied to multiple pending commits data: {@value}.
+   */
+  public static final String PENDING_MANY_SUFFIX = ".pending-many";
 
   /**
    * Flag to trigger creation of a marker file on job completion.

@@ -64,6 +64,9 @@ public class SinglePendingCommit extends PersistentCommitData
   private static JsonSerDeser<SinglePendingCommit> serializer
       = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
 
+  // This type is serialized/deserilized by Jackson: make all the fields visible
+  // to show what is going on.
+
   /**
    * Serialization ID: {@value}.
    */
@@ -72,7 +75,13 @@ public class SinglePendingCommit extends PersistentCommitData
   /** Version marker. */
   public int version = VERSION;
 
-  /** Path URI. */
+  /**
+   * This is the filename of the pending file itself.
+   * Used during processing; it's persistent value, if any, is ignored.
+   */
+  public String filename;
+
+  /** Path URI of the destination. */
   public String uri = "";
 
   /** ID of the upload. */
@@ -248,18 +257,6 @@ public class SinglePendingCommit extends PersistentCommitData
     return new AbortMultipartUploadRequest(bucket, destinationKey, uploadId);
   }
 
-  public String getKey() {
-    return destinationKey;
-  }
-
-  public String getBucketName() {
-    return bucket;
-  }
-
-  public String getUploadId() {
-    return uploadId;
-  }
-
   /**
    * Build the destination path of the object.
    * @return the path
@@ -284,7 +281,6 @@ public class SinglePendingCommit extends PersistentCommitData
     return etags.iterator();
   }
 
-
   /**
    * Load an instance from a file, then validate it.
    * @param fs filesystem
@@ -294,9 +290,10 @@ public class SinglePendingCommit extends PersistentCommitData
    * @throws IllegalStateException if the data is invalid
    */
   public static SinglePendingCommit load(FileSystem fs, Path path)
-      throws IOException {
+      throws IOException, IllegalStateException {
     SinglePendingCommit instance = getSerializer().load(fs, path);
     instance.validate();
+    instance.filename = path.toString();
     return instance;
   }
 
