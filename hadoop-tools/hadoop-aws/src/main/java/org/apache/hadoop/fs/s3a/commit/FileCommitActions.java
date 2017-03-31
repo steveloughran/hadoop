@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +34,7 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
@@ -296,6 +299,7 @@ public class FileCommitActions {
    * Outcome of a commit or abort operation, lists all successes and failures.
    */
   public static class CommitAllFilesOutcome {
+    private final List<CommitFileOutcome> outcomes = new ArrayList<>();
     private final List<CommitFileOutcome> succeeded = new ArrayList<>();
     private final List<CommitFileOutcome> failed = new ArrayList<>();
 
@@ -305,14 +309,6 @@ public class FileCommitActions {
      */
     public List<CommitFileOutcome> getSucceeded() {
       return succeeded;
-    }
-
-    /**
-     * Get the list of failed operations.
-     * @return a possibly empty list.
-     */
-    public List<CommitFileOutcome> getFailed() {
-      return failed;
     }
 
     /**
@@ -335,11 +331,26 @@ public class FileCommitActions {
     }
 
     /**
+     * Select all outcomes of a specific type
+     * @param expected expected outcome
+     * @return an iterator over all values matching the expected type.
+     */
+    public Iterable<CommitFileOutcome> select(final CommitOutcomes expected) {
+      return Iterables.filter(outcomes,
+          new Predicate<CommitFileOutcome>() {
+            @Override
+            public boolean apply(CommitFileOutcome input) {
+              return input.outcome == expected;
+            }
+          });
+    }
+
+    /**
      * Get the total size of the outcome list.
      * @return the size of the list
      */
     public int size() {
-      return succeeded.size() + failed.size();
+      return outcomes.size();
     }
 
     /**
@@ -347,10 +358,15 @@ public class FileCommitActions {
      * @param outcome outcome to add.
      */
     public void add(CommitFileOutcome outcome) {
-      if (outcome.isSucceeded()) {
-        succeeded.add(outcome);
+      outcomes.add(outcome);
+    }
+
+    public CommitFileOutcome firstOutcome(final CommitOutcomes expected) {
+      Iterator<CommitFileOutcome> iterator = select(expected).iterator();
+      if (iterator.hasNext()) {
+        return iterator.next();
       } else {
-        failed.add(outcome);
+        return null;
       }
     }
 
@@ -359,24 +375,19 @@ public class FileCommitActions {
      * @throws IOException the first exception caught.
      */
     public void maybeRethrow() throws IOException {
-      if (!failed.isEmpty()) {
-        failed.get(0).maybeRethrow();
+      CommitFileOutcome failure = firstOutcome(CommitOutcomes.FAILED);
+      if (failure != null) {
+        throw failure.getException();
       }
-    }
-
-    /**
-     * Get the first exception if there was one in the first failure.
-     * This is the same exception which {@link #maybeRethrow()} will throw.
-     * @return an exception or null.
-     */
-    public IOException getFirstException() {
-      return !failed.isEmpty() ? failed.get(0).getException() : null;
     }
 
     @Override
     public String toString() {
-      return String.format("successes=%d failures=%d, total=%d",
-          succeeded.size(), failed.size(), size());
+      final StringBuilder sb = new StringBuilder(
+          "CommitAllFilesOutcome{");
+      sb.append("outcome count=").append(outcomes.size());
+      sb.append('}');
+      return sb.toString();
     }
   }
 
@@ -384,7 +395,7 @@ public class FileCommitActions {
    * Outcome of a commit to a single file.
    */
   public static class CommitFileOutcome {
-    private final boolean succeeded;
+    private final CommitOutcomes outcome;
     private final String origin;
     private final String destination;
     private final IOException exception;
@@ -395,10 +406,7 @@ public class FileCommitActions {
      * @param destination destination of commit
      */
     public CommitFileOutcome(String origin, String destination) {
-      this.succeeded = true;
-      this.destination = destination;
-      this.origin = origin;
-      this.exception = null;
+      this(CommitOutcomes.SUCCEEDED, origin, destination, null);
     }
 
     /**
@@ -410,14 +418,48 @@ public class FileCommitActions {
     public CommitFileOutcome(String origin,
         String destination,
         IOException exception) {
-      this.succeeded = exception == null;
-      this.destination = destination;
+      this(exception == null ?
+              CommitOutcomes.SUCCEEDED : CommitOutcomes.FAILED, origin, destination,
+          exception);
+    }
+
+    public CommitFileOutcome(CommitOutcomes outcome,
+        String origin,
+        String destination,
+        IOException exception) {
+      if (outcome.equals(CommitOutcomes.FAILED)) {
+        Preconditions.checkArgument(exception != null,
+            "no exception for failure");
+      }
+      this.outcome = outcome;
       this.origin = origin;
+      this.destination = destination;
       this.exception = exception;
     }
 
+    public CommitOutcomes getOutcome() {
+      return outcome;
+    }
+
+    public String getDestination() {
+      return destination;
+    }
+
+    /**
+     * Predicate: is this a successful commit operation?
+     * @return true if the outcome was SUCCEEDED.
+     */
     public boolean isSucceeded() {
-      return succeeded;
+      return hasOutcome(CommitOutcomes.SUCCEEDED);
+    }
+
+    /**
+     * Probe for the outcome being the desired one.
+     * @param desired desired outcome.
+     * @return true if the outcome is the desired one
+     */
+    public boolean hasOutcome(CommitOutcomes desired) {
+      return outcome == desired;
     }
 
     public String getOrigin() {
@@ -432,10 +474,10 @@ public class FileCommitActions {
     public String toString() {
       final StringBuilder sb = new StringBuilder(
           "CommitFileOutcome{");
-      sb.append(succeeded ? "success" : "failure");
+      sb.append(outcome);
       sb.append(", destination=").append(destination);
       sb.append(", pendingFile=").append(origin);
-      if (!succeeded) {
+      if (exception != null) {
         sb.append(", exception=").append(exception);
       }
       sb.append('}');
@@ -451,6 +493,13 @@ public class FileCommitActions {
         throw exception;
       }
     }
+  }
+
+  enum CommitOutcomes {
+    SUCCEEDED,
+    FAILED,
+    ABORTED,
+    REVERTED
   }
 
 }
