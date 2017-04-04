@@ -20,6 +20,8 @@
  * The staging committers.
  */
 @InterfaceAudience.Private
+@InterfaceStability.Unstable
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;

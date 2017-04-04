@@ -18,19 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.google.common.collect.Lists;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
-import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.Assume;
-import org.junit.Test;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.JobContext;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,10 +25,23 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.google.common.collect.Lists;
+import org.junit.Assume;
+import org.junit.Test;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.test.LambdaTestUtils;
+
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.mockito.Mockito.*;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /** Test suite.*/
 public class TestStagingPartitionedJobCommit
@@ -118,9 +118,11 @@ public class TestStagingPartitionedJobCommit
     for (String mode : Arrays.asList(null, CONFLICT_MODE_FAIL,
         CONFLICT_MODE_APPEND)) {
       if (mode != null) {
-        getJob().getConfiguration().set(CONFLICT_MODE, mode);
+        getJob().getConfiguration().set(
+            FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, mode);
       } else {
-        getJob().getConfiguration().unset(CONFLICT_MODE);
+        getJob().getConfiguration().unset(
+            FS_S3A_COMMITTER_STAGING_CONFLICT_MODE);
       }
 
       PartitionedStagingCommitter committer = newJobCommitter();
@@ -132,7 +134,7 @@ public class TestStagingPartitionedJobCommit
       // get the right number of delete calls.
       // as this is just the original setup, not worrying about it
 /*      verify(mockS3, times(1)).delete(
-          new Path(OUTPUT_PATH, CommitConstants.PENDING_DIR_NAME), true);
+          new Path(OUTPUT_PATH, PENDING_DIR_NAME), true);
       verifyNoMoreInteractions(mockS3);*/
 
       // parent and peer directories exist
@@ -153,7 +155,8 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testBadConflictMode() throws Throwable {
-    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, "merge");
     assertThrows("commiter conflict", IllegalArgumentException.class,
         "MERGE", this::newJobCommitter);
   }
@@ -162,7 +165,8 @@ public class TestStagingPartitionedJobCommit
   public void testReplace() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     PartitionedStagingCommitter committer = newJobCommitter();
 
@@ -227,7 +231,8 @@ public class TestStagingPartitionedJobCommit
   public void testReplaceWithExistsFailure() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 
@@ -259,7 +264,8 @@ public class TestStagingPartitionedJobCommit
   public void testReplaceWithDeleteFailure() throws Exception {
     FileSystem mockS3 = getMockS3();
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 
@@ -297,7 +303,8 @@ public class TestStagingPartitionedJobCommit
     Assume.assumeTrue("not needed", false);
     FileSystem mockS3 = getMockS3();
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final PartitionedStagingCommitter committer = newJobCommitter();
 

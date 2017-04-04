@@ -35,7 +35,7 @@ public class ITestS3AHugeFilesClassicOutput extends AbstractSTestS3AHugeFiles {
     conf.setBoolean(Constants.FAST_UPLOAD, false);
     // turn off magic committer if it was on, as that will force the
     // FS into using the fast upload stream again
-    conf.setBoolean(CommitConstants.COMMITTER_ENABLED, false);
+    conf.setBoolean(CommitConstants.MAGIC_COMMITTER_ENABLED, false);
     return conf;
   }
 

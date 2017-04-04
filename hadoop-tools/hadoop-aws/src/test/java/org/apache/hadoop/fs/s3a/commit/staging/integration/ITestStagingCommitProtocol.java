@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
 import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.fs.s3a.commit.staging.Paths;
@@ -31,10 +34,7 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
-import java.io.IOException;
-
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
 /** ITest of the low level protocol methods. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
@@ -48,7 +48,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
 //    conf.setBoolean(COMMITTER_ENABLED, false);
-    conf.setInt(COMMITTER_THREADS, 1);
+    conf.setInt(CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         DIRECTORY_COMMITTER_FACTORY);
     // disable unique filenames so that the protocol tests of FileOutputFormat

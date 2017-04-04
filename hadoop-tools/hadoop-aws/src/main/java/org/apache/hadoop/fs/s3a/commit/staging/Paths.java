@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.IOException;
+import java.net.URI;
+import java.util.Random;
+
 import com.google.common.base.Objects;
 
 import org.apache.hadoop.conf.Configuration;
@@ -27,10 +31,6 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import java.io.IOException;
-import java.net.URI;
-import java.util.Random;
 
 /**
  * Path operations for the staging committers.

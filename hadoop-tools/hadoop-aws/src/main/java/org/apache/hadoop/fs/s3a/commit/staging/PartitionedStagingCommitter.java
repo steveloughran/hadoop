@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+
 import com.google.common.collect.Sets;
-import org.apache.hadoop.fs.PathIsDirectoryException;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,12 +30,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
+import org.apache.hadoop.fs.PathIsDirectoryException;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Partitioned committer.

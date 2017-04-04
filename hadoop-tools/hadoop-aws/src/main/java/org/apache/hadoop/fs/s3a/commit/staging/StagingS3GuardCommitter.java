@@ -18,34 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.PathIOException;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.s3a.commit.CommitUtils;
-import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
-import org.apache.hadoop.mapreduce.JobID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
-import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.JobStatus;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -57,10 +29,39 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.apache.hadoop.fs.s3a.commit.CommitUtils;
+import org.apache.hadoop.fs.s3a.commit.DurationInfo;
+import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
+
+import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
-
 
 /**
  * Committer based on the contributed work of the
@@ -128,11 +129,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     constructorOutputPath = getOutputPath();
     Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
-    this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
+    this.uploadPartSize = getMultipartSizeProperty(conf,
+        MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
-    this.uniqueFilenames = conf.getBoolean(COMMITTER_UNIQUE_FILENAMES,
+    this.uniqueFilenames = conf.getBoolean(
+        FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
         DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
     this.wrappedCommitter = createWrappedCommitter(context, conf);
@@ -151,12 +154,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     constructorOutputPath = getOutputPath();
     Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
-    this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
+    this.uploadPartSize = getMultipartSizeProperty(conf,
+        MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
-    this.uniqueFilenames = conf.getBoolean(COMMITTER_UNIQUE_FILENAMES,
-        DEFAULT_COMMITTER_UNIQUE_FILENAMES);
+    this.uniqueFilenames = conf.getBoolean(
+        CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
+        CommitConstants.DEFAULT_COMMITTER_UNIQUE_FILENAMES);
     setWorkPath(buildWorkPath(context, uuid));
     this.wrappedCommitter = createWrappedCommitter(context, conf);
     postCreationActions();
@@ -234,10 +239,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return an ID for use in paths.
    */
   public static String getUploadUUID(Configuration conf, String jobId) {
-    return conf.getTrimmed(UPLOAD_UUID,
+    return conf.getTrimmed(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID,
         conf.get(SPARK_WRITE_UUID,
             conf.getTrimmed(SPARK_APP_ID, jobId)));
   }
+
   /**
    * Get the UUID of an upload; may be the job ID.
    * @param conf job/task configuration
@@ -446,7 +452,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * <p>
    * This implementation concatenates the relative path with the key prefix
    * from the output path.
-   * If {@link StagingCommitterConstants#COMMITTER_UNIQUE_FILENAMES} is
+   * If {@link CommitConstants#FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES} is
    * set, then the task UUID is also included in the calculation
    *
    * @param relative the path of a file relative to the task attempt path
@@ -527,7 +533,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void setupJob(JobContext context) throws IOException {
     LOG.debug("{}, Setting up job {}", getRole(), jobIdString(context));
-    context.getConfiguration().set(UPLOAD_UUID, uuid);
+    context.getConfiguration().set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, uuid);
     wrappedCommitter.setupJob(context);
   }
 
@@ -1114,7 +1120,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   protected final ExecutorService getThreadPool(JobContext context) {
     if (threadPool == null) {
       int numThreads = context.getConfiguration().getInt(
-          COMMITTER_THREADS, DEFAULT_COMMITTER_THREADS);
+          CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS, CommitConstants.DEFAULT_STAGING_COMMITTER_THREADS);
       LOG.debug("{}: creating thread pool of size {}", getRole(), numThreads);
       if (numThreads > 0) {
         this.threadPool = Executors.newFixedThreadPool(numThreads,
@@ -1165,7 +1171,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public static String getConfictModeOption(JobContext context) {
     return context
         .getConfiguration()
-        .getTrimmed(CONFLICT_MODE, DEFAULT_CONFLICT_MODE)
+        .getTrimmed(CommitConstants.FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CommitConstants.DEFAULT_CONFLICT_MODE)
         .toUpperCase(Locale.ENGLISH);
   }
 }

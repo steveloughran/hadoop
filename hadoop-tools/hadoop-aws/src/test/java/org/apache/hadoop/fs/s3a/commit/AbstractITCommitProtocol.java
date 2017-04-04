@@ -18,7 +18,19 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import com.amazonaws.services.s3.model.MultipartUpload;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -50,23 +62,15 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
-import static org.apache.hadoop.test.LambdaTestUtils.*;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.CallOnLocatedFileStatus;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.TEMP_FILE_FILTER;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.iterateOverFiles;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.lsR;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
+import static org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
  * Test the job/task commit actions of an S3A Committer, including trying to
@@ -926,7 +930,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
       AbstractS3GuardCommitter committer) throws Exception {
-    ((FaultInjection)committer).setFaults(FaultInjection.Faults.commitJob);
+    ((FaultInjection) committer).setFaults(FaultInjection.Faults.commitJob);
     expectJobCommitFailure(jContext, committer,
         FaultInjectionImpl.Failure.class);
   }
@@ -1145,7 +1149,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     try {
       Path p = getPart0000(dir);
       // bad
-      fail("Unexpectedly found generated part-0000 output file "  + p);
+      fail("Unexpectedly found generated part-0000 output file " + p);
     } catch (FileNotFoundException e) {
       // good
     }

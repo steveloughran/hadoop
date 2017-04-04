@@ -18,6 +18,15 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Serializable;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
@@ -31,6 +40,13 @@ import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
@@ -50,21 +66,6 @@ import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.service.ServiceOperations;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.Serializable;
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 import static org.mockito.Matchers.*;
@@ -264,7 +265,7 @@ public class StagingTestBase {
     @Before
     public void setupJob() throws Exception {
       this.jobConf = new JobConf();
-      jobConf.set(StagingCommitterConstants.UPLOAD_UUID,
+      jobConf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID,
           UUID.randomUUID().toString());
       jobConf.setBoolean(
           CommitConstants.CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,

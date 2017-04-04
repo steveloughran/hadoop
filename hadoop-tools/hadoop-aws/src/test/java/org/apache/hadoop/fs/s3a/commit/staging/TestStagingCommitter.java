@@ -18,32 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
-import com.google.common.collect.Sets;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.AWSClientIOException;
-import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.apache.hadoop.mapreduce.JobID;
-import org.apache.hadoop.mapreduce.JobStatus;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
-import org.apache.hadoop.mapreduce.TaskID;
-import org.apache.hadoop.mapreduce.TaskType;
-import org.apache.hadoop.mapreduce.task.JobContextImpl;
-import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -56,6 +30,36 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
+import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.google.common.collect.Sets;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.AWSClientIOException;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.JobStatus;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.hadoop.mapreduce.task.JobContextImpl;
+import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+
+import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.Paths.*;
@@ -101,9 +105,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
   @Before
   public void setupCommitter() throws Exception {
-    getConfiguration().setInt(COMMITTER_THREADS, numThreads);
-    getConfiguration().setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames);
-    getConfiguration().set(UPLOAD_UUID, UUID.randomUUID().toString());
+    getConfiguration().setInt(FS_S3A_COMMITTER_STAGING_THREADS, numThreads);
+    getConfiguration().setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
+        uniqueFilenames);
+    getConfiguration().set(FS_S3A_COMMITTER_STAGING_UUID,
+        UUID.randomUUID().toString());
 
     this.job = new JobContextImpl(getConfiguration(), JOB_ID);
     this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job);
@@ -116,7 +122,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.conf = tac.getConfiguration();
     // TODO: is this the right path
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
-    conf.setInt(UPLOAD_SIZE, 100);
+    conf.set(MULTIPART_SIZE, "5M");
 
     this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
   }
@@ -125,7 +131,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public void testAttemptPathConstruction() throws Exception {
     Configuration config = new Configuration();
     String jobUUID = UUID.randomUUID().toString();
-    config.set(UPLOAD_UUID, jobUUID);
+    config.set(FS_S3A_COMMITTER_STAGING_UUID, jobUUID);
 
     final int taskId = StagingS3GuardCommitter.getTaskId(tac);
     final int attemptId = StagingS3GuardCommitter.getAttemptId(tac);

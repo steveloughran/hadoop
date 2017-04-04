@@ -18,12 +18,9 @@
 
 package org.apache.hadoop.fs.s3a.commit.magic;
 
+import java.io.IOException;
+
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.CommitUtils;
-import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
-import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,10 +28,13 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitUtils;
+import org.apache.hadoop.fs.s3a.commit.DurationInfo;
+import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
+import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-
-import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
@@ -166,7 +166,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
 
   /**
    * Probe for a task existing by looking to see if the attempt dir exists.
-   * This adds 4 HTTP requests to the call. It may be better just to
+   * This adds four HTTP requests to the call. It may be better just to
    * return true and rely on the commit task doing the work.
    * @param context task context
    * @param taskAttemptPath path to the attempt
@@ -213,6 +213,13 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
         getTaskAttemptPath(context), true);
   }
 
+  /**
+   * Abort a task. Attempt load then abort all pending files,
+   * then try to delete the task attempt path.
+   * @param context task context
+   * @throws IOException if there was some problem querying the path other
+   * than it not actually existing.
+   */
   @Override
   public void abortTask(TaskAttemptContext context) throws IOException {
     Path attemptPath = getTaskAttemptPath(context);
@@ -221,10 +228,8 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       FileCommitActions.CommitAllFilesOutcome outcome
           = getCommitActions().abortAllPendingFilesInPath(
           attemptPath, true);
-      outcome.maybeRethrow();
     } finally {
       deleteQuietly(getDestFS(), attemptPath, true);
-      deleteQuietly(getDestFS(), getTempTaskAttemptPath(context), true);
     }
   }
 

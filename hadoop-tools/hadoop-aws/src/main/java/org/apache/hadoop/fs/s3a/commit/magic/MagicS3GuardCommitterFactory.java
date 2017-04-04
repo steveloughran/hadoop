@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.fs.s3a.commit.magic;
 
-import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
-import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
-import org.apache.hadoop.mapreduce.JobContext;
+import java.io.IOException;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-
-import java.io.IOException;
+import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 
 /**
  * Creates the Magic committer.
@@ -39,12 +39,14 @@ public class MagicS3GuardCommitterFactory
   public static final String NAME
       = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory";
 
-  protected AbstractS3GuardCommitter createTaskCommitter(Path outputPath,
+  public PathOutputCommitter createTaskCommitter(S3AFileSystem fileSystem,
+      Path outputPath,
       TaskAttemptContext context) throws IOException {
     return new MagicS3GuardCommitter(outputPath, context);
   }
 
-  protected AbstractS3GuardCommitter createJobCommitter(Path outputPath,
+  public PathOutputCommitter createJobCommitter(S3AFileSystem fileSystem,
+      Path outputPath,
       JobContext context) throws IOException {
     return new MagicS3GuardCommitter(outputPath, context);
   }

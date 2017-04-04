@@ -18,7 +18,16 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
+
 import com.amazonaws.services.s3.model.MultipartUpload;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -29,14 +38,6 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.util.Progressable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.URI;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Relays FS calls to the mocked FS, allows for some extra logging with

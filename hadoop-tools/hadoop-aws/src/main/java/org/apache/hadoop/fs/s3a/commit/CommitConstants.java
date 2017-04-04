@@ -36,24 +36,17 @@ public final class CommitConstants {
   }
 
   /**
-   * Flag to indicate whether the S3 committer is enabled, and
-   * so {@code create()} calls under the path {@link #MAGIC_DIR_NAME} will
-   * be converted to pending commit operations.
+   * Flag to indicate whether support for the Magic committer is enabled
+   * in the filesystem.
    * Value: {@value}.
    */
-  public static final String COMMITTER_ENABLED
-      = "fs.s3a.committer.enabled";
+  public static final String MAGIC_COMMITTER_ENABLED
+      = "fs.s3a.committer.magic.enabled";
 
   /**
    * Is the committer enabled by default? No.
    */
-  public static final boolean DEFAULT_COMMITTER_ENABLED = false;
-
-  /**
-   * Path for "magic" pending writes: path and {@link #PENDING_SUFFIX} files:
-   * {@value}.
-   */
-  public static final String MAGIC_DIR_NAME = "__magic";
+  public static final boolean DEFAULT_MAGIC_COMMITTER_ENABLED = false;
 
   /**
    * This is the "Pending" directory of the FileOutputCommitter;
@@ -63,28 +56,11 @@ public final class CommitConstants {
   public static final String PENDING_DIR_NAME = "_temporary";
 
   /**
-   * Marker of the start of a directory tree for calculating
-   * the final path names: {@value}.
-   */
-  public static final String BASE_PATH = "__base";
-
-  /**
    * Temp data which is not auto-committed: {@value}.
    * Uses a different name from normal just to make clear it is different.
    */
   public static final String TEMP_DATA_PATH = "__temp-data";
 
-
-  /**
-   * Suffix applied to pending commit data: {@value}.
-   */
-  public static final String PENDING_SUFFIX = ".pending-one";
-
-
-  /**
-   * Suffix applied to multiple pending commits data: {@value}.
-   */
-  public static final String PENDING_MANY_SUFFIX = ".pending-many";
 
   /**
    * Flag to trigger creation of a marker file on job completion.
@@ -100,10 +76,122 @@ public final class CommitConstants {
   /** Default job marker option: {@value}. */
   public static final boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
 
-  public static final String MAGIC_COMMITTER_FACTORY =
-      MagicS3GuardCommitterFactory.NAME;
+  /**
+   * Directory committer: {@value}.
+   */
   public static final String DIRECTORY_COMMITTER_FACTORY =
       DirectoryStagingCommitterFactory.NAME;
+
+  /**
+   * Partitioned committer: {@value}.
+   */
   public static final String PARTITION_COMMITTER_FACTORY =
       PartitonedStagingCommitterFactory.NAME;
+
+  /**
+   * Dynamic committer: {@value}.
+   */
+  public static final String DYNAMIC_COMMITTER_FACTORY =
+      DynamicCommitterFactory.NAME;
+
+  /**
+   * Magic committer: {@value}.
+   */
+  public static final String MAGIC_COMMITTER_FACTORY =
+      MagicS3GuardCommitterFactory.NAME;
+
+  /**
+   * Property to identify the S3a committer when the dynamic committer is used:
+   * {@value}.
+   */
+  public static final String FS_S3A_COMMITTER_NAME =
+      "fs.s3a.committer.name";
+
+  /**
+   * Option for {@link #FS_S3A_COMMITTER_NAME}:
+   * classic/file output committer: {@value}.
+   */
+  public static final String COMMITTER_NAME_FILE = "file";
+
+  /**
+   * Option for {@link #FS_S3A_COMMITTER_NAME}:
+   * magic output committer: {@value}.
+   */
+  public static final String COMMITTER_NAME_MAGIC = "magic";
+
+  /**
+   * Option for {@link #FS_S3A_COMMITTER_NAME}:
+   * directory output committer: {@value}.
+   */
+  public static final String COMMITTER_NAME_DIRECTORY = "directory";
+
+  /**
+   * Option for {@link #FS_S3A_COMMITTER_NAME}:
+   * partition output committer: {@value}.
+   */
+  public static final String COMMITTER_NAME_PARTITION = "partition";
+
+  /**
+   * Default option for {@link #FS_S3A_COMMITTER_NAME}: {@value}.
+   * This is <i>initially the classic one; it may change in future.</i>
+   */
+  public static final String COMMITTER_NAME_DEFAULT
+      = COMMITTER_NAME_FILE;
+
+  /**
+   * Option for final files to have uniqueness through uuid or attempt info:
+   * {@value}.
+   * Can be used for conflict resolution, but it also means that the filenames
+   * of output may not always be predictable in advance.
+   */
+  public static final String FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES =
+      "fs.s3a.committer.staging.unique-filenames";
+  /**
+   * Default value for {@link #FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES}:
+   * {@value}.
+   */
+  public static final boolean DEFAULT_COMMITTER_UNIQUE_FILENAMES = false;
+
+  /**
+   * A unique identifier to use for this work: {@value}.
+   */
+  public static final String FS_S3A_COMMITTER_STAGING_UUID =
+      "fs.s3a.committer.staging.uuid";
+
+  /**
+   * Conflict mode resolution policy: {@value}.
+   */
+  public static final String FS_S3A_COMMITTER_STAGING_CONFLICT_MODE =
+      "fs.s3a.committer.staging.conflict-mode";
+
+  /** Conflict mode: {@value}. */
+  public static final String CONFLICT_MODE_FAIL = "fail";
+
+  /** Default conflict mode: {@value}. */
+  public static final String DEFAULT_CONFLICT_MODE = CONFLICT_MODE_FAIL;
+
+  /** Conflict mode: {@value}. */
+  public static final String CONFLICT_MODE_APPEND = "append";
+
+  /** Conflict mode: {@value}. */
+  public static final String CONFLICT_MODE_REPLACE = "replace";
+
+  /**
+   * Number of threads in staging committers for parallel operations
+   * (upload, commit, abort): {@value}.
+   */
+  public static final String FS_S3A_COMMITTER_STAGING_THREADS =
+      "fs.s3a.committer.staging.threads";
+  /**
+   * Default value for {@link #FS_S3A_COMMITTER_STAGING_THREADS}: {@value}.
+   */
+  public static final int DEFAULT_STAGING_COMMITTER_THREADS = 8;
+
+  /**
+   * Path for pending data in the cluster FS: {@value}.
+   * TODO: Support this somehow (i.e. not just /tmp)
+   */
+  public static final String FS_S3A_COMMITTER_STAGING_PENDING_PATH =
+      "fs.s3a.committer.staging.pending.path";
+
 }

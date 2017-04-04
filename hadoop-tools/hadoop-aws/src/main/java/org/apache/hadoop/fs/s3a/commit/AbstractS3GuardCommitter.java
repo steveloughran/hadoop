@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -27,10 +28,10 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
+
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
@@ -241,7 +242,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     final StringBuilder sb = new StringBuilder(
         "AbstractS3GuardCommitter{");
     sb.append("role=").append(role);
-    sb.append("outputPath=").append(getOutputPath());
+    sb.append(", outputPath=").append(getOutputPath());
     sb.append(", workPath=").append(workPath);
     sb.append('}');
     return sb.toString();

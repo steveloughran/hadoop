@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.List;
+
 import com.amazonaws.services.s3.model.PartETag;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,19 +31,17 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.List;
-
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -117,15 +117,16 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     FileCommitActions actions = newActions();
     // abort,; rethrow on failure
     LOG.info("First abort call");
-    actions.abortPendingFile(pendingDataPath, true).maybeRethrow();
+    actions.abortPendingFile(pendingDataPath).maybeRethrow();
     assertPathDoesNotExist("pending file not deleted", pendingDataPath);
     assertPathDoesNotExist("dest file was created", destFile);
 
     // and again. here uprating a missing file to a failure
     LOG.info("Second abort call");
     FileCommitActions.CommitFileOutcome outcome = actions.abortPendingFile(
-        pendingDataPath, false);
-    assertFalse("Expected 2nd abort to fail " + outcome, outcome.isSucceeded());
+        pendingDataPath);
+    assertTrue("Expected 2nd abort to fail to ABORT_FAILED " + outcome,
+        outcome.hasOutcome(FileCommitActions.CommitOutcomes.ABORT_FAILED));
     if (!(outcome.getException() instanceof FileNotFoundException)) {
       outcome.maybeRethrow();
     }
@@ -147,7 +148,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   private static Path makePendingChild(Path destFile, String name) {
     return new Path(destFile.getParent(),
-        MAGIC_DIR_NAME + '/' + name);
+        MagicCommitterConstants.MAGIC_DIR_NAME + '/' + name);
   }
 
   @Test
@@ -195,7 +196,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to abort a directory that does not exist");
     Path destFile = methodPath("testAbortNonexistentFile");
     FileCommitActions.CommitFileOutcome outcome =
-        newActions().abortPendingFile(destFile, true);
+        newActions().abortPendingFile(destFile);
     assertTrue("succeeded: " + outcome, outcome.isSucceeded());
   }
 
@@ -217,7 +218,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testBaseRelativePath() throws Throwable {
     Path destDir = methodPath("testBaseRelativePath");
     Path pendingBaseDir = new Path(destDir,
-        MAGIC_DIR_NAME + "/child/" + BASE_PATH);
+        MagicCommitterConstants.MAGIC_DIR_NAME + "/child/" + MagicCommitterConstants.BASE_PATH);
     String child = "subdir/child.txt";
     Path pendingChildPath = new Path(pendingBaseDir, child);
     Path expectedDestPath = new Path(destDir, child);
@@ -279,7 +280,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
       Path pendingFilePath) throws IOException {
     S3AFileSystem fs = getFileSystem();
     Path pendingDataPath = new Path(pendingFilePath.getParent(),
-        filename + PENDING_SUFFIX);
+        filename + MagicCommitterConstants.PENDING_SUFFIX);
     FileStatus fileStatus = verifyPathExists(fs, "no pending data",
         pendingDataPath);
     assertTrue("No data in " + fileStatus, fileStatus.getLen() > 0);

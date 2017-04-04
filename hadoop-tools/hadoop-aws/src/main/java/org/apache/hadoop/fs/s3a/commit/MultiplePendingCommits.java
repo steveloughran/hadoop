@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.JsonSerDeser;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
@@ -32,7 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.JsonSerDeser;
+
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
+import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
 
 /**
  * Persistent format for multiple pending commits.
@@ -40,17 +40,6 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClas
  * checks those values on load.
  */
 public class MultiplePendingCommits extends PersistentCommitData {
-
-  public MultiplePendingCommits() {
-    this(0);
-  }
-
-  public MultiplePendingCommits(int size) {
-    commits = new ArrayList<>(size);
-  }
-
-  private static JsonSerDeser<MultiplePendingCommits> serializer
-      = new JsonSerDeser<>(MultiplePendingCommits.class, false, true);
 
   /**
    * Supported version value: {@value}.
@@ -64,6 +53,13 @@ public class MultiplePendingCommits extends PersistentCommitData {
    */
   private static final long serialVersionUID = 0x11000 + VERSION;
 
+
+  /**
+   * Serializer for the operation.
+   */
+  private static final JsonSerDeser<MultiplePendingCommits> SERIALIZER
+      = new JsonSerDeser<>(MultiplePendingCommits.class, false, true);
+
   /** Version marker. */
   public int version = VERSION;
 
@@ -72,6 +68,42 @@ public class MultiplePendingCommits extends PersistentCommitData {
    */
   public List<SinglePendingCommit> commits;
 
+  /**
+   * Any custom extra data committer subclasses may choose to add.
+   */
+  public Map<String, String> extraData = new HashMap<>(0);
+
+  public MultiplePendingCommits() {
+    this(0);
+  }
+
+
+  public MultiplePendingCommits(int size) {
+    commits = new ArrayList<>(size);
+  }
+
+  /**
+   * Get the singleton JSON serializer for this class.
+   * @return the serializer.
+   */
+  public static JsonSerDeser<MultiplePendingCommits> getSerializer() {
+    return SERIALIZER;
+  }
+
+  /**
+   * Load an instance from a file, then validate it.
+   * @param fs filesystem
+   * @param path path
+   * @return the loaded instance
+   * @throws IOException IO failure
+   * @throws ValidationFailure if the data is invalid
+   */
+  public static MultiplePendingCommits load(FileSystem fs, Path path)
+      throws IOException {
+    MultiplePendingCommits instance = getSerializer().load(fs, path);
+    instance.validate();
+    return instance;
+  }
 
   /**
    * Add a commit.
@@ -82,18 +114,12 @@ public class MultiplePendingCommits extends PersistentCommitData {
   }
 
   /**
-   * Any custom extra data committer subclasses may choose to add.
-   */
-  public Map<String, String> extraData = new HashMap<>(0);
-
-  /**
    * Deserialize via java Serialization API: deserialize the instance
    * and then call {@link #validate()} to verify that the deserialized
    * data is valid.
    * @param inStream input stream
-   * @throws IOException IO problem
+   * @throws IOException IO problem or validation failure
    * @throws ClassNotFoundException reflection problems
-   * @throws IllegalStateException validation failure
    */
   private void readObject(ObjectInputStream inStream) throws IOException,
       ClassNotFoundException {
@@ -103,10 +129,10 @@ public class MultiplePendingCommits extends PersistentCommitData {
 
   /**
    * Validate the data: those fields which must be non empty, must be set.
-   * @throws IllegalStateException if the data is invalid
+   * @throws ValidationFailure if the data is invalid
    */
-  public void validate() {
-    Preconditions.checkState(version == VERSION, "Wrong version: %s", version);
+  public void validate() throws ValidationFailure {
+    verify(version == VERSION, "Wrong version: %s", version);
     if (extraData != null) {
       validateCollectionClass(extraData.keySet(), String.class);
       validateCollectionClass(extraData.values(), String.class);
@@ -115,7 +141,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
     validateCollectionClass(commits, SinglePendingCommit.class);
     for (SinglePendingCommit c : commits) {
       c.validate();
-      Preconditions.checkArgument(!destinations.contains(c.destinationKey),
+      verify(!destinations.contains(c.destinationKey),
           "Destination %s is written to by more than one pending commit",
           c.destinationKey);
       destinations.add(c.destinationKey);
@@ -125,14 +151,13 @@ public class MultiplePendingCommits extends PersistentCommitData {
 
   @Override
   public byte[] toBytes() throws IOException {
-    return serializer.toBytes(this);
+    return SERIALIZER.toBytes(this);
   }
 
   /**
    * Number of commits.
    * @return the number of commits in this structure.
    */
-
   public int size() {
     return commits != null ? commits.size() : 0;
   }
@@ -140,29 +165,6 @@ public class MultiplePendingCommits extends PersistentCommitData {
   @Override
   public void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException {
-    serializer.save(fs, path, this, overwrite);
-  }
-
-  /**
-   * Get the singleton JSON serializer for this class.
-   * @return the serializer.
-   */
-  public static JsonSerDeser<MultiplePendingCommits> getSerializer() {
-    return serializer;
-  }
-
-  /**
-   * Load an instance from a file, then validate it.
-   * @param fs filesystem
-   * @param path path
-   * @return the loaded instance
-   * @throws IOException IO failure
-   * @throws IllegalStateException if the data is invalid
-   */
-  public static MultiplePendingCommits load(FileSystem fs, Path path)
-      throws IOException {
-    MultiplePendingCommits instance = getSerializer().load(fs, path);
-    instance.validate();
-    return instance;
+    SERIALIZER.save(fs, path, this, overwrite);
   }
 }

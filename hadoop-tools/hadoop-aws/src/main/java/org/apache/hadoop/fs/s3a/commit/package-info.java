@@ -24,6 +24,5 @@
 @InterfaceStability.Unstable
 package org.apache.hadoop.fs.s3a.commit;
 
-
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;

@@ -45,8 +45,7 @@ public class MiniDFSTestCluster extends AbstractService {
   protected FileSystem getFS() {
     return localFS;
   }
-
-
+  
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     conf.setBoolean("dfs.webhdfs.enabled", false);

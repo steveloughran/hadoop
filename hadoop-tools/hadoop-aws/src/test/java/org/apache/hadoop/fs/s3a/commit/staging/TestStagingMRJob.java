@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.google.common.collect.Sets;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -136,8 +137,8 @@ public class TestStagingMRJob extends StagingTestBase.MiniDFSTest {
     mockResultsFile.delete();
     String committerPath = "file:" + mockResultsFile;
     conf.set("mock-results-file", committerPath);
-    conf.set(StagingCommitterConstants.UPLOAD_UUID, commitUUID);
-    conf.setBoolean(StagingCommitterConstants.COMMITTER_UNIQUE_FILENAMES, true);
+    conf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, commitUUID);
+    conf.setBoolean(CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES, true);
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     TextInputFormat.addInputPath(mrJob,

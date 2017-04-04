@@ -18,26 +18,27 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import com.google.common.collect.Lists;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.Path;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static org.apache.hadoop.test.LambdaTestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Tests for {@link CommitUtils} methods.
  */
 public class TestCommitUtils extends Assert {
 
-  private static final List<String> PENDING_AT_ROOT = list(MAGIC_DIR_NAME);
+  private static final List<String> PENDING_AT_ROOT =
+      list(MAGIC_DIR_NAME);
   private static final List<String> PENDING_AT_ROOT_WITH_CHILD =
       list(MAGIC_DIR_NAME, "child");
   private static final List<String> PENDING_WITH_CHILD =

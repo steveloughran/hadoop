@@ -18,6 +18,12 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -30,15 +36,10 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
-import static org.apache.hadoop.fs.s3a.S3AUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
+import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
 
 /**
  * The implementation of the various actions a committer needs.
@@ -170,7 +171,8 @@ public class FileCommitActions {
     }
     while (pendingFiles.hasNext()) {
       LocatedFileStatus next = pendingFiles.next();
-      if (next.getPath().getName().endsWith(PENDING_SUFFIX) && next.isFile()) {
+      if (next.getPath().getName().endsWith(
+          MagicCommitterConstants.PENDING_SUFFIX) && next.isFile()) {
         result.add(next);
       }
     }
@@ -180,11 +182,11 @@ public class FileCommitActions {
   /**
    * Load all single pending commits in the directory. All load failures are
    * logged and then added the failures part of the results.
-   * @param pendingDir
-   * @param recursive
+   * @param pendingDir directory containing commits
+   * @param recursive do a recursive scan?
    * @return tuple of loaded entries and those pending files which would
    * not load/validate.
-   * @throws IOException
+   * @throws IOException on a failure to list the files.
    */
   public LoadResults loadSinglePendingCommits(Path pendingDir,
       boolean recursive) throws IOException {
@@ -196,7 +198,7 @@ public class FileCommitActions {
     for (LocatedFileStatus status : statusList) {
       try {
         commits.add(SinglePendingCommit.load(fs, status.getPath()));
-      } catch (IOException | IllegalStateException e) {
+      } catch (IOException e) {
         LOG.warn("Failed to load commit file {}", status.getPath(), e);
         failures.add(status);
       }
@@ -223,12 +225,9 @@ public class FileCommitActions {
    * This operation is designed to always
    * succeed; failures are caught and logged.
    * @param pendingFile path
-   * @param ignoreLoadFailure treat FNFEs and other load failures as commit
-   * successes anyway.
    * @return the outcome
    */
-  public CommitFileOutcome abortPendingFile(Path pendingFile,
-      boolean ignoreLoadFailure) {
+  public CommitFileOutcome abortPendingFile(Path pendingFile) {
     CommitFileOutcome outcome;
     String destKey = null;
     String origin = pendingFile.toString();
@@ -238,14 +237,9 @@ public class FileCommitActions {
       destKey = commit.destinationKey;
       outcome = abort(pendingFile.toString(), commit);
     } catch (IOException e) {
-      // file isn't found, log
-      LOG.info("File {} not found; no operation to abort", origin);
-      if (ignoreLoadFailure) {
-        LOG.debug("Ignoring missing file; marking as success");
-        outcome = commitSuccess(origin, destKey);
-      } else {
-        outcome = commitFailure(origin, destKey, e);
-      }
+      // abort failed to load/validate
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
+          origin, null, e);
     } finally {
       deleteQuietly(fs, pendingFile, false);
     }
@@ -253,10 +247,11 @@ public class FileCommitActions {
   }
 
   /**
-   * Abort a pending commit.
-   * This operation is designed to always
-   * succeed; failures are caught and logged.
-   * @param pendingFile path
+   * Abort a pending commit, returning an outcome of type
+   * {@link CommitOutcomes#ABORTED} describing the operation.
+   * Failures are caught and result in an outcome of the type
+   * {@link CommitOutcomes#ABORT_FAILED}
+   * @param origin origin of data
    * @return the outcome
    */
   public CommitFileOutcome abort(String origin,
@@ -269,20 +264,16 @@ public class FileCommitActions {
       S3AFileSystem.WriteOperationHelper writer
           = fs.createWriteOperationHelper(destKey);
       writer.abortMultipartCommit(destKey, commit.uploadId);
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED, origin, destKey, null);
-    } catch (IllegalArgumentException | IllegalStateException e) {
-      String msg = String.format("Failed to abort upload against %s," +
-          " described in %s: %s", destKey, origin, e);
-      LOG.warn(msg, e);
-      // TODO: best way to handle a failure to abort. Treat as a no-op?
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED, origin, destKey,
-          new PathCommitException(origin, msg, e));
-    } catch (IOException e) {
-      // TODO: again, download to an abort + exception
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
+          origin, destKey, null);
+    } catch (IOException | IllegalArgumentException e) {
+      // download to an abort + exception
       LOG.warn("Failed to abort upload against {}," +
           " described in {}", destKey, origin, e);
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
-          origin, destKey, e);
+      outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
+          origin, destKey,
+          e instanceof IOException ? (IOException) e
+              : new PathCommitException(origin, e.toString(), e));
     }
     return outcome;
   }
@@ -294,7 +285,7 @@ public class FileCommitActions {
 
   public static CommitFileOutcome commitFailure(String origin,
       String destKey, IOException e) {
-    return new CommitFileOutcome(origin, null, e);
+    return new CommitFileOutcome(origin, destKey, e);
   }
 
   /**
@@ -317,13 +308,13 @@ public class FileCommitActions {
       return outcome;
     }
     if (!pendingFiles.hasNext()) {
-      LOG.info("No files to abort under {}", pendingDir);
+      LOG.debug("No files to abort under {}", pendingDir);
     }
     while (pendingFiles.hasNext()) {
       LocatedFileStatus next = pendingFiles.next();
       Path pending = next.getPath();
-      if (pending.getName().endsWith(PENDING_SUFFIX)) {
-        outcome.add(abortPendingFile(pending, true));
+      if (pending.getName().endsWith(MagicCommitterConstants.PENDING_SUFFIX)) {
+        outcome.add(abortPendingFile(pending));
       }
     }
     LOG.info("aborted operations: {}", outcome);
@@ -569,6 +560,7 @@ public class FileCommitActions {
     SUCCEEDED,
     FAILED,
     ABORTED,
+    ABORT_FAILED,
     REVERTED
   }
 

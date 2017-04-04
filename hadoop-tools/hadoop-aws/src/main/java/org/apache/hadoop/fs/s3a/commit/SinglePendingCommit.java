@@ -18,20 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
-import com.amazonaws.services.s3.model.PartETag;
-import com.google.common.base.Preconditions;
-
-import com.google.common.collect.Lists;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.JsonSerDeser;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -44,6 +30,22 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
+import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.amazonaws.services.s3.model.PartETag;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.JsonSerDeser;
+
+import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
+import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
 import static org.apache.hadoop.util.StringUtils.join;
 
 /**
@@ -61,16 +63,20 @@ import static org.apache.hadoop.util.StringUtils.join;
 public class SinglePendingCommit extends PersistentCommitData
     implements Iterable<String> {
 
-  private static JsonSerDeser<SinglePendingCommit> serializer
-      = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
-
-  // This type is serialized/deserilized by Jackson: make all the fields visible
-  // to show what is going on.
-
   /**
    * Serialization ID: {@value}.
    */
   private static final long serialVersionUID = 0x10000 + VERSION;
+
+  /**
+   * Single serializer.
+   */
+  private static final JsonSerDeser<SinglePendingCommit> SERIALIZER
+      = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
+
+
+  // This type is serialized/deserilized by Jackson: make all the fields visible
+  // to show what is going on.
 
   /** Version marker. */
   public int version = VERSION;
@@ -126,13 +132,37 @@ public class SinglePendingCommit extends PersistentCommitData
   }
 
   /**
+   * Get the singleton JSON serializer for this class.
+   * @return the serializer.
+   */
+  public static JsonSerDeser<SinglePendingCommit> getSerializer() {
+    return SERIALIZER;
+  }
+
+  /**
+   * Load an instance from a file, then validate it.
+   * @param fs filesystem
+   * @param path path
+   * @return the loaded instance
+   * @throws IOException IO failure
+   * @throws ValidationFailure if the data is invalid
+   */
+  public static SinglePendingCommit load(FileSystem fs, Path path)
+      throws IOException {
+    SinglePendingCommit instance = getSerializer().load(fs, path);
+    instance.validate();
+    instance.filename = path.toString();
+    return instance;
+  }
+
+  /**
    * Deserialize via java Serialization API: deserialize the instance
    * and then call {@link #validate()} to verify that the deserialized
    * data is valid.
    * @param inStream input stream
    * @throws IOException IO problem
    * @throws ClassNotFoundException reflection problems
-   * @throws IllegalStateException validation failure
+   * @throws ValidationFailure validation failure
    */
   private void readObject(ObjectInputStream inStream) throws IOException,
       ClassNotFoundException {
@@ -154,11 +184,11 @@ public class SinglePendingCommit extends PersistentCommitData
    * Set the commit data.
    * @param parts ordered list of etags.
    */
-  public void bindCommitData(List<PartETag> parts) {
+  public void bindCommitData(List<PartETag> parts) throws ValidationFailure {
     etags = new ArrayList<>(parts.size());
     int counter = 1;
     for (PartETag part : parts) {
-      Preconditions.checkState(part.getPartNumber() == counter,
+      verify(part.getPartNumber() == counter,
           "Expected part number %s but got %s", counter, part.getPartNumber());
       etags.add(part.getETag());
       counter++;
@@ -166,25 +196,22 @@ public class SinglePendingCommit extends PersistentCommitData
   }
 
   @Override
-  public void validate() {
-    Preconditions.checkState(version == VERSION, "Wrong version: %s", version);
-    Preconditions.checkState(StringUtils.isNotEmpty(bucket),
-        "Empty bucket");
-    Preconditions.checkState(StringUtils.isNotEmpty(destinationKey),
+  public void validate() throws ValidationFailure {
+    verify(version == VERSION, "Wrong version: %s", version);
+    verify(StringUtils.isNotEmpty(bucket), "Empty bucket");
+    verify(StringUtils.isNotEmpty(destinationKey),
         "Empty destination");
-    Preconditions.checkState(StringUtils.isNotEmpty(uploadId),
-        "Empty uploadId");
-    Preconditions.checkState(size >= 0, "Invalid size: " + size);
+    verify(StringUtils.isNotEmpty(uploadId), "Empty uploadId");
+    verify(size >= 0, "Invalid size: " + size);
     destinationPath();
-    Preconditions.checkState(etags != null, "No etag list");
-//    Preconditions.checkState(!etags.isEmpty(), "Empty etag list");
-    CommitUtils.validateCollectionClass(etags, String.class);
+    verify(etags != null, "No etag list");
+    validateCollectionClass(etags, String.class);
     for (String etag : etags) {
-      Preconditions.checkState(StringUtils.isNotEmpty(etag), "Empty etag");
+      verify(StringUtils.isNotEmpty(etag), "Empty etag");
     }
     if (extraData != null) {
-      CommitUtils.validateCollectionClass(extraData.keySet(), String.class);
-      CommitUtils.validateCollectionClass(extraData.values(), String.class);
+      validateCollectionClass(extraData.keySet(), String.class);
+      validateCollectionClass(extraData.values(), String.class);
     }
   }
 
@@ -227,19 +254,14 @@ public class SinglePendingCommit extends PersistentCommitData
   }
 
   /**
-   * Get the singleton JSON serializer for this class.
-   * @return the serializer.
-   */
-  public static JsonSerDeser<SinglePendingCommit> getSerializer() {
-    return serializer;
-  }
-
-  /**
    * Create a completion request from the operation.
    * TODO: this is an intermediate operation
-   * @return the rewuest
+   * @return the request
+   * @throws ValidationFailure if the data is invalid and the request cannot
+   * be created.
    */
-  public CompleteMultipartUploadRequest newCompleteRequest() {
+  public CompleteMultipartUploadRequest newCompleteRequest()
+      throws ValidationFailure {
     validate();
     List<PartETag> parts = Lists.newArrayList();
     for (int i = 0; i < etags.size(); i++) {
@@ -264,7 +286,6 @@ public class SinglePendingCommit extends PersistentCommitData
    */
   public Path destinationPath() {
     Preconditions.checkState(StringUtils.isNotEmpty(uri), "Empty uri");
-
     try {
       return new Path(new URI(uri));
     } catch (URISyntaxException e) {
@@ -272,29 +293,21 @@ public class SinglePendingCommit extends PersistentCommitData
     }
   }
 
+  /**
+   * Get the number of etags.
+   * @return the size of the etag list.
+   */
   public int size() {
     return etags.size();
   }
 
+  /**
+   * Iterate over the etags.
+   * @return an iterator.
+   */
   @Override
   public Iterator<String> iterator() {
     return etags.iterator();
-  }
-
-  /**
-   * Load an instance from a file, then validate it.
-   * @param fs filesystem
-   * @param path path
-   * @return the loaded instance
-   * @throws IOException IO failure
-   * @throws IllegalStateException if the data is invalid
-   */
-  public static SinglePendingCommit load(FileSystem fs, Path path)
-      throws IOException, IllegalStateException {
-    SinglePendingCommit instance = getSerializer().load(fs, path);
-    instance.validate();
-    instance.filename = path.toString();
-    return instance;
   }
 
 }

@@ -34,6 +34,7 @@ import java.util.List;
 @InterfaceAudience.Private
 public class DefaultPutTracker {
 
+  /** The destination. */
   private final String destKey;
 
   /**
@@ -54,14 +55,14 @@ public class DefaultPutTracker {
   }
 
   /**
-   * Callback when the MPU is about to complete.
+   * Callback when the upload is is about to complete.
    * @param uploadId Upload ID
    * @param parts list of parts
    * @param bytesWritten bytes written
-   * @return true if the commit is to be execute4d
-   * @throws IOException any IO problem.
-   * @throws IllegalStateException if there's a problem with the validity
-   * of the request.
+   * @return true if the commit is to be initiated immediately.
+   * False implies the output stream does not need to worry about
+   * what happens.
+   * @throws IOException I/O problem or validation failure.
    */
   public boolean aboutToComplete(String uploadId,
       List<PartETag> parts,

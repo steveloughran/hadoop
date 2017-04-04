@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-
 import java.io.IOException;
 import java.io.Serializable;
+
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 /**
  * Class for single/multiple commit data structures.
@@ -37,16 +37,15 @@ public abstract class PersistentCommitData implements Serializable {
 
   /**
    * Validate the data: those fields which must be non empty, must be set.
-   * @throws IllegalStateException if the data is invalid
+   * @throws ValidationFailure if the data is invalid
    */
-  public abstract void validate();
+  public abstract void validate() throws ValidationFailure;
 
   /**
    * Serialize to JSON and then to a byte array, after performing a
    * preflight validation of the data to be saved.
    * @return the data in a persistable form.
-   * @throws IOException serialization problem
-   * @throws IllegalStateException validation failure.
+   * @throws IOException serialization problem or validation failure.
    */
   public abstract byte[] toBytes() throws IOException;
 

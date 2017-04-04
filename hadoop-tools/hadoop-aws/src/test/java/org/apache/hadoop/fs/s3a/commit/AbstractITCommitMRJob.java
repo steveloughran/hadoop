@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
 import org.apache.hadoop.fs.s3a.StorageStatisticsTracker;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -51,7 +50,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.COMMITTER_UNIQUE_FILENAMES;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES;
 
 /** Test suite.*/
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
@@ -137,7 +136,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
     Job mrJob = Job.getInstance(yarn.getConfig(), "test-committer-job");
     Configuration jobConf = mrJob.getConfiguration();
-    jobConf.setBoolean(COMMITTER_UNIQUE_FILENAMES, uniqueFilenames);
+    jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES, uniqueFilenames);
 
 
     mrJob.setOutputFormatClass(LoggingTextOutputFormat.class);
@@ -147,7 +146,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     mockResultsFile.delete();
     String committerPath = "file:" + mockResultsFile;
     jobConf.set("mock-results-file", committerPath);
-    jobConf.set(StagingCommitterConstants.UPLOAD_UUID, commitUUID);
+    jobConf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, commitUUID);
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     FileInputFormat.addInputPath(mrJob,

@@ -16,10 +16,64 @@
 
 <!-- DISABLEDMACRO{toc|fromDepth=0|toDepth=5} -->
 
-This page covers the S3A Committer, which can commit work directly
+This page covers the S3A Committers, which can commit work directly
 to an S3 object store which supports consistent metadata.
 
-## Usage: TODO
+## Choosing a committer
+
+The choice of which committer to use for writing data via `FileOutputFormat`
+is set in the configuration option `mapreduce.pathoutputcommitter.factory.class`.
+This declares a the classname of a class which creates committers for jobs and tasks.
+
+
+| factory | description |
+|--------|---------|
+| `org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory` |  The default file output committer |
+| `org.apache.hadoop.fs.s3a.commit.DynamicCommitterFactory` | Dynamically choose the committer on a per-bucket basis |
+| `org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory` |  Use the Directory Staging Committer|
+| `org.apache.hadoop.fs.s3a.commit.staging.PartitonedStagingCommitterFactory` |  Partitioned Staging Committer|
+| `org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory` | Use the magic committer (not yet ready for production use) |
+
+All of the s3a committers revert to provide a classic FileOutputCommitter instance
+when a commmitter is requested for any filesystem other than an S3A one.
+This allows any of these committers to be declared in an application configuration,
+without worrying about the job failing for any queries using `hdfs://` paths as
+the final destination of work.
+
+The Dynamic committer factory is different in that it allows any of the other committer
+factories to be used to create a committer, based on the specific value of the 
+option `fs.s3a.committer.name`:
+
+| value of `fs.s3a.committer.name` |  meaning |
+|--------|---------|
+| `file` | the original File committer; (not safe for use with S3 storage) |
+| `directory` | directory staging committer |
+| `partition` | partition staging committer |
+| `magic` | the "magic" committer |
+
+The dynamic committer was originally written to allow for easier performance
+testing of the committers from applications such as Apache Zeppelin notebooks:
+different buckets can be given a different committer with S3A's per-bucket
+configuration, and the performance of the operations compared.
+
+
+
+
+### Staging Committer Options
+
+The initial option set:
+
+| option | meaning |
+|--------|---------|
+| `fs.s3a.committer.staging.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`. |
+| `fs.s3a.committer.staging.unique-filenames` | Should the committer generate unique filenames by including a unique ID in the name of each created file? |
+| `fs.s3a.committer.staging.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
+| `fs.s3a.committer.staging.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
+| `fs.s3a.committer.staging.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
+| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | flag to control creation of `_SUCCESS` marker file on job completion. Default: true |
+| `fs.s3a.multipart.size` | Size in bytes of each part of a multipart upload. Default: "100M" |
+
+
 
 ## Terminology
 
@@ -263,7 +317,7 @@ was removed from Spark 2 [SPARK-10063](https://issues.apache.org/jira/browse/SPA
 There is also the issue that work-in-progress data is visible; this may or may
 not be a problem.
 
-## Proposed zero rename algorithm
+## Proposed zero rename algorithm, "The Magic Committer"
 
 
 Our proposal for commiting work without rename is: delayed completion of
@@ -374,7 +428,7 @@ Paths would just be created under the temporary directory to match
 that of the final data; `/results/latest/__magic/job_400/task_01_01/2017/2017-01-01.orc.lzo.pending`
 would be mapped to a final path of `/results/latest/2017/2017-01-01.orc.lzo`.
 
-(Why have a new suffix, `.pending` rather than just use the original filename?
+Why have a new suffix, `.pending` rather than just use the original filename?
 
 1. This avoids anything getting confused between the commit data and the actual data.
 1. It guarantees that any attempt to query or read the path written to will raise
@@ -385,7 +439,7 @@ they can be identified. (maybe the task committer should check for that and sign
 
 **Issues**
 
-* What if there are some non-.pending files in the task directory?
+* What if there are some non-`.pending` files in the task directory?
 * What if the multipart commit fails?
 
 ### Aborting a task
@@ -796,6 +850,47 @@ it is needed to aid aborting work in failed tasks, but the list of files
 created by successful tasks could be passed directly from the task to committer,
 avoid that potentially-inconsistent list.
 
+
+#### Spark, Parquet and the Spark SQL Commit mechanism
+
+Spark's `org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat`
+Parquet output format wants a subclass of`org.apache.parquet.hadoop.ParquetOutputCommitter`,
+the option being defined by the classname in the configuration
+key `spark.sql.parquet.output.committer.class`;
+this is then patched in to the value `spark.sql.sources.outputCommitterClass`
+where it is picked up by `SQLHadoopMapReduceCommitProtocol` and instantiated
+as the committer for the work.
+
+To use a s3guard committer, it must also be identified as the parquet committer.
+The fact that instances are dynamically instantiated somewhat complicates the process.
+
+In early tests; we can switch committers for ORC output without making any changes
+to the Spark code or configuration other than configuring the factory
+for Path output committers.  For Parquet support, it may be sufficient to also declare
+the classname of the specific committer (i.e not the factory).
+
+This is unfortunate as it complicates dynamically selecting a committer protocol
+based on the destination filesystem type or any per-bucket configuration. Some
+possible solutions are
+
+* Have a dynamic output committer which relays to another PathOutputCommitter;
+it chooses the actual committer by way of the new factory mechanism.
+* Add a new spark output committer.
+
+Ultimately, a new Spark committer is going to be the best solution, as it
+can also address temporary files.  Given the difficulties encountered trying
+to get any cloud integration into Spark, this will be done outside the
+spark codebase, with a goal of adding it to Apache Bahir. (Short term: 
+Steve's [spark/cloud test suite](https://github.com/steveloughran/spark-cloud-examples).
+
+
+The short term solution of a dynamic wrapper committer could postpone the need for this.
+
+
+
+
+
+
 #### Outstanding issues
 
 
@@ -897,7 +992,7 @@ Task outputs are directed to the local FS by `getTaskAttemptPath` and `getWorkPa
 
 The single-directory and partitioned committers handle conflict resolution by
 checking whether target paths exist in S3 before uploading any data. 
-There are 3 conflict resolution modes, controlled by setting `fs.s3a.staging.committer.conflict-mode`:
+There are 3 conflict resolution modes, controlled by setting `fs.s3a.committer.staging.conflict-mode`:
 
 * `fail`: Fail a task if an output directory or partition already exists. (Default)
 * `append`: Upload data files without checking whether directories or partitions already exist.
@@ -1056,19 +1151,6 @@ We should adds command to the s3guard CLI to probe for, list and abort pending r
 a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <path>`. 
 
 
-### Configuration
-
-The initial option set:
-
-| option | meaning |
-|--------|----------|
-| `fs.s3a.staging.committer.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`. |
-| `fs.s3a.staging.committer.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
-| `fs.s3a.staging.committer.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
-| `fs.s3a.staging.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
-
-
-(The upload side can be unified with the `fs.s3a.multipart.size` property.)
 
 ### Integration
 

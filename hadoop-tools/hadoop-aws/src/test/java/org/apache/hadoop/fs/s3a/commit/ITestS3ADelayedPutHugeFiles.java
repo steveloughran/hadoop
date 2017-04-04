@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,9 +30,10 @@ import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles;
 
-import java.io.IOException;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
+import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.MAGIC_DIR_NAME;
+import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.PENDING_SUFFIX;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Write a huge file via the commit mechanism, commit it and verify that it is
@@ -62,7 +65,7 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
   @Override
   protected Configuration createScaleConfiguration() {
     Configuration conf = super.createScaleConfiguration();
-    conf.setBoolean(COMMITTER_ENABLED, true);
+    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     return conf;
   }
 
@@ -102,8 +105,7 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
     S3AFileSystem fs = getFileSystem();
 
     assertPathExists("No pending file", pendingDataFile);
-    ContractTestUtils.NanoTimer timer
-        = new ContractTestUtils.NanoTimer();
+    ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
     FileCommitActions.CommitAllFilesOutcome outcome =
         new FileCommitActions(fs)
             .commitSinglePendingCommits(jobDir, false);

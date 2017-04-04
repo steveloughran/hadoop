@@ -20,12 +20,13 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -88,7 +89,7 @@ public class DelayedCommitFSIntegration {
     DefaultPutTracker tracker;
     if (isDelayedCommitPath(elements)) {
       final String destKey = keyOfFinalDestination(elements, key);
-      String pendingKey = key + PENDING_SUFFIX;
+      String pendingKey = key + MagicCommitterConstants.PENDING_SUFFIX;
       tracker = new DelayedCommitTracker(path,
           owner.getBucket(),
           destKey, pendingKey,

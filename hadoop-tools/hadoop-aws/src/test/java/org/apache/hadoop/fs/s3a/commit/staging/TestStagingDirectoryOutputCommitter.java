@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.PathExistsException;
+import java.util.concurrent.Callable;
 
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.util.concurrent.Callable;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.PathExistsException;
 
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.mockito.Mockito.*;
 
@@ -40,7 +40,8 @@ public class TestStagingDirectoryOutputCommitter
 
   @Test
   public void testBadConflictMode() throws Throwable {
-    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, "merge");
     assertThrows("commiter conflict",
         IllegalArgumentException.class,
         "MERGE",
@@ -49,12 +50,14 @@ public class TestStagingDirectoryOutputCommitter
 
   @Test
   public void testDefaultConflictResolution() throws Exception {
-    getJob().getConfiguration().unset(CONFLICT_MODE);
+    getJob().getConfiguration().unset(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE);
     verifyFailureConflictOutcome();
   }
   @Test
   public void testFailConflictResolution() throws Exception {
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_FAIL);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_FAIL);
     verifyFailureConflictOutcome();
   }
 
@@ -101,7 +104,8 @@ public class TestStagingDirectoryOutputCommitter
 
     pathExists(mockS3, OUTPUT_PATH);
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_APPEND);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_APPEND);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 
@@ -121,7 +125,8 @@ public class TestStagingDirectoryOutputCommitter
 
     pathExists(mockS3, OUTPUT_PATH);
 
-    getJob().getConfiguration().set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     final DirectoryStagingCommitter committer = newJobCommitter();
 

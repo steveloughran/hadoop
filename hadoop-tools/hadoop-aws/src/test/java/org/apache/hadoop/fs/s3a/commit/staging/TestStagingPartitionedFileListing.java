@@ -18,18 +18,18 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+
 import com.google.common.collect.Lists;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 

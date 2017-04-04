@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
+import java.io.IOException;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
@@ -26,8 +28,6 @@ import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-
-import java.io.IOException;
 
 /** ITest of the low level protocol methods. */
 public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {

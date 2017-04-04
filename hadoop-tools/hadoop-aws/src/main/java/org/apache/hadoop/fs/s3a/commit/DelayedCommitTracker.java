@@ -83,8 +83,6 @@ public class DelayedCommitTracker extends DefaultPutTracker {
    * @return false, indicating that the commit must fail.
    * @throws IOException any IO problem.
    * @throws IllegalArgumentException bad argument
-   * @throws IllegalStateException if there's a problem with the validity
-   * of the request.
    */
   @Override
   public boolean aboutToComplete(String uploadId,

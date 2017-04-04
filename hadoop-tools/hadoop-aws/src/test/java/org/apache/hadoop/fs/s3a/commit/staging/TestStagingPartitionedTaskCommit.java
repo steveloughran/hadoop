@@ -18,17 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
-import org.apache.hadoop.mapreduce.JobContext;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathExistsException;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -36,9 +25,20 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathExistsException;
+import org.apache.hadoop.mapreduce.JobContext;
+
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
-import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
 /** Test suite.*/
 public class TestStagingPartitionedTaskCommit
@@ -77,7 +77,8 @@ public class TestStagingPartitionedTaskCommit
 
   @Test
   public void testBadConflictMode() throws Throwable {
-    getJob().getConfiguration().set(CONFLICT_MODE, "merge");
+    getJob().getConfiguration().set(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, "merge");
     assertThrows("commiter conflict", IllegalArgumentException.class,
         "MERGE", this::newJobCommitter);
   }
@@ -87,7 +88,8 @@ public class TestStagingPartitionedTaskCommit
     FileSystem mockS3 = getMockS3();
 
     JobContext job = getJob();
-    job.getConfiguration().unset(CONFLICT_MODE);
+    job.getConfiguration().unset(
+        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE);
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
     committer.setupTask(getTAC());
@@ -132,7 +134,7 @@ public class TestStagingPartitionedTaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(CONFLICT_MODE, CONFLICT_MODE_FAIL);
+        .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_FAIL);
 
     final PartitionedStagingCommitter committer = newTaskCommitter();
 
@@ -177,7 +179,7 @@ public class TestStagingPartitionedTaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(CONFLICT_MODE, CONFLICT_MODE_APPEND);
+        .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_APPEND);
 
     PartitionedStagingCommitter committer = newTaskCommitter();
 
@@ -211,7 +213,7 @@ public class TestStagingPartitionedTaskCommit
     FileSystem mockS3 = getMockS3();
 
     getTAC().getConfiguration()
-        .set(CONFLICT_MODE, CONFLICT_MODE_REPLACE);
+        .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     PartitionedStagingCommitter committer = newTaskCommitter();
 

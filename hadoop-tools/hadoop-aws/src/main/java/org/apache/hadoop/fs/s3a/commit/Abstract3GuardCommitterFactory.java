@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -30,7 +29,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
-import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
@@ -42,19 +42,14 @@ public abstract class Abstract3GuardCommitterFactory
   public static final Logger LOG = LoggerFactory.getLogger(
       Abstract3GuardCommitterFactory.class);
 
-  /**
-   * Name of this class: {@value}.
-   */
-  public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory";
-
   @Override
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    FileSystem fs = getDestFS(outputPath, context);
+    FileSystem fs = getDestinationFileSystem(outputPath, context);
     PathOutputCommitter outputCommitter;
     if (fs instanceof S3AFileSystem) {
-      outputCommitter = createTaskCommitter(outputPath, context);
+      outputCommitter = createTaskCommitter((S3AFileSystem)fs,
+          outputPath, context);
     } else {
       outputCommitter = super.createOutputCommitter(outputPath, context);
     }
@@ -64,11 +59,18 @@ public abstract class Abstract3GuardCommitterFactory
     return outputCommitter;
   }
 
-  protected abstract AbstractS3GuardCommitter createTaskCommitter(
-      Path outputPath,
-      TaskAttemptContext context) throws IOException;
 
-  public FileSystem getDestFS(Path outputPath, JobContext context)
+  /**
+   * Get the destination filesystem, returning null if there is one.
+   * Code using this must explicitly or implicitly look for a null value
+   * in the response.
+   * @param outputPath output path
+   * @param context job/task context
+   * @return the destination filesystem, if it can be determined
+   * @throws IOException if the FS cannot be instantiated
+   */
+  protected FileSystem getDestinationFileSystem(Path outputPath,
+      JobContext context)
       throws IOException {
     return outputPath != null ?
           FileSystem.get(outputPath.toUri(), context.getConfiguration())
@@ -78,12 +80,16 @@ public abstract class Abstract3GuardCommitterFactory
   @Override
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       JobContext context) throws IOException {
-    FileSystem fs = getDestFS(outputPath, context);
+    FileSystem fs = getDestinationFileSystem(outputPath, context);
+    LOG.debug("Destination FS is {}", fs);
     PathOutputCommitter outputCommitter;
     if (fs instanceof S3AFileSystem) {
-      outputCommitter = createJobCommitter(outputPath, context);
+      outputCommitter = createJobCommitter((S3AFileSystem)fs, outputPath,
+          context);
     } else {
-      outputCommitter = super.createOutputCommitter(outputPath, context);
+      // this is the null path as well as the patch taken if the
+      // FS is not an S3A FS.
+      outputCommitter = createDefaultCommitter(outputPath, context);
     }
     LOG.info("Using Commmitter {} for {}",
         outputCommitter,
@@ -91,7 +97,31 @@ public abstract class Abstract3GuardCommitterFactory
     return outputCommitter;
   }
 
-  protected abstract AbstractS3GuardCommitter createJobCommitter(
+  /**
+   * Override point: create a job committer for a specific filesystem
+   * @param fileSystem destination FS.
+   * @param outputPath final output path for work
+   * @param context job context
+   * @return a committer
+   * @throws IOException any problem, including the FS not supporting
+   * the desired committer
+   */
+  public abstract PathOutputCommitter createJobCommitter(
+      S3AFileSystem fileSystem,
       Path outputPath,
       JobContext context) throws IOException;
+
+  /**
+   * Override point: create a task committer for a specific filesystem
+   * @param fileSystem destination FS.
+   * @param outputPath final output path for work
+   * @param context task context
+   * @return a committer
+   * @throws IOException any problem, including the FS not supporting
+   * the desired committer
+   */
+  public abstract PathOutputCommitter createTaskCommitter(
+      S3AFileSystem fileSystem,
+      Path outputPath,
+      TaskAttemptContext context) throws IOException;
 }

@@ -32,8 +32,8 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.COMMITTER_ENABLED;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_DIR_NAME;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
+import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.MAGIC_DIR_NAME;
 
 /**
  * Test the magic committer's commit protocol.
@@ -48,7 +48,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    conf.setBoolean(COMMITTER_ENABLED, true);
+    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.NAME);
     return conf;

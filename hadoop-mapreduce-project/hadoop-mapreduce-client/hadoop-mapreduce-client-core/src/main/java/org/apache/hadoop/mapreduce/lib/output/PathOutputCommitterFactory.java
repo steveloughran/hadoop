@@ -67,12 +67,27 @@ public class PathOutputCommitterFactory extends Configured {
   /**
    * Create a path output committer for a job.
    * @param outputPath the job's output path, or null if you want the output
-   * committer to act as a noop.
+   * committer to act as a no-op.
    * @param context the task's context
    * @return the committer to use
    * @throws IOException problems instantiating the committer
    */
   public PathOutputCommitter createOutputCommitter(Path outputPath,
+      JobContext context) throws IOException {
+    return createDefaultCommitter(outputPath, context);
+  }
+
+  /**
+   * Create an instance of the default committer, a {@link FileOutputCommitter}
+   * for a job. This is made available for subclasses to use if they ever
+   * need to create the default committer.
+   * @param outputPath the job's output path, or null if you want the output
+   * committer to act as a no-op.
+   * @param context the task's context
+   * @return the committer to use
+   * @throws IOException problems instantiating the committer
+   */
+  protected final PathOutputCommitter createDefaultCommitter(Path outputPath,
       JobContext context) throws IOException {
     return new FileOutputCommitter(outputPath, context);
   }
@@ -89,7 +104,7 @@ public class PathOutputCommitterFactory extends Configured {
         conf.getClass(OUTPUTCOMMITTER_FACTORY_CLASS,
             PathOutputCommitterFactory.class,
             PathOutputCommitterFactory.class);
-    LOG.debug("Using FileOutputCommitter factory class {}", factory);
+    LOG.debug("Using OutputCommitter factory class {}", factory);
     return ReflectionUtils.newInstance(factory, conf);
   }
 }

@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.File;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.Constants;
-
-import java.io.File;
-import java.io.IOException;
 
 import static org.apache.hadoop.fs.s3a.Constants.BUFFER_DIR;
 
