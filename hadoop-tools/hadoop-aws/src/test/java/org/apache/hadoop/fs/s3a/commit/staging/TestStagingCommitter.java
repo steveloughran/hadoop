@@ -45,7 +45,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -177,8 +176,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "hdfs", committedTaskPath.toUri().getScheme());
     String ending = STAGING_UPLOADS + "/_temporary/0/task_job_0001_r_000002";
     assertTrue("Did not end with \"" + ending +"\" :" + committedTaskPath,
-        committedTaskPath.toString().endsWith(
-        ending));
+        committedTaskPath.toString().endsWith(ending));
   }
 
   @Test
@@ -327,11 +325,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     StagingTestBase.assertThrows("Should fail during upload",
         AWSClientIOException.class, "Fail on upload 2",
-        new Callable<Void>() {
+        new Callable<String>() {
           @Override
-          public Void call() throws IOException {
+          public String call() throws IOException {
             committer.commitTask(tac);
-            return null;
+            return committer.toString();
           }
         });
 
@@ -360,11 +358,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     StagingTestBase.assertThrows("Should fail during upload",
         AWSClientIOException.class, "Fail on upload 5",
-        new Callable<Void>() {
+        new Callable<String>() {
           @Override
-          public Void call() throws IOException {
+          public String call() throws IOException {
             committer.commitTask(tac);
-            return null;
+            return committer.toString();
           }
         });
 
@@ -395,11 +393,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     StagingTestBase.assertThrows(
         "Should suppress abort failure, propagate upload failure",
         AWSClientIOException.class, "Fail on upload 5",
-        new Callable<Void>() {
+        new Callable<String>() {
           @Override
-          public Void call() throws IOException {
+          public String call() throws IOException {
             committer.commitTask(tac);
-            return null;
+            return committer.toString();
           }
         });
 
@@ -467,11 +465,12 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     jobCommitter.getErrors().failOnCommit(5);
 
     StagingTestBase.assertThrows("Should propagate the commit failure",
-        AWSClientIOException.class, "Fail on commit 5", new Callable<Void>() {
+        AWSClientIOException.class, "Fail on commit 5",
+        new Callable<String>() {
           @Override
-          public Void call() throws IOException {
+          public String call() throws IOException {
             jobCommitter.commitJob(job);
-            return null;
+            return jobCommitter.toString();
           }
         });
 
@@ -523,11 +522,12 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     jobCommitter.getErrors().recoverAfterFailure();
 
     StagingTestBase.assertThrows("Should propagate the abort failure",
-        AWSClientIOException.class, "Fail on abort 5", new Callable<Void>() {
+        AWSClientIOException.class, "Fail on abort 5",
+        new Callable<String>() {
           @Override
-          public Void call() throws IOException {
+          public String call() throws IOException {
             jobCommitter.abortJob(job, JobStatus.State.KILLED);
-            return null;
+            return jobCommitter.toString();
           }
         });
 

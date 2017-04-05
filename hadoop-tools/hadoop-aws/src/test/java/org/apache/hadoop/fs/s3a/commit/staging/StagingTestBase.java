@@ -383,7 +383,7 @@ public class StagingTestBase {
     }
   }
 
-  /** */
+  /** Control errors to raise in mock S3 client. */
   public static class ClientErrors {
     // For injecting errors
     public int failOnInit = -1;
@@ -413,6 +413,12 @@ public class StagingTestBase {
     }
   }
 
+  /**
+   * Instantiate mock client with the results and errors requested.
+   * @param results results to accrue
+   * @param errors when (if any) to fail
+   * @return the mock client to patch in to a committer/FS instance
+   */
   public static AmazonS3 newMockClient(final ClientResults results,
       final ClientErrors errors) {
     AmazonS3Client mockClient = mock(AmazonS3Client.class);
