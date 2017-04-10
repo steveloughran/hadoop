@@ -46,6 +46,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,9 +69,14 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.service.ServiceOperations;
 
-import static org.apache.hadoop.test.LambdaTestUtils.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
+import static org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Test base for staging: core constants and static methods, inner classes
@@ -83,6 +90,8 @@ public class StagingTestBase {
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
   public static final URI OUTPUT_PATH_URI = OUTPUT_PATH.toUri();
   public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
+  private static final Logger LOG =
+      LoggerFactory.getLogger(StagingTestBase.class);
 
   protected StagingTestBase() {
   }
@@ -340,7 +349,7 @@ public class StagingTestBase {
     abstract C newTaskCommitter() throws Exception;
   }
 
-  /** */
+  /** Results accrued during mock runs. */
   public static class ClientResults implements Serializable {
     // For inspection of what the committer did
     public final Map<String, InitiateMultipartUploadRequest> requests =
@@ -411,6 +420,19 @@ public class StagingTestBase {
     public void recoverAfterFailure() {
       this.recover = true;
     }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder(
+          "ClientErrors{");
+      sb.append("failOnInit=").append(failOnInit);
+      sb.append(", failOnUpload=").append(failOnUpload);
+      sb.append(", failOnCommit=").append(failOnCommit);
+      sb.append(", failOnAbort=").append(failOnAbort);
+      sb.append(", recover=").append(recover);
+      sb.append('}');
+      return sb.toString();
+    }
   }
 
   /**
@@ -424,12 +446,14 @@ public class StagingTestBase {
     AmazonS3Client mockClient = mock(AmazonS3Client.class);
     final Object lock = new Object();
 
+    // initiateMultipartUpload
     when(mockClient
         .initiateMultipartUpload(any(InitiateMultipartUploadRequest.class)))
         .thenAnswer(new Answer<InitiateMultipartUploadResult>() {
           @Override
           public InitiateMultipartUploadResult answer(
               InvocationOnMock invocation) throws Throwable {
+            LOG.debug("initiateMultipartUpload for {}", mockClient);
             synchronized (lock) {
               if (results.requests.size() == errors.failOnInit) {
                 if (errors.recover) {
@@ -447,16 +471,19 @@ public class StagingTestBase {
           }
         });
 
+    // uploadPart
     when(mockClient.uploadPart(any(UploadPartRequest.class)))
         .thenAnswer(new Answer<UploadPartResult>() {
           @Override
           public UploadPartResult answer(InvocationOnMock invocation)
               throws Throwable {
+            LOG.debug("uploadPart for {}", mockClient);
             synchronized (lock) {
               if (results.parts.size() == errors.failOnUpload) {
                 if (errors.recover) {
                   errors.failOnUpload(-1);
                 }
+                LOG.info("Triggering upload failure");
                 throw new AmazonClientException(
                     "Fail on upload " + results.parts.size());
               }
@@ -475,12 +502,14 @@ public class StagingTestBase {
           }
         });
 
+    // completeMultipartUpload
     when(mockClient
         .completeMultipartUpload(any(CompleteMultipartUploadRequest.class)))
         .thenAnswer(new Answer<CompleteMultipartUploadResult>() {
           @Override
           public CompleteMultipartUploadResult answer(
               InvocationOnMock invocation) throws Throwable {
+            LOG.debug("completeMultipartUpload for {}", mockClient);
             synchronized (lock) {
               if (results.commits.size() == errors.failOnCommit) {
                 if (errors.recover) {
@@ -497,11 +526,13 @@ public class StagingTestBase {
           }
         });
 
+    // abortMultipartUpload mocking
     doAnswer(
         new Answer<Void>() {
           @Override
           public Void answer(
               InvocationOnMock invocation) throws Throwable {
+            LOG.debug("abortMultipartUpload for {}", mockClient);
             synchronized (lock) {
               if (results.aborts.size() == errors.failOnAbort) {
                 if (errors.recover) {
@@ -519,11 +550,12 @@ public class StagingTestBase {
         .when(mockClient)
         .abortMultipartUpload(any(AbortMultipartUploadRequest.class));
 
-    doAnswer(
-        new Answer<Void>() {
+    // deleteObject mocking
+    doAnswer(new Answer<Void>() {
           @Override
           public Void answer(
               InvocationOnMock invocation) throws Throwable {
+            LOG.debug("deleteObject for {}", mockClient);
             synchronized (lock) {
               results.deletes.add(invocation.getArgumentAt(
                   0, DeleteObjectRequest.class));
@@ -533,6 +565,16 @@ public class StagingTestBase {
         })
         .when(mockClient)
         .deleteObject(any(DeleteObjectRequest.class));
+
+    // to String returns the error stats, for debug logs
+    when(mockClient.toString()).thenAnswer(
+        new Answer<String>() {
+          @Override
+          public String answer(InvocationOnMock invocation) throws Throwable {
+            return errors.toString();
+          }
+        });
+
 
     return mockClient;
   }
@@ -557,10 +599,18 @@ public class StagingTestBase {
     return result;
   }
 
+  /**
+   * create files in the attempt path that should be found by
+   * {@code getTaskOutput}.
+   * @param relativeFiles list of files relative to address path
+   * @param attemptPath
+   * @param conf config for FS
+   * @throws IOException on any failure
+   */
   public static void createTestOutputFiles(List<String> relativeFiles,
       Path attemptPath,
-      Configuration conf) throws Exception {
-    // create files in the attempt path that should be found by getTaskOutput
+      Configuration conf) throws IOException {
+    //
     FileSystem attemptFS = attemptPath.getFileSystem(conf);
     attemptFS.delete(attemptPath, true);
     for (String relative : relativeFiles) {

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
 import org.junit.Test;
@@ -82,22 +83,32 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   private Path outDir;
 
-  private static final String SUB_DIR = "SUB_DIR";
-
   protected static final Logger LOG =
       LoggerFactory.getLogger(AbstractITCommitProtocol.class);
 
-  // A random task attempt id for testing.
-  protected static final String ATTEMPT_0 =
-      "attempt_200707121733_0001_m_000000_0";
-  protected static final String PART_00000 = "part-m-00000";
-  protected static final TaskAttemptID TASK_ATTEMPT_0 =
-      TaskAttemptID.forName(ATTEMPT_0);
+  private static final String SUB_DIR = "SUB_DIR";
 
-  protected static final String ATTEMPT_1 =
-      "attempt_200707121733_0001_m_000001_0";
-  protected static final TaskAttemptID TASK_ATTEMPT_1 =
-      TaskAttemptID.forName(ATTEMPT_1);
+  protected static final String PART_00000 = "part-m-00000";
+
+  /**
+   * Counter to guarantee that even in parallel test runs, no job has the same
+   * ID.
+   */
+  private static final AtomicInteger JOB_ID_COUNTER = new AtomicInteger(1);
+
+  protected final String jobId = String.format("200707121733_%04d",
+      JOB_ID_COUNTER.getAndIncrement());
+  // A random task attempt id for testing.
+  protected final String attempt0 =
+      "attempt_" + jobId + "_m_000000_0";
+
+  protected final TaskAttemptID taskAttempt0 =
+      TaskAttemptID.forName(attempt0);
+
+  protected final String attempt1 =
+      "attempt_" + jobId + "_m_000001_0";
+  protected final TaskAttemptID taskAttempt1 =
+      TaskAttemptID.forName(attempt1);
 
   private static final Text KEY_1 = new Text("key1");
   private static final Text KEY_2 = new Text("key2");
@@ -334,7 +345,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   public Job newJob() throws IOException {
     Job job = Job.getInstance(getConfiguration());
     Configuration conf = job.getConfiguration();
-    conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt0);
     conf.setBoolean(CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
     FileOutputFormat.setOutputPath(job, outDir);
     return job;
@@ -374,11 +385,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       throws IOException, InterruptedException {
     Job job = newJob();
     Configuration conf = job.getConfiguration();
-    conf.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt0);
     conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
-    JobContext jContext = new JobContextImpl(conf, TASK_ATTEMPT_0.getJobID());
+    JobContext jContext = new JobContextImpl(conf, taskAttempt0.getJobID());
     TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
-        TASK_ATTEMPT_0);
+        taskAttempt0);
     AbstractS3GuardCommitter committer = factory.createCommitter(tContext);
 
     // setup
@@ -521,11 +532,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     assertPathDoesNotExist("commit dir", attemptPath);
 
     Configuration conf2 = jobData.job.getConfiguration();
-    conf2.set(MRJobConfig.TASK_ATTEMPT_ID, ATTEMPT_0);
+    conf2.set(MRJobConfig.TASK_ATTEMPT_ID, attempt0);
     conf2.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 2);
-    JobContext jContext2 = new JobContextImpl(conf2, TASK_ATTEMPT_0.getJobID());
+    JobContext jContext2 = new JobContextImpl(conf2, taskAttempt0.getJobID());
     TaskAttemptContext tContext2 = new TaskAttemptContextImpl(conf2,
-        TASK_ATTEMPT_0);
+        taskAttempt0);
     AbstractS3GuardCommitter committer2 = createCommitter(tContext2);
     committer2.setupJob(tContext2);
 
@@ -862,10 +873,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       AbstractS3GuardCommitter committer, Class<? extends IOException> clazz)
       throws Exception {
     return intercept(clazz,
-        new VoidCallable() {
+        new Callable<String>() {
           @Override
-          public void call() throws Exception {
+          public String call() throws Exception {
             committer.commitJob(jContext);
+            return committer.toString();
           }
         });
   }
@@ -875,10 +887,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       AbstractS3GuardCommitter committer,
       TaskAttemptContext tContext) throws Exception {
     intercept(FileNotFoundException.class,
-        new VoidCallable() {
+        new Callable<String>() {
           @Override
-          public void call() throws Exception {
+          public String call() throws Exception {
             committer.commitTask(tContext);
+            return committer.toString();
           }
         });
   }
@@ -1230,13 +1243,13 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 */
 
     final JobContext jContext = new JobContextImpl(conf,
-        TASK_ATTEMPT_0.getJobID());
+        taskAttempt0.getJobID());
     AbstractS3GuardCommitter amCommitter = createCommitter(jContext);
     amCommitter.setupJob(jContext);
 
     final TaskAttemptContext[] taCtx = new TaskAttemptContextImpl[2];
-    taCtx[0] = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_0);
-    taCtx[1] = new TaskAttemptContextImpl(conf, TASK_ATTEMPT_1);
+    taCtx[0] = new TaskAttemptContextImpl(conf, taskAttempt0);
+    taCtx[1] = new TaskAttemptContextImpl(conf, taskAttempt1);
 
     final TextOutputFormat[] tof = new LoggingTextOutputFormat[2];
     for (int i = 0; i < tof.length; i++) {
@@ -1298,7 +1311,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     return ContractTestUtils.readUTF8(getFileSystem(), f, -1);
   }
 
-
   /**
    * Create a committer which fails; the class {@link FaultInjectionImpl}
    * implements the logic.
@@ -1319,6 +1331,5 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       return createFailingCommitter(context);
     }
   }
-
 
 }

@@ -39,6 +39,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -56,6 +58,7 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+import org.apache.hadoop.test.LambdaTestUtils;
 
 import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
@@ -74,6 +77,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private static final JobID JOB_ID = new JobID("job", 1);
   private static final TaskAttemptID AID = new TaskAttemptID(
       new TaskID(JOB_ID, TaskType.REDUCE, 2), 3);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestStagingCommitter.class);
 
   private final int numThreads;
   private final boolean uniqueFilenames;
@@ -86,6 +91,15 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   @BeforeClass
   public static void setupS3() throws IOException {
     createAndBindMockFSInstance(getConfiguration());
+  }
+
+  /**
+   * Describe a test in the logs.
+   * @param text text to print
+   * @param args arguments to format in the printing
+   */
+  protected void describe(String text, Object... args) {
+    LOG.info("\n\n: {}\n", String.format(text, args));
   }
 
   @Parameterized.Parameters
@@ -121,7 +135,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.conf = tac.getConfiguration();
     // TODO: is this the right path
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
-    conf.set(MULTIPART_SIZE, "5M");
+    conf.setInt(UPLOAD_SIZE, 100);
 
     this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
   }
@@ -313,6 +327,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
   @Test
   public void testTaskSingleFileUploadFailure() throws Exception {
+    describe("Set up a single file upload to fail on upload 2");
     committer.setupTask(tac);
 
     committer.getErrors().failOnUpload(2);
@@ -437,7 +452,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     Set<String> uploads = runTasks(job, 4, 3);
 
-    assertTrue(fs.exists(jobAttemptPath));
+    assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     jobCommitter.commitJob(job);
     assertEquals("Should have aborted no uploads",
@@ -460,7 +475,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     Set<String> uploads = runTasks(job, 4, 3);
 
-    assertTrue(fs.exists(jobAttemptPath));
+    assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     jobCommitter.getErrors().failOnCommit(5);
 
@@ -558,7 +573,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     Set<String> uploads = runTasks(job, 4, 3);
 
-    assertTrue(fs.exists(jobAttemptPath));
+    assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     jobCommitter.abortJob(job, JobStatus.State.KILLED);
     assertEquals("Should have committed no uploads",

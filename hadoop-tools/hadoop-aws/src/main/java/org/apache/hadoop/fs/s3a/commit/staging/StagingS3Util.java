@@ -150,8 +150,9 @@ public final class StagingS3Util {
       String bucket, String key, String destURI, long uploadPartSize)
       throws IOException {
 
-    LOG.debug("Initiating multipart upload from {} to s3a://{}/{} partition={}",
-        localFile, bucket, key, partition);
+    LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
+            " partition={} partSize={}",
+        localFile, bucket, key, partition, uploadPartSize);
     if (!localFile.exists()) {
       throw new FileNotFoundException(localFile.toString());
     }

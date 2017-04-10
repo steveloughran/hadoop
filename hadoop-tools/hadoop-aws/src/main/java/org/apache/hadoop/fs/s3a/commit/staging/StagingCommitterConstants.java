@@ -34,6 +34,10 @@ public final class StagingCommitterConstants {
   private StagingCommitterConstants() {
   }
 
+  public static final String UPLOAD_SIZE =
+      "fs.s3a.staging.committer.upload.size";
+  public static final long DEFAULT_UPLOAD_SIZE = 10485760L; // 10 MB
+
   // Spark configuration keys
 
   /**

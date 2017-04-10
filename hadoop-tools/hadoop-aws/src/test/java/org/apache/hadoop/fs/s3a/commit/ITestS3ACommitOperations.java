@@ -42,11 +42,12 @@ import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
- * Test the various commit operations
- * {@link S3AFileSystem#getFileStatus(Path)}.
+ * Test the low-level binding of the S3A FS to the magic commit mechanism,
+ * and handling of the commit operations.
  */
 public class ITestS3ACommitOperations extends AbstractCommitITest {
 
@@ -54,8 +55,18 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
       LoggerFactory.getLogger(ITestS3ACommitOperations.class);
   private static final byte[] DATASET = dataset(1000, 'a', 32);
 
-  @Test
-  public void testVerifyIsDelayedCompleteFS() throws Throwable {
+  @Override
+  protected Configuration createConfiguration() {
+    Configuration conf = super.createConfiguration();
+    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
+    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+        MagicS3GuardCommitterFactory.NAME);
+    return conf;
+  }
+
+  @Override
+  public void setup() throws Exception {
+    super.setup();
     verifyIsMagicCommitFS(getFileSystem());
   }
 
@@ -197,7 +208,8 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path destFile = methodPath("testAbortNonexistentFile");
     FileCommitActions.CommitFileOutcome outcome =
         newActions().abortPendingFile(destFile);
-    assertTrue("succeeded: " + outcome, outcome.isSucceeded());
+    assertTrue("not aborted: " + outcome, outcome.hasOutcome(
+        FileCommitActions.CommitOutcomes.ABORT_FAILED));
   }
 
   @Test
@@ -216,9 +228,12 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   @Test
   public void testBaseRelativePath() throws Throwable {
+    describe("Test creating file with a __base marker and verify that it ends" +
+        " up in where expected");
     Path destDir = methodPath("testBaseRelativePath");
     Path pendingBaseDir = new Path(destDir,
-        MagicCommitterConstants.MAGIC_DIR_NAME + "/child/" + MagicCommitterConstants.BASE_PATH);
+        MagicCommitterConstants.MAGIC_DIR_NAME + "/child/"
+            + MagicCommitterConstants.BASE_PATH);
     String child = "subdir/child.txt";
     Path pendingChildPath = new Path(pendingBaseDir, child);
     Path expectedDestPath = new Path(destDir, child);

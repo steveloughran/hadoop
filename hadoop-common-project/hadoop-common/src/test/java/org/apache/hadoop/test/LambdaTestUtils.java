@@ -43,7 +43,7 @@ import java.util.concurrent.TimeoutException;
  * check; useful when checking the contents of the exception.
  */
 public final class LambdaTestUtils {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(LambdaTestUtils.class);
 
   private LambdaTestUtils() {

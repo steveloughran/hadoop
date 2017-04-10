@@ -36,7 +36,7 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 
-/** ITest of the low level protocol methods. */
+/** Test the staging committer's handling of the base protocol operations. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
   @Override
@@ -64,8 +64,8 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     // identify working dir for staging and delete
     Configuration conf = getConfiguration();
     String uuid = StagingS3GuardCommitter.getUploadUUID(conf,
-        TASK_ATTEMPT_0.getJobID());
-    Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid, TASK_ATTEMPT_0);
+        taskAttempt0.getJobID());
+    Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid, taskAttempt0);
     rmdir(tempDir, conf);
   }
 
