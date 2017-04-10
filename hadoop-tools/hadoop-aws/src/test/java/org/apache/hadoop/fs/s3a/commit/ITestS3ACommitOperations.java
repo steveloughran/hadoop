@@ -178,8 +178,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testCommitNonexistentDir() throws Throwable {
     describe("Attempt to commit a pending directory that does not exist");
     Path destFile = methodPath("testCommitNonexistentDir");
-    newActions()
-        .commitSinglePendingCommits(destFile, true);
+    newActions().commitSinglePendingCommits(destFile, true);
   }
 
   @Test(expected = PathCommitException.class)
@@ -187,8 +186,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to commit a pending directory that is actually a file");
     Path destFile = methodPath("testCommitPendingFilesinSimpleFile");
     touch(getFileSystem(), destFile);
-    newActions()
-        .commitSinglePendingCommits(destFile, true);
+    newActions().commitSinglePendingCommits(destFile, true);
   }
 
   @Test
@@ -204,7 +202,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   @Test
   public void testAbortNonexistentFile() throws Throwable {
-    describe("Attempt to abort a directory that does not exist");
+    describe("Attempt to abort a file that does not exist");
     Path destFile = methodPath("testAbortNonexistentFile");
     FileCommitActions.CommitFileOutcome outcome =
         newActions().abortPendingFile(destFile);

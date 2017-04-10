@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.services.s3.model.MultipartUpload;
 import org.junit.Test;
@@ -94,21 +93,15 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * Counter to guarantee that even in parallel test runs, no job has the same
    * ID.
    */
-  private static final AtomicInteger JOB_ID_COUNTER = new AtomicInteger(1);
 
-  protected final String jobId = String.format("200707121733_%04d",
-      JOB_ID_COUNTER.getAndIncrement());
+  protected String jobId;
+
   // A random task attempt id for testing.
-  protected final String attempt0 =
-      "attempt_" + jobId + "_m_000000_0";
+  protected String attempt0;
+  protected TaskAttemptID taskAttempt0;
 
-  protected final TaskAttemptID taskAttempt0 =
-      TaskAttemptID.forName(attempt0);
-
-  protected final String attempt1 =
-      "attempt_" + jobId + "_m_000001_0";
-  protected final TaskAttemptID taskAttempt1 =
-      TaskAttemptID.forName(attempt1);
+  protected String attempt1;
+  protected TaskAttemptID taskAttempt1;
 
   private static final Text KEY_1 = new Text("key1");
   private static final Text KEY_2 = new Text("key2");
@@ -143,6 +136,20 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Override
   public void setup() throws Exception {
     super.setup();
+    String testUniqueForkId = System.getProperty(TEST_UNIQUE_FORK_ID, "0001");
+    int l = testUniqueForkId.length();
+    String trailingDigits = testUniqueForkId.substring(l - 4, l);
+    try {
+      int digitValue = Integer.valueOf(trailingDigits);
+      jobId = String.format("200707121733_%04d", digitValue);
+      attempt0 = "attempt_" + jobId + "_m_000000_0";
+      taskAttempt0 = TaskAttemptID.forName(attempt0);
+      attempt1 = "attempt_" + jobId + "_m_000001_0";
+      taskAttempt1 = TaskAttemptID.forName(attempt1);
+    } catch (NumberFormatException e) {
+      throw new Exception("Failed to parse " + trailingDigits, e);
+    }
+
     outDir = path(getMethodName());
     S3AFileSystem fileSystem = getFileSystem();
     bindFileSystem(fileSystem, outDir, fileSystem.getConf());
@@ -156,8 +163,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     if (abortInTeardown != null) {
       abortJobQuietly(abortInTeardown);
     }
-    abortMultipartUploadsUnderPath(outDir);
-    cleanupDestDir();
+    if (outDir != null) {
+      abortMultipartUploadsUnderPath(outDir);
+      cleanupDestDir();
+    }
     super.teardown();
   }
 

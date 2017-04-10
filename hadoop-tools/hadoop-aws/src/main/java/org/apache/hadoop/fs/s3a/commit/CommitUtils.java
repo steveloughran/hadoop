@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import com.amazonaws.services.s3.model.PartETag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,16 +47,22 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
  * staging and magic.
  */
 public final class CommitUtils {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CommitUtils.class);
 
+  /** Error message for bad path: {@value}. */
   public static final String E_BAD_PATH
       = "Path does not represent a magic-commit path";
 
+  /** Error message if filesystem isn't magic: {@value}. */
   public static final String E_NORMAL_FS
       = "Filesystem does not have support for 'magic' committer enabled";
 
+  /** Error message if the dest FS isn't S3A: {@value}. */
   public static final String E_WRONG_FS
       = "Output path is not on an S3A Filesystem";
 
+  /** Error message for a path without a magic element in the list: {@value}. */
   public static final String E_NO_MAGIC_PATH_ELEMENT
       = "No " + MagicCommitterConstants.MAGIC_DIR_NAME + " element in path";
 
@@ -283,6 +291,9 @@ public final class CommitUtils {
   public static void verifyIsMagicCommitFS(S3AFileSystem fs)
       throws PathCommitException {
     if (!fs.isDelayedCompleteEnabled()) {
+      // dump out details to console for support diagnostics
+      LOG.error("{}: {}:\n{}", E_NORMAL_FS, fs.getUri().toString(), fs);
+      // then fail
       throw new PathCommitException(fs.getUri().toString(),
           E_NORMAL_FS);
     }
