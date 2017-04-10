@@ -129,11 +129,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     constructorOutputPath = getOutputPath();
     Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
-/*
-    this.uploadPartSize = getMultipartSizeProperty(conf,
+    this.uploadPartSize = conf.getLongBytes(
         MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
-*/
-    this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
@@ -157,11 +154,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     constructorOutputPath = getOutputPath();
     Preconditions.checkNotNull(constructorOutputPath, "output path");
     Configuration conf = getConf();
-/*
-    this.uploadPartSize = getMultipartSizeProperty(conf,
+    this.uploadPartSize = conf.getLongBytes(
         MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
-*/
-    this.uploadPartSize = conf.getLong(UPLOAD_SIZE, DEFAULT_UPLOAD_SIZE);
 
     // Spark will use a fake app id based on the current minute and job id 0.
     // To avoid collisions, use the YARN application ID for Spark.

@@ -22,6 +22,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.MRConfig;
 
+import static org.apache.hadoop.fs.s3a.Constants.DEFAULT_MULTIPART_SIZE;
+import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
+
 /**
  * Internal staging committer constants.
  */
@@ -33,10 +36,6 @@ public final class StagingCommitterConstants {
 
   private StagingCommitterConstants() {
   }
-
-  public static final String UPLOAD_SIZE =
-      "fs.s3a.staging.committer.upload.size";
-  public static final long DEFAULT_UPLOAD_SIZE = 10485760L; // 10 MB
 
   // Spark configuration keys
 

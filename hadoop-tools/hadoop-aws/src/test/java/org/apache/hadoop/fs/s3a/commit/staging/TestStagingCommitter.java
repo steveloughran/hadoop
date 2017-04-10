@@ -58,7 +58,6 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
-import org.apache.hadoop.test.LambdaTestUtils;
 
 import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
@@ -135,7 +134,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.conf = tac.getConfiguration();
     // TODO: is this the right path
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
-    conf.setInt(UPLOAD_SIZE, 100);
+    conf.setInt(MULTIPART_SIZE, 100);
 
     this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
   }
