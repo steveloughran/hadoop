@@ -655,6 +655,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       List<SinglePendingCommit> pending) throws IOException {
   }
 
+  /**
+   * Internal Job commit operation: where the S3 requests are made
+   * (potentially in parallel).
+   * @param context job context
+   * @param pending pending request
+   * @throws IOException any failure
+   */
   protected void commitJobInternal(JobContext context,
                                    List<SinglePendingCommit> pending)
       throws IOException {
@@ -753,7 +760,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       throws IOException {
     LOG.warn("{}: aborting Job", getRole());
     if (pending == null || pending.isEmpty()) {
-      LOG.info("{}: ro pending commits to abort", getRole());
+      LOG.info("{}: no pending commits to abort", getRole());
       return;
     }
 

@@ -55,13 +55,14 @@ public class MockS3AFileSystem extends S3AFileSystem {
   protected static final Logger LOG =
       LoggerFactory.getLogger(MockS3AFileSystem.class);
 
-  private S3AFileSystem mock = null;
+  private final S3AFileSystem mock;
   public static final int LOG_NONE = 0;
   public static final int LOG_NAME = 1;
   public static final int LOG_STACK = 2;
   private int logEvents = LOG_NAME;
 
-  public MockS3AFileSystem() {
+  public MockS3AFileSystem(S3AFileSystem mock) {
+    this.mock = mock;
   }
 
   public int getLogEvents() {
@@ -106,10 +107,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public Path getWorkingDirectory() {
     return new Path("s3a://" + BUCKET + "/work");
-  }
-
-  public void setMock(S3AFileSystem mock) {
-    this.mock = mock;
   }
 
   @Override
@@ -235,32 +232,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public WriteOperationHelper createWriteOperationHelper(String key) {
-    return new MockWriteOperationHelper(key, super.createWriteOperationHelper(key));
-  }
-
-  /**
-   * Class to help mock WriteOperations & so file commit actions.
-   */
-  private class MockWriteOperationHelper extends WriteOperationHelper {
-
-    private final WriteOperationHelper wrapped;
-
-    public MockWriteOperationHelper(String key,
-        WriteOperationHelper writeOperationHelper) {
-      super(key);
-      wrapped = writeOperationHelper;
-    }
-
-    /**
-     * Abort a multipart upload operation.
-     * @param uploadId multipart operation Id
-     * @throws AmazonClientException on problems.
-     */
-    public void abortMultipartUpload(String uploadKey, String uploadId)
-        throws AmazonClientException {
-      event("Aborting multipart upload %s to %s", uploadId, uploadKey);
-      wrapped.abortMultipartUpload(uploadKey, uploadId);
-    }
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "MockS3AFileSystem{");
+    sb.append("inner mockFS=").append(mock);
+    sb.append("S3A client=").append(getAmazonS3Client());
+    sb.append('}');
+    return sb.toString();
   }
 }

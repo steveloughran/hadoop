@@ -52,7 +52,7 @@ import java.util.UUID;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES;
 
-/** Test suite.*/
+/** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   private static MiniDFSTestCluster hdfs;
@@ -113,7 +113,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   @Test
   public void testMRJob() throws Exception {
-//    FileSystem mockS3 = mock(FileSystem.class);
     FileSystem s3 = getFileSystem();
     // final dest is in S3A
     Path outputPath = path("testMRJob");

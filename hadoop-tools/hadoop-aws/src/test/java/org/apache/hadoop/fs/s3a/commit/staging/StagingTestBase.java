@@ -108,9 +108,8 @@ public class StagingTestBase {
   protected static S3AFileSystem createAndBindMockFSInstance(Configuration conf)
       throws IOException {
     S3AFileSystem mockFs = mock(S3AFileSystem.class);
-    MockS3AFileSystem wrapperFS = new MockS3AFileSystem();
+    MockS3AFileSystem wrapperFS = new MockS3AFileSystem(mockFs);
     URI uri = OUTPUT_PATH_URI;
-    wrapperFS.setMock(mockFs);
     wrapperFS.initialize(uri, conf);
     FileSystemTestHelper.addFileSystemForTesting(uri, conf, wrapperFS);
     return mockFs;
@@ -119,8 +118,8 @@ public class StagingTestBase {
   /**
    * Look up the FS by URI, return a (cast) Mock wrapper.
    * @param conf config
-   * @return F
-   * @throws IOException
+   * @return the FS
+   * @throws IOException IO Failure
    */
   public static MockS3AFileSystem lookupWrapperFS(Configuration conf)
       throws IOException {
@@ -286,6 +285,8 @@ public class StagingTestBase {
       this.results = new StagingTestBase.ClientResults();
       this.errors = new StagingTestBase.ClientErrors();
       this.mockClient = newMockClient(results, errors);
+      // and bind the FS
+      wrapperFS.setAmazonS3Client(mockClient);
     }
 
     public S3AFileSystem getMockS3() {
@@ -349,7 +350,10 @@ public class StagingTestBase {
     abstract C newTaskCommitter() throws Exception;
   }
 
-  /** Results accrued during mock runs. */
+  /**
+   * Results accrued during mock runs.
+   * This data is serialized in MR Tests and read back in in the test runner
+   */
   public static class ClientResults implements Serializable {
     // For inspection of what the committer did
     public final Map<String, InitiateMultipartUploadRequest> requests =
@@ -389,6 +393,35 @@ public class StagingTestBase {
 
     public List<DeleteObjectRequest> getDeletes() {
       return deletes;
+    }
+
+    public void resetDeletes() { deletes.clear(); }
+
+    public void resetUploads() {
+      uploads.clear();
+    }
+
+    public void resetCommits() {
+      commits.clear();
+    }
+
+    public void resetRequests() {
+      requests.clear();
+    }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder(
+          super.toString());
+      sb.append("{ requests=").append(requests.size());
+      sb.append(", uploads=").append(uploads.size());
+      sb.append(", parts=").append(parts.size());
+      sb.append(", tagsByUpload=").append(tagsByUpload.size());
+      sb.append(", commits=").append(commits.size());
+      sb.append(", aborts=").append(aborts.size());
+      sb.append(", deletes=").append(deletes.size());
+      sb.append('}');
+      return sb.toString();
     }
   }
 
@@ -566,12 +599,12 @@ public class StagingTestBase {
         .when(mockClient)
         .deleteObject(any(DeleteObjectRequest.class));
 
-    // to String returns the error stats, for debug logs
+    // to String returns the debug information
     when(mockClient.toString()).thenAnswer(
         new Answer<String>() {
           @Override
           public String answer(InvocationOnMock invocation) throws Throwable {
-            return errors.toString();
+            return "Mock3AClient " + results + " " + errors;
           }
         });
 

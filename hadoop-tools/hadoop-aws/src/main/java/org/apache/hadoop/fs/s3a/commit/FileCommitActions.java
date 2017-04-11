@@ -258,10 +258,7 @@ public class FileCommitActions {
     String destKey = commit.destinationKey;
     String origin = commit.filename;
     try {
-      LOG.info("Aborting commit to file {} defined in {}",
-          destKey, origin);
-      String uploadId = commit.uploadId;
-      abortMultipartCommit(destKey, uploadId);
+      abortMultipartCommit(commit);
       outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
           origin, destKey, null);
     } catch (IOException | IllegalArgumentException e) {
@@ -274,6 +271,24 @@ public class FileCommitActions {
               : new PathCommitException(destKey, e.toString(), e));
     }
     return outcome;
+  }
+
+  /**
+   * Abort the multipart commit supplied. This is the lower level operation
+   * which doesn't generate an outcome, instead raising an exception.
+   * @param pending pending commit to abort
+   * @throws IOException on any failure
+   */
+  public void abortMultipartCommit(SinglePendingCommit commit)
+      throws IOException {
+    String destKey = commit.destinationKey;
+    String origin = commit.filename !=null ?
+        (" defined in " + commit.filename)
+        : "";
+    String uploadId = commit.uploadId;
+    LOG.info("Aborting commit to object {}{}",
+        destKey, origin);
+    abortMultipartCommit(destKey, uploadId);
   }
 
   /**

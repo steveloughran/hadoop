@@ -112,24 +112,8 @@ public final class StagingS3Util {
   public static void abortCommit(FileCommitActions actions,
       SinglePendingCommit pending) throws IOException {
     LOG.debug("Abort {}", pending);
-    abort(actions.getS3Client(), pending.destinationKey, pending.newAbortRequest());
-  }
-
-  /**
-   * Abort an MPU; translate the failure into an IOE.
-   * @param client S3 client
-   * @param key dest key
-   * @param request MPU request
-   * @throws IOException failure
-   */
-  protected static void abort(AmazonS3 client,
-      String key,
-      AbortMultipartUploadRequest request) throws IOException {
-    try {
-      client.abortMultipartUpload(request);
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("abort commit", key, e);
-    }
+//    abort(actions.getS3Client(), pending.destinationKey, pending.newAbortRequest());
+    actions.abortMultipartCommit(pending);
   }
 
   /**

@@ -40,7 +40,9 @@ public class MockFileCommitActions extends FileCommitActions {
    * with the mock client.
    * @param fs filesystem to work with.
    * @param mockClient optional mock S3A FS: if unset, one is created.
-   * @param patchFSwithMockS3Client set flag to patch the FS
+   * @param patchFSwithMockS3Client set flag to patch the FS if the client was
+   * created on demand' ignored if a client is passed in (caller is expected
+   * to have set this up)
    */
   public MockFileCommitActions(S3AFileSystem fs,
       AmazonS3 mockClient,
@@ -51,11 +53,10 @@ public class MockFileCommitActions extends FileCommitActions {
     } else {
       this.mockClient = StagingTestBase.newMockClient(
           getResults(), getErrors());
-    }
-    // conditionally patch any mock FS with the client which has been
-    // assigned/created
-    if (patchFSwithMockS3Client && fs instanceof MockS3AFileSystem) {
-      ((MockS3AFileSystem) fs).setAmazonS3Client(this.mockClient);
+      // conditionally patch any mock FS with the createdclient
+      if (patchFSwithMockS3Client) {
+        ((MockS3AFileSystem) fs).setAmazonS3Client(mockClient);
+      }
     }
   }
 
@@ -70,5 +71,15 @@ public class MockFileCommitActions extends FileCommitActions {
   @Override
   public AmazonS3 getS3Client() {
     return mockClient;
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "MockFileCommitActions{");
+    sb.append("results=").append(results);
+    sb.append(", errors=").append(errors);
+    sb.append('}');
+    return sb.toString();
   }
 }

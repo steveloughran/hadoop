@@ -38,20 +38,22 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   private MockFileCommitActions mockCommitActions;
 
-  MockedStagingCommitter(Path outputPath, JobContext context)
+  MockedStagingCommitter(Path outputPath,
+      JobContext context, AmazonS3 mockClient)
       throws IOException {
     super(outputPath, context);
-    createMockCommitActions();
+    createMockCommitActions(mockClient);
   }
 
-  MockedStagingCommitter(Path outputPath, TaskAttemptContext context)
+  MockedStagingCommitter(Path outputPath,
+      TaskAttemptContext context, AmazonS3 mockClient)
       throws IOException {
     super(outputPath, context);
-    createMockCommitActions();
+    createMockCommitActions(mockClient);
   }
 
-  private void createMockCommitActions() throws IOException {
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), null, true);
+  private void createMockCommitActions(AmazonS3 mockClient) throws IOException {
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient, true);
 
     setCommitActions(mockCommitActions);
   }
@@ -118,5 +120,16 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   public AmazonS3 getMockClient() {
     return mockCommitActions.getS3Client();
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "MockedStagingCommitter{");
+    sb.append("mockCommitActions=").append(mockCommitActions);
+    sb.append(' ');
+    sb.append(super.toString());
+    sb.append('}');
+    return sb.toString();
   }
 }
