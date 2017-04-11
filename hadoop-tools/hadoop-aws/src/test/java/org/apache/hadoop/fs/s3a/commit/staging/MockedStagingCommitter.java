@@ -51,7 +51,8 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   private void createMockCommitActions() throws IOException {
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), null);
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), null, true);
+
     setCommitActions(mockCommitActions);
   }
 

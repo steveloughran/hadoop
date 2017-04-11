@@ -130,7 +130,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       if (getCommitActions() != null) {
         Path pending = getJobAttemptPath(context);
         FileCommitActions.CommitAllFilesOutcome outcome
-            = getCommitActions().abortAllPendingFilesInPath(pending, true);
+            = getCommitActions().abortAllSinglePendingCommits(pending, true);
         outcome.maybeRethrow();
       }
     }
@@ -209,7 +209,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @VisibleForTesting
   FileCommitActions.CommitAllFilesOutcome innerCommitTask(
       TaskAttemptContext context) throws IOException {
-    return getCommitActions().commitSinglePendingCommits(
+    return getCommitActions().commitSinglePendingCommitFiles(
         getTaskAttemptPath(context), true);
   }
 
@@ -226,7 +226,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d =
              new DurationInfo("Abort task %s", context.getTaskAttemptID())) {
       FileCommitActions.CommitAllFilesOutcome outcome
-          = getCommitActions().abortAllPendingFilesInPath(
+          = getCommitActions().abortAllSinglePendingCommits(
           attemptPath, true);
     } finally {
       deleteQuietly(getDestFS(), attemptPath, true);

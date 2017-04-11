@@ -127,13 +127,13 @@ public class FileCommitActions {
   }
 
   /**
-   * Commit all pending files.
+   * Commit all single pending files in a directory tree.
    * @param pendingDir directory of pending operations
    * @param recursive recurse?
    * @return the outcome of all the operations
    * @throws IOException if there is a problem listing the path.
    */
-  public CommitAllFilesOutcome commitSinglePendingCommits(Path pendingDir,
+  public CommitAllFilesOutcome commitSinglePendingCommitFiles(Path pendingDir,
       boolean recursive) throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
     LoadResults loadResults = loadSinglePendingCommits(
@@ -227,17 +227,15 @@ public class FileCommitActions {
    * @param pendingFile path
    * @return the outcome
    */
-  public CommitFileOutcome abortPendingFile(Path pendingFile) {
+  public CommitFileOutcome abortSinglePendingCommitFile(Path pendingFile) {
     CommitFileOutcome outcome;
-    String destKey = null;
-    String origin = pendingFile.toString();
     try {
       // really read it in and parse
       SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
-      destKey = commit.destinationKey;
-      outcome = abort(pendingFile.toString(), commit);
+      outcome = abort(commit);
     } catch (IOException e) {
       // abort failed to load/validate
+      String origin = pendingFile.toString();
       outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
           origin, null, e);
     } finally {
@@ -251,19 +249,19 @@ public class FileCommitActions {
    * {@link CommitOutcomes#ABORTED} describing the operation.
    * Failures are caught and result in an outcome of the type
    * {@link CommitOutcomes#ABORT_FAILED}
-   * @param origin origin of data
+   * @param origin filename of data; used for error messages. Set to ""
+   * and {@code commit.filename} is used instead
    * @return the outcome
    */
-  public CommitFileOutcome abort(String origin,
-      SinglePendingCommit commit) {
+  public CommitFileOutcome abort(SinglePendingCommit commit) {
     CommitFileOutcome outcome;
     String destKey = commit.destinationKey;
+    String origin = commit.filename;
     try {
       LOG.info("Aborting commit to file {} defined in {}",
           destKey, origin);
-      S3AFileSystem.WriteOperationHelper writer
-          = fs.createWriteOperationHelper(destKey);
-      writer.abortMultipartCommit(destKey, commit.uploadId);
+      String uploadId = commit.uploadId;
+      abortMultipartCommit(destKey, uploadId);
       outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
           origin, destKey, null);
     } catch (IOException | IllegalArgumentException e) {
@@ -273,9 +271,23 @@ public class FileCommitActions {
       outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
           origin, destKey,
           e instanceof IOException ? (IOException) e
-              : new PathCommitException(origin, e.toString(), e));
+              : new PathCommitException(destKey, e.toString(), e));
     }
     return outcome;
+  }
+
+  /**
+   * Create an {@code AbortMultipartUpload} request and POST it
+   * to S3.
+   * @param destKey destination key
+   * @param uploadId upload to cancel
+   * @throws IOException on any failure
+   */
+  public void abortMultipartCommit(String destKey, String uploadId)
+      throws IOException {
+    S3AFileSystem.WriteOperationHelper writer
+        = fs.createWriteOperationHelper(destKey);
+    writer.abortMultipartCommit(destKey, uploadId);
   }
 
   public static CommitFileOutcome commitSuccess(String origin,
@@ -295,7 +307,7 @@ public class FileCommitActions {
    * @return the outcome of all the abort operations
    * @throws IOException if there is a problem listing the path.
    */
-  public CommitAllFilesOutcome abortAllPendingFilesInPath(Path pendingDir,
+  public CommitAllFilesOutcome abortAllSinglePendingCommits(Path pendingDir,
       boolean recursive)
       throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
@@ -314,7 +326,7 @@ public class FileCommitActions {
       LocatedFileStatus next = pendingFiles.next();
       Path pending = next.getPath();
       if (pending.getName().endsWith(MagicCommitterConstants.PENDING_SUFFIX)) {
-        outcome.add(abortPendingFile(pending));
+        outcome.add(abortSinglePendingCommitFile(pending));
       }
     }
     LOG.info("aborted operations: {}", outcome);

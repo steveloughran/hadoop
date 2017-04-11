@@ -34,13 +34,28 @@ public class MockFileCommitActions extends FileCommitActions {
       errors = new StagingTestBase.ClientErrors();
   private final AmazonS3 mockClient;
 
-  public MockFileCommitActions(S3AFileSystem fs, AmazonS3 mockClient) {
+  /**
+   * Creator. Will create a mock S3 client if none is provided, using the
+   * results and errors in this instance. Can optionally patch the FS
+   * with the mock client.
+   * @param fs filesystem to work with.
+   * @param mockClient optional mock S3A FS: if unset, one is created.
+   * @param patchFSwithMockS3Client set flag to patch the FS
+   */
+  public MockFileCommitActions(S3AFileSystem fs,
+      AmazonS3 mockClient,
+      boolean patchFSwithMockS3Client) {
     super(fs);
     if (mockClient != null) {
       this.mockClient = mockClient;
     } else {
       this.mockClient = StagingTestBase.newMockClient(
           getResults(), getErrors());
+    }
+    // conditionally patch any mock FS with the client which has been
+    // assigned/created
+    if (patchFSwithMockS3Client && fs instanceof MockS3AFileSystem) {
+      ((MockS3AFileSystem) fs).setAmazonS3Client(this.mockClient);
     }
   }
 

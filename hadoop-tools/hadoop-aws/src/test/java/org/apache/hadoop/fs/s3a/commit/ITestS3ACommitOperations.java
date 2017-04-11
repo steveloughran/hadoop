@@ -128,13 +128,13 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     FileCommitActions actions = newActions();
     // abort,; rethrow on failure
     LOG.info("First abort call");
-    actions.abortPendingFile(pendingDataPath).maybeRethrow();
+    actions.abortSinglePendingCommitFile(pendingDataPath).maybeRethrow();
     assertPathDoesNotExist("pending file not deleted", pendingDataPath);
     assertPathDoesNotExist("dest file was created", destFile);
 
     // and again. here uprating a missing file to a failure
     LOG.info("Second abort call");
-    FileCommitActions.CommitFileOutcome outcome = actions.abortPendingFile(
+    FileCommitActions.CommitFileOutcome outcome = actions.abortSinglePendingCommitFile(
         pendingDataPath);
     assertTrue("Expected 2nd abort to fail to ABORT_FAILED " + outcome,
         outcome.hasOutcome(FileCommitActions.CommitOutcomes.ABORT_FAILED));
@@ -178,7 +178,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testCommitNonexistentDir() throws Throwable {
     describe("Attempt to commit a pending directory that does not exist");
     Path destFile = methodPath("testCommitNonexistentDir");
-    newActions().commitSinglePendingCommits(destFile, true);
+    newActions().commitSinglePendingCommitFiles(destFile, true);
   }
 
   @Test(expected = PathCommitException.class)
@@ -186,7 +186,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to commit a pending directory that is actually a file");
     Path destFile = methodPath("testCommitPendingFilesinSimpleFile");
     touch(getFileSystem(), destFile);
-    newActions().commitSinglePendingCommits(destFile, true);
+    newActions().commitSinglePendingCommitFiles(destFile, true);
   }
 
   @Test
@@ -194,7 +194,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to abort a directory that does not exist");
     Path destFile = methodPath("testAbortNonexistentPath");
     FileCommitActions.CommitAllFilesOutcome outcome = newActions()
-        .abortAllPendingFilesInPath(destFile, true);
+        .abortAllSinglePendingCommits(destFile, true);
     outcome.maybeRethrow();
     assertFalse("outcome includes successes",
         outcome.hasOutcome(FileCommitActions.CommitOutcomes.SUCCEEDED));
@@ -205,7 +205,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     describe("Attempt to abort a file that does not exist");
     Path destFile = methodPath("testAbortNonexistentFile");
     FileCommitActions.CommitFileOutcome outcome =
-        newActions().abortPendingFile(destFile);
+        newActions().abortSinglePendingCommitFile(destFile);
     assertTrue("not aborted: " + outcome, outcome.hasOutcome(
         FileCommitActions.CommitOutcomes.ABORT_FAILED));
   }

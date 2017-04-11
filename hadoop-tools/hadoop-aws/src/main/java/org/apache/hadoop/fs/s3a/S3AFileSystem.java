@@ -437,6 +437,15 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
+   * Set the client -used in mocking tests to force in a different client.
+   * @param client client.
+   */
+  protected void setAmazonS3Client(AmazonS3 client) {
+    Preconditions.checkNotNull(client != null, "client");
+    s3 = client;
+  }
+
+  /**
    * Get the region of a bucket.
    * @return the region in which a bucket is located
    * @throws IOException on any failure.
@@ -2852,10 +2861,10 @@ public class S3AFileSystem extends FileSystem {
    * Each instance of this state is unique to a single output stream.
    */
   @InterfaceAudience.Private
-  public final class WriteOperationHelper {
+  public class WriteOperationHelper {
     private final String key;
 
-    private WriteOperationHelper(String key) {
+    protected WriteOperationHelper(String key) {
       this.key = key;
     }
 
@@ -2963,8 +2972,8 @@ public class S3AFileSystem extends FileSystem {
      * @param uploadId multipart operation Id
      * @throws IOException on problems.
      */
-    public void abortMultipartCommit(String dest,
-        String uploadId) throws IOException {
+    public void abortMultipartCommit(String dest, String uploadId)
+        throws IOException {
       try {
         abortMultipartUpload(dest, uploadId);
       } catch (AmazonClientException e) {
@@ -2972,6 +2981,7 @@ public class S3AFileSystem extends FileSystem {
             keyToPath(dest), e);
       }
     }
+
     /**
      * Abort a multipart upload operation.
      * @param uploadId multipart operation Id

@@ -36,12 +36,14 @@ class PartitionedCommitterForTesting extends
   private final S3AFileSystem mockFS;
 
   PartitionedCommitterForTesting(Path outputPath,
-      TaskAttemptContext context, AmazonS3 mockClient,
+      TaskAttemptContext context,
+      AmazonS3 mockClient,
       S3AFileSystem mockFS) throws IOException {
     super(outputPath, context);
     this.mockFS = mockFS;
     this.mockClient = mockClient;
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient);
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient,
+        true);
     setCommitActions(mockCommitActions);
   }
 
@@ -52,7 +54,8 @@ class PartitionedCommitterForTesting extends
     super(outputPath, context);
     this.mockFS = mockFS;
     this.mockClient = mockClient;
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient);
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient,
+        true);
     setCommitActions(mockCommitActions);
   }
 

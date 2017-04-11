@@ -24,6 +24,8 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.MultipartUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +47,7 @@ import org.apache.hadoop.util.Progressable;
  * down why there are extra calls to a method than a test would expect:
  * changes in implementation details often trigger such false-positive
  * test failures.
+ *
  */
 public class MockS3AFileSystem extends S3AFileSystem {
   public static final String BUCKET = "bucket-name";
@@ -71,12 +74,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   private void event(String format, Object... args) {
     Throwable ex = null;
+    String s = String.format(format, args);
     switch (logEvents) {
     case LOG_STACK:
-      ex = new Exception("stack");
+      ex = new Exception(s);
         /* fall through */
     case LOG_NAME:
-      String s = String.format(format, args);
       LOG.info(s, ex);
       break;
     case LOG_NONE:
@@ -113,6 +116,16 @@ public class MockS3AFileSystem extends S3AFileSystem {
   public void initialize(URI name, Configuration originalConf)
       throws IOException {
 //    mock.initialize(name, originalConf);
+  }
+
+  /**
+   * Make operation to set the s3 client public.
+   * @param client client.
+   */
+  @Override
+  protected void setAmazonS3Client(AmazonS3 client) {
+    LOG.debug("Setting S3 client to {}", client);
+    super.setAmazonS3Client(client);
   }
 
   @Override
@@ -218,6 +231,36 @@ public class MockS3AFileSystem extends S3AFileSystem {
     @Override
     public LocatedFileStatus next() throws IOException {
       return null;
+    }
+  }
+
+  @Override
+  public WriteOperationHelper createWriteOperationHelper(String key) {
+    return new MockWriteOperationHelper(key, super.createWriteOperationHelper(key));
+  }
+
+  /**
+   * Class to help mock WriteOperations & so file commit actions.
+   */
+  private class MockWriteOperationHelper extends WriteOperationHelper {
+
+    private final WriteOperationHelper wrapped;
+
+    public MockWriteOperationHelper(String key,
+        WriteOperationHelper writeOperationHelper) {
+      super(key);
+      wrapped = writeOperationHelper;
+    }
+
+    /**
+     * Abort a multipart upload operation.
+     * @param uploadId multipart operation Id
+     * @throws AmazonClientException on problems.
+     */
+    public void abortMultipartUpload(String uploadKey, String uploadId)
+        throws AmazonClientException {
+      event("Aborting multipart upload %s to %s", uploadId, uploadKey);
+      wrapped.abortMultipartUpload(uploadKey, uploadId);
     }
   }
 }

@@ -879,7 +879,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       try {
         List<FileStatus> filesToCommit = getTaskOutput(context);
         int count = commitTaskInternal(context, filesToCommit);
-        LOG.info("{}: upload file count: {}", getRole(), count);
+        LOG.info("{}: upl´oad file count: {}", getRole(), count);
       } catch (IOException e) {
         LOG.error("{}: commit of task {} failed",
             getRole(), context.getTaskAttemptID(), e);
@@ -904,7 +904,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     final Path attemptPath = getTaskAttemptPath(context);
     FileSystem attemptFS = getTaskAttemptFilesystem(context);
     LOG.debug("{}: attempt path is {}", getRole(), attemptPath);
-
 
     // add the commits file to the wrapped committer's task attempt location.
     // this complete file will be committed by the wrapped committer at the end

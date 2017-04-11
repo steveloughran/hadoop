@@ -43,6 +43,7 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 /** Test suite.*/
 public class TestStagingPartitionedTaskCommit
     extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
+
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
     return new PartitionedCommitterForTesting(OUTPUT_PATH,

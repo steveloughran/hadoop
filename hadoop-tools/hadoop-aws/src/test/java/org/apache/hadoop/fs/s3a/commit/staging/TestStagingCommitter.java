@@ -88,7 +88,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private MockedStagingCommitter committer = null;
 
   @BeforeClass
-  public static void setupS3() throws IOException {
+  public static void setupMockFS() throws IOException {
     createAndBindMockFSInstance(getConfiguration());
   }
 
@@ -105,8 +105,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
         {0, false},
-        {1, true},
-        {3, true},
+//        {1, true},
+//        {3, true},
     });
   }
 
@@ -132,7 +132,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     // get the task's configuration copy so modifications take effect
     this.conf = tac.getConfiguration();
-    // TODO: is this the right path
+    // TODO: is this the right path?
     conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
     conf.setInt(MULTIPART_SIZE, 100);
 

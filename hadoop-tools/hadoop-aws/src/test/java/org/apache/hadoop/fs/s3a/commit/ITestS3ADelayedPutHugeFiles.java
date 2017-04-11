@@ -108,7 +108,7 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
     FileCommitActions.CommitAllFilesOutcome outcome =
         new FileCommitActions(fs)
-            .commitSinglePendingCommits(jobDir, false);
+            .commitSinglePendingCommitFiles(jobDir, false);
     timer.end("time to commit %s", pendingDataFile);
     outcome.maybeRethrow();
     super.test_030_postCreationAssertions();

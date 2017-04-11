@@ -223,8 +223,7 @@ public final class StagingS3Util {
     } finally {
       if (threw && uploadId != null) {
         try {
-          abort(client, key,
-              new AbortMultipartUploadRequest(bucket, key, uploadId));
+          actions.abortMultipartCommit(key, uploadId);
         } catch (IOException e) {
           LOG.error("Failed to abort upload {} to {}", uploadId, key, e);
         }
