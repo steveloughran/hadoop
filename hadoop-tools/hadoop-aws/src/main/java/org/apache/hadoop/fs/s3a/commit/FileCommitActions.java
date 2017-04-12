@@ -18,13 +18,17 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.services.s3.model.PartETag;
+import com.amazonaws.services.s3.model.UploadPartRequest;
+import com.amazonaws.services.s3.model.UploadPartResult;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -56,15 +60,6 @@ public class FileCommitActions {
   public FileCommitActions(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
-  }
-
-  /**
-   * Get the S3 client.
-   * Only temporarily available.
-   * @return the client
-   */
-  public AmazonS3 getS3Client() {
-    return fs.getAmazonS3Client();
   }
 
   /**
@@ -111,7 +106,7 @@ public class FileCommitActions {
       commit.validate();
       destKey = commit.destinationKey;
       S3AFileSystem.WriteOperationHelper writer
-          = fs.createWriteOperationHelper(destKey);
+          = writer(destKey);
       writer.finalizeMultipartCommit(destKey,
           commit.uploadId,
           CommitUtils.toPartEtags(commit.etags),
@@ -134,6 +129,10 @@ public class FileCommitActions {
     return outcome;
   }
 
+  private S3AFileSystem.WriteOperationHelper writer(String destKey) {
+    return fs.createWriteOperationHelper(destKey);
+  }
+
   /**
    * Verify that the path at the end of a commit exists. This does
    * not validate the size.
@@ -144,11 +143,9 @@ public class FileCommitActions {
    */
   public void verifyCommitExists(SinglePendingCommit commit)
       throws FileNotFoundException, ValidationFailure, IOException {
-    String destKey = "unknown destination";
     commit.validate();
-    destKey = commit.destinationKey;
-    Path destPath = fs.keyToQualifiedPath(destKey);
-    FileStatus status = fs.getFileStatus(destPath);
+    FileStatus status = fs.getFileStatus(
+        fs.keyToQualifiedPath(commit.destinationKey));
     LOG.debug("Destination entry: {}", status);
   }
 
@@ -288,7 +285,7 @@ public class FileCommitActions {
   /**
    * Abort the multipart commit supplied. This is the lower level operation
    * which doesn't generate an outcome, instead raising an exception.
-   * @param pending pending commit to abort
+   * @param commit pending commit to abort
    * @throws IOException on any failure
    */
   public void abortMultipartCommit(SinglePendingCommit commit)
@@ -312,9 +309,7 @@ public class FileCommitActions {
    */
   public void abortMultipartCommit(String destKey, String uploadId)
       throws IOException {
-    S3AFileSystem.WriteOperationHelper writer
-        = fs.createWriteOperationHelper(destKey);
-    writer.abortMultipartCommit(destKey, uploadId);
+    writer(destKey).abortMultipartCommit(destKey, uploadId);
   }
 
   public static CommitFileOutcome commitSuccess(String origin,
@@ -366,11 +361,9 @@ public class FileCommitActions {
    * @return a count of the number of uploads aborted.
    * @throws IOException IO failure
    */
-  public int abortPendingUploadsUnderDestination(Path dest) throws IOException {
+  public int abortPendingUploadsUnderPath(Path dest) throws IOException {
     String destKey = fs.pathToKey(dest);
-    S3AFileSystem.WriteOperationHelper writer
-        = fs.createWriteOperationHelper(destKey);
-    return writer.abortMultipartUploadsUnderPath(destKey);
+    return writer(destKey).abortMultipartUploadsUnderPath(destKey);
   }
 
   /**
@@ -394,8 +387,96 @@ public class FileCommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.debug("Revert {}", commit);
-    fs.createWriteOperationHelper(commit.destinationKey)
+    writer(commit.destinationKey)
         .revertCommit(commit.destinationKey);
+  }
+
+
+  /**
+   * Upload all the data in the local file, returning the information
+   * needed to commit the work.
+   * @param actions commit actions to use
+   * @param localFile local file (be  a file)
+   * @param partition partition/subdir. Not used
+   * @param bucket dest bucket
+   * @param key dest key
+   * @param destURI destination
+   * @param uploadPartSize size of upload  @return a pending upload entry
+   * @return the commit data
+   * @throws IOException failure
+   */
+  public SinglePendingCommit uploadFileToPendingCommit(File localFile,
+      String partition,
+      String bucket,
+      String key,
+      String destURI,
+      long uploadPartSize)
+      throws IOException {
+
+    LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
+            " partition={} partSize={}",
+        localFile, bucket, key, partition, uploadPartSize);
+    if (!localFile.exists()) {
+      throw new FileNotFoundException(localFile.toString());
+    }
+    if (!localFile.isFile()) {
+      throw new IOException("Not a file: " + localFile);
+    }
+    S3AFileSystem.WriteOperationHelper writer = writer(key);
+    String uploadId = null;
+
+    boolean threw = true;
+    try {
+      uploadId = writer.initiateMultiPartUpload();
+      long length = localFile.length();
+
+      SinglePendingCommit commitData = new SinglePendingCommit();
+      commitData.destinationKey = key;
+      commitData.bucket = bucket;
+      commitData.touch(System.currentTimeMillis());
+      commitData.uploadId = uploadId;
+      commitData.uri = destURI;
+      commitData.text = partition != null ? "partition: " + partition : "";
+      commitData.size = length;
+
+      long offset = 0;
+      long numParts = (length / uploadPartSize +
+                           ((length % uploadPartSize) > 0 ? 1 : 0));
+
+      List<PartETag> parts = new ArrayList<>((int) numParts);
+
+      LOG.debug("File size is {}, number of parts to upload = {}",
+          length, numParts);
+      for (int partNumber = 1; partNumber <= numParts; partNumber += 1) {
+        long size = Math.min(length - offset, uploadPartSize);
+        UploadPartRequest part;
+        part = writer.newUploadPartRequest(
+            uploadId,
+            partNumber,
+            (int) size,
+            null,
+            localFile,
+            offset
+        );
+        part.setLastPart(partNumber == numParts);
+
+        UploadPartResult partResult = writer.uploadPart(part);
+        offset += uploadPartSize;
+        parts.add(partResult.getPartETag());
+      }
+
+      commitData.bindCommitData(parts);
+      threw = false;
+      return commitData;
+    } finally {
+      if (threw && uploadId != null) {
+        try {
+          abortMultipartCommit(key, uploadId);
+        } catch (IOException e) {
+          LOG.error("Failed to abort upload {} to {}", uploadId, key, e);
+        }
+      }
+    }
   }
 
   /**

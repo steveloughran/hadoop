@@ -3160,14 +3160,11 @@ public class S3AFileSystem extends FileSystem {
       } else {
         Preconditions.checkArgument(sourceFile.exists(),
             "Source file does not exist: %s", sourceFile);
-        Preconditions.checkArgument(offset >= 0, "Invalid offset %d", offset);
+        Preconditions.checkArgument(offset >= 0, "Invalid offset %s", offset);
         long length = sourceFile.length();
         Preconditions.checkArgument(offset == 0 || offset < length,
-            "Offset %d beyond length of file %d", offset, length);
-        long range = length - offset;
-        Preconditions.checkArgument(range <= size,
-            "Partion size %d > available bytes %d from offset %d in file %s",
-            size, range, offset);
+            "Offset %s beyond length of file %s", offset, length);
+        long range = Math.min(size, length - offset);
         request.setFile(sourceFile);
         request.setFileOffset(offset);
       }
@@ -3259,6 +3256,23 @@ public class S3AFileSystem extends FileSystem {
       } catch (AmazonClientException e) {
         throw S3AUtils.translateException("revert commit",
             destKey,
+            e);
+      }
+    }
+
+    /**
+     * Upload part of a multi-partition file.
+     * @param request request
+     * @return the result of the operation.
+     * @throws AmazonClientException on problems
+     */
+    public UploadPartResult uploadPart(UploadPartRequest request)
+        throws IOException {
+      try {
+        return S3AFileSystem.this.uploadPart(request);
+      } catch (AmazonClientException e) {
+        throw S3AUtils.translateException("upload part",
+            request.getKey(),
             e);
       }
     }

@@ -43,7 +43,7 @@ class PartitionedCommitterForTesting extends
     this.mockFS = mockFS;
     this.mockClient = mockClient;
     mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient,
-        true);
+        false);
     setCommitActions(mockCommitActions);
   }
 
@@ -63,11 +63,6 @@ class PartitionedCommitterForTesting extends
   protected void initOutput(Path out) throws IOException {
     super.initOutput(out);
     setOutputPath(out);
-  }
-
-  @Override
-  protected AmazonS3 getClient(Path path, Configuration conf) {
-    return mockClient;
   }
 
   /**

@@ -45,7 +45,8 @@ public class ValidationFailure extends IOException {
    * @throws ValidationFailure on a failure
    */
   public static void verify(boolean expression,
-      String message, Object... args) throws ValidationFailure {
+      String message,
+      Object... args) throws ValidationFailure {
     if (!expression) {
       throw new ValidationFailure(message, args);
     }

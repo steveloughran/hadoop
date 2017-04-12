@@ -73,11 +73,6 @@ public class TestStagingPartitionedJobCommit
     }
 
     @Override
-    protected AmazonS3 getClient(Path path, Configuration conf) {
-      return client;
-    }
-
-    @Override
     protected List<SinglePendingCommit> getPendingUploads(JobContext context)
         throws IOException {
       List<SinglePendingCommit> pending = Lists.newArrayList();

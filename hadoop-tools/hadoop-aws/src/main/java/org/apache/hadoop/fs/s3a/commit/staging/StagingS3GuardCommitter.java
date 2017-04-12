@@ -397,19 +397,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     throw new UnsupportedOperationException("Unimplemented");
   }
 
-    /**
-   * Getter for the cached {@link AmazonS3} client. Subclasses should call this
-   * method to get a client instance.
-   *
-   * @param path the output S3 path (with bucket)
-   * @param conf a Hadoop {@link Configuration}
-   * @return a {@link AmazonS3} client
-   */
-  protected AmazonS3 getClient(Path path, Configuration conf)
-      throws IOException {
-    return getCommitActions().getS3Client();
-  }
-
   /**
    * Lists the output of a task under the task attempt path. Subclasses can
    * override this method to change how output files are identified.
@@ -728,7 +715,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     try (DurationInfo d =
              new DurationInfo("%s: aborting all pending commits", getRole())) {
       int count = getCommitActions()
-          .abortPendingUploadsUnderDestination(getOutputPath(context));
+          .abortPendingUploadsUnderPath(getOutputPath(context));
       if (count > 0) {
         LOG.warn("{}: deleted {} extra pending upload(s)", getRole(), count);
       }

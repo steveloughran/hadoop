@@ -53,9 +53,9 @@ public class MockFileCommitActions extends FileCommitActions {
     } else {
       this.mockClient = StagingTestBase.newMockS3Client(
           getResults(), getErrors());
-      // conditionally patch any mock FS with the createdclient
+      // conditionally patch any mock FS with the created client
       if (patchFSwithMockS3Client) {
-        ((MockS3AFileSystem) fs).setAmazonS3Client(mockClient);
+        ((MockS3AFileSystem) fs).setAmazonS3Client(this.mockClient);
       }
     }
   }
@@ -66,11 +66,6 @@ public class MockFileCommitActions extends FileCommitActions {
 
   public StagingTestBase.ClientErrors getErrors() {
     return errors;
-  }
-
-  @Override
-  public AmazonS3 getS3Client() {
-    return mockClient;
   }
 
   @Override

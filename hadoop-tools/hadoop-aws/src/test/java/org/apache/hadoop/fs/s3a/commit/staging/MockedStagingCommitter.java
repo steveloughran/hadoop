@@ -71,20 +71,6 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
     return out.getFileSystem(config);
   }
 
-  /*
-
-  @Override
-  protected void initOutput(Path outputPath) throws IOException {
-
-    setOutputPath(outputPath);
-  }
-*/
-
-  @Override
-  protected AmazonS3 getClient(Path path, Configuration conf) {
-    return getMockClient();
-  }
-
   @Override
   public void commitJob(JobContext context) throws IOException {
     // turn off stamping an output marker, as that codepath isn't mocked yet.
@@ -116,10 +102,6 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   public ClientErrors getErrors() {
     return mockCommitActions.getErrors();
-  }
-
-  public AmazonS3 getMockClient() {
-    return mockCommitActions.getS3Client();
   }
 
   @Override

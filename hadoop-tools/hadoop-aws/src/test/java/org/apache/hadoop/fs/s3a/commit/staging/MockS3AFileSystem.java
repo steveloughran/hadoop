@@ -18,15 +18,13 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
-import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.MultipartUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +33,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -228,17 +225,14 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   @Override
   public void incrementPutStartStatistics(long bytes) {
-    super.incrementPutStartStatistics(bytes);
   }
 
   @Override
   public void incrementPutCompletedStatistics(boolean success, long bytes) {
-    super.incrementPutCompletedStatistics(success, bytes);
   }
 
   @Override
   public void incrementPutProgressStatistics(String key, long bytes) {
-    super.incrementPutProgressStatistics(key, bytes);
   }
 
 /*
@@ -248,6 +242,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
     getAmazonS3Client().deleteObject(new DeleteObjectRequest(getBucket(), key));
   }
 */
+
+  @Override
+  protected void setOptionalMultipartUploadRequestParameters(
+      InitiateMultipartUploadRequest req) {
+// no-op
+  }
 
   @Override
   public long getDefaultBlockSize() {

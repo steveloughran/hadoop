@@ -27,8 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingS3Util;
 import org.apache.hadoop.util.JsonSerDeser;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
@@ -40,6 +44,8 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
  * checks those values on load.
  */
 public class MultiplePendingCommits extends PersistentCommitData {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      MultiplePendingCommits.class);
 
   /**
    * Supported version value: {@value}.
@@ -100,6 +106,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
    */
   public static MultiplePendingCommits load(FileSystem fs, Path path)
       throws IOException {
+    LOG.debug("Reading pending commits in file {}", path);
     MultiplePendingCommits instance = getSerializer().load(fs, path);
     instance.validate();
     return instance;
@@ -167,4 +174,5 @@ public class MultiplePendingCommits extends PersistentCommitData {
       throws IOException {
     SERIALIZER.save(fs, path, this, overwrite);
   }
+
 }

@@ -583,7 +583,8 @@ class S3ABlockOutputStream extends OutputStream {
               // do the upload
               PartETag partETag;
               try {
-                partETag = fs.uploadPart(request).getPartETag();
+                partETag = writeOperationHelper.uploadPart(request)
+                    .getPartETag();
                 LOG.debug("Completed upload of {} to part {}", block,
                     partETag.getETag());
                 LOG.debug("Stream statistics of {}", statistics);
