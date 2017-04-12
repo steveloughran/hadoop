@@ -278,35 +278,4 @@ public class MockS3AFileSystem extends S3AFileSystem {
     return sb.toString();
   }
 
-  @Override
-  public WriteOperationHelper createWriteOperationHelper(String key) {
-    return new MockWriteOperationHelper(key,
-        super.createWriteOperationHelper(key));
-  }
-
-  /**
-   * Class to help mock WriteOperations & so file commit actions.
-   */
-  private class MockWriteOperationHelper extends WriteOperationHelper {
-
-    private final WriteOperationHelper wrapped;
-
-    public MockWriteOperationHelper(String key,
-        WriteOperationHelper writeOperationHelper) {
-      super(key);
-      wrapped = writeOperationHelper;
-    }
-
-    /**
-     * Abort a multipart upload operation.
-     * @param uploadId multipart operation Id
-     * @throws AmazonClientException on problems.
-     */
-    public void abortMultipartUpload(String uploadKey, String uploadId)
-        throws AmazonClientException {
-      event("Aborting multipart upload %s to %s", uploadId, uploadKey);
-      wrapped.abortMultipartUpload(uploadKey, uploadId);
-    }
-  }
-
 }
