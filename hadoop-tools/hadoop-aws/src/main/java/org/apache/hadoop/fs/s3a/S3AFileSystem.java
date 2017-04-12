@@ -423,6 +423,15 @@ public class S3AFileSystem extends FileSystem {
     return uri;
   }
 
+  /**
+   * Set the URI field; exported for testing
+   * @param uri
+   */
+  @VisibleForTesting
+  protected void setUri(URI uri) {
+    this.uri = uri;
+  }
+
   @Override
   public int getDefaultPort() {
     return Constants.S3A_DEFAULT_PORT;
@@ -513,6 +522,15 @@ public class S3AFileSystem extends FileSystem {
    */
   public String getBucket() {
     return bucket;
+  }
+
+  /**
+   * Set the bucket.
+   * @param bucket
+   */
+  @VisibleForTesting
+  protected void setBucket(String bucket) {
+    this.bucket = bucket;
   }
 
   /**
@@ -3047,8 +3065,10 @@ public class S3AFileSystem extends FileSystem {
         List<PartETag> partETags) throws AmazonClientException {
       Preconditions.checkNotNull(uploadId);
       Preconditions.checkNotNull(partETags);
+/*
       Preconditions.checkArgument(!partETags.isEmpty(),
           "No partitions have been uploaded");
+*/
       LOG.debug("Completing multipart upload {} with {} parts",
           uploadId, partETags.size());
       // a copy of the list is required, so that the AWS SDK doesn't

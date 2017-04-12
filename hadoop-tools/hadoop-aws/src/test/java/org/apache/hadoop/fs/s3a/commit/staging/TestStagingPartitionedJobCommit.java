@@ -163,50 +163,51 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testReplace() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    S3AFileSystem mockS3A = getMockS3();
 
     getJob().getConfiguration().set(
         FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
 
     PartitionedStagingCommitter committer = newJobCommitter();
 
+//    getWrapperFS().setLogEvents(MockS3AFileSystem.LOG_STACK);
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3);
-    verifyCompletion(mockS3);
+    verifyReplaceCommitActions(mockS3A);
+    verifyCompletion(mockS3A);
 
     // parent and peer directories exist
-    reset(mockS3);
-    pathsExist(mockS3, "dateint=20161115",
+    reset(mockS3A);
+    pathsExist(mockS3A, "dateint=20161115",
         "dateint=20161115/hour=12");
 
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3);
-    verifyCompletion(mockS3);
+    verifyReplaceCommitActions(mockS3A);
+    verifyCompletion(mockS3A);
 
     // partition directories exist and should be removed
-    reset(mockS3);
-    pathsExist(mockS3, "dateint=20161115/hour=12",
+    reset(mockS3A);
+    pathsExist(mockS3A, "dateint=20161115/hour=12",
         "dateint=20161115/hour=13");
-    canDelete(mockS3, "dateint=20161115/hour=13");
+    canDelete(mockS3A, "dateint=20161115/hour=13");
 
     committer.commitJob(getJob());
-    verifyDeleted(mockS3, "dateint=20161115/hour=13");
-    verifyReplaceCommitActions(mockS3);
-    verifyCompletion(mockS3);
+    verifyDeleted(mockS3A, "dateint=20161115/hour=13");
+    verifyReplaceCommitActions(mockS3A);
+    verifyCompletion(mockS3A);
 
     // partition directories exist and should be removed
-    reset(mockS3);
-    pathsExist(mockS3, "dateint=20161116/hour=13",
+    reset(mockS3A);
+    pathsExist(mockS3A, "dateint=20161116/hour=13",
         "dateint=20161116/hour=14");
 
-    canDelete(mockS3, "dateint=20161116/hour=13",
+    canDelete(mockS3A, "dateint=20161116/hour=13",
         "dateint=20161116/hour=14");
 
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3);
-    verifyDeleted(mockS3, "dateint=20161116/hour=13");
-    verifyDeleted(mockS3, "dateint=20161116/hour=14");
-    verifyCompletion(mockS3);
+    verifyReplaceCommitActions(mockS3A);
+    verifyDeleted(mockS3A, "dateint=20161116/hour=13");
+    verifyDeleted(mockS3A, "dateint=20161116/hour=14");
+    verifyCompletion(mockS3A);
   }
 
 
@@ -291,46 +292,4 @@ public class TestStagingPartitionedJobCommit
     verifyCompletion(mockS3);
   }
 
-  /**
-   * This isn't tested as it is looking at what the committer is meant to
-   * do when delete(path, recursive) returns false. Answer: you only get
-   * to see that return code with s3a in the special cases related to
-   * root directories or the path not existing.
-   * @throws Exception
-   */
-  @Test
-  public void testReplaceWithDeleteFalse() throws Exception {
-    Assume.assumeTrue("not needed", false);
-    FileSystem mockS3 = getMockS3();
-
-    getJob().getConfiguration().set(
-        FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
-
-    final PartitionedStagingCommitter committer = newJobCommitter();
-
-    pathsExist(mockS3, "dateint=20161116/hour=13");
-    when(mockS3
-        .delete(
-            new Path(OUTPUT_PATH, "dateint=20161116/hour=13"),
-            true))
-        .thenReturn(false);
-
-    StagingTestBase.assertThrows(
-        "commitJob should throw an IOException, but completed",
-        IOException.class, new Callable<Void>() {
-          @Override
-          public Void call() throws IOException {
-            committer.commitJob(getJob());
-            return null;
-          }
-        });
-
-    verifyExistenceChecked(mockS3, "dateint=20161115/hour=13");
-    verifyExistenceChecked(mockS3, "dateint=20161115/hour=14");
-    verifyExistenceChecked(mockS3, "dateint=20161116/hour=13");
-    verifyDeleted(mockS3, "dateint=20161116/hour=13");
-    assertTrue("Should have aborted",
-        ((PartitionedStagingCommitterForTesting) committer).aborted);
-    verifyCompletion(mockS3);
-  }
 }

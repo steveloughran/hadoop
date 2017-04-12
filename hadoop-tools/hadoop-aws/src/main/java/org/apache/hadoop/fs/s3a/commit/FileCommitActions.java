@@ -87,6 +87,16 @@ public class FileCommitActions {
   }
 
   /**
+   * Commit the operation, throwing an exception on any failure
+   * @param commit commit to execute
+   * @throws IOException on a failure
+   */
+  public void commitOrFail(SinglePendingCommit commit) throws IOException {
+    CommitFileOutcome outcome = commit(commit, commit.filename);
+    outcome.maybeRethrow();
+  }
+
+  /**
    * Commit a single pending commit; exceptions are caught
    * and converted to an outcome.
    * @param commit entry to commit
@@ -95,20 +105,18 @@ public class FileCommitActions {
    */
   public CommitFileOutcome commit(SinglePendingCommit commit, String origin) {
     CommitFileOutcome outcome;
-    String destKey = null;
-    // really read it in and parse
+    String destKey = "unknown destination";
+    LOG.debug("Committing single commit {}", commit);
     try {
+      commit.validate();
       destKey = commit.destinationKey;
       S3AFileSystem.WriteOperationHelper writer
           = fs.createWriteOperationHelper(destKey);
-      writer.finalizeMultipartCommit(destKey, commit.uploadId,
+      writer.finalizeMultipartCommit(destKey,
+          commit.uploadId,
           CommitUtils.toPartEtags(commit.etags),
           commit.size);
       LOG.debug("Successfull commit");
-      // now do a low level get to verify it is there
-      Path destPath = fs.keyToQualifiedPath(destKey);
-      FileStatus status = fs.getFileStatus(destPath);
-      LOG.debug("Destination entry: {}", status);
       outcome = commitSuccess(origin, destKey);
     } catch (IOException e) {
       String msg = String.format("Failed to commit upload against %s: %s",
@@ -127,6 +135,24 @@ public class FileCommitActions {
   }
 
   /**
+   * Verify that the path at the end of a commit exists. This does
+   * not validate the size.
+   * @param commit commit to verify
+   * @throws FileNotFoundException dest doesn't exist
+   * @throws ValidationFailure commit arg is invalid
+   * @throws IOException invalid commit, IO failure
+   */
+  public void verifyCommitExists(SinglePendingCommit commit)
+      throws FileNotFoundException, ValidationFailure, IOException {
+    String destKey = "unknown destination";
+    commit.validate();
+    destKey = commit.destinationKey;
+    Path destPath = fs.keyToQualifiedPath(destKey);
+    FileStatus status = fs.getFileStatus(destPath);
+    LOG.debug("Destination entry: {}", status);
+  }
+
+  /**
    * Commit all single pending files in a directory tree.
    * @param pendingDir directory of pending operations
    * @param recursive recurse?
@@ -136,11 +162,10 @@ public class FileCommitActions {
   public CommitAllFilesOutcome commitSinglePendingCommitFiles(Path pendingDir,
       boolean recursive) throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
-    LoadResults loadResults = loadSinglePendingCommits(
-        pendingDir, recursive);
+    Pair<MultiplePendingCommits, List<LocatedFileStatus>> results
+        = loadSinglePendingCommits(pendingDir, recursive);
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
-    for (SinglePendingCommit singlePendingCommit :
-        loadResults.multiplePendingCommits.commits) {
+    for (SinglePendingCommit singlePendingCommit : results.first().commits) {
       CommitFileOutcome commit = commit(singlePendingCommit,
           singlePendingCommit.filename);
       outcome.add(commit);
@@ -188,7 +213,8 @@ public class FileCommitActions {
    * not load/validate.
    * @throws IOException on a failure to list the files.
    */
-  public LoadResults loadSinglePendingCommits(Path pendingDir,
+  public Pair<MultiplePendingCommits, List<LocatedFileStatus>>
+  loadSinglePendingCommits(Path pendingDir,
       boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
@@ -203,21 +229,7 @@ public class FileCommitActions {
         failures.add(status);
       }
     }
-    return new LoadResults(commits, failures);
-  }
-
-  /**
-   * Result tuple.
-   */
-  public static class LoadResults {
-    public final MultiplePendingCommits multiplePendingCommits;
-    public final List<LocatedFileStatus> loadFailures;
-
-    public LoadResults(MultiplePendingCommits multiplePendingCommits,
-        List<LocatedFileStatus> loadFailures) {
-      this.multiplePendingCommits = multiplePendingCommits;
-      this.loadFailures = loadFailures;
-    }
+    return Pair.of(commits, failures);
   }
 
   /**

@@ -32,10 +32,16 @@ import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
 @InterfaceStability.Evolving
 public final class StagingCommitterConstants {
 
-  public static final String STAGING_UPLOADS = "staging-uploads";
-
   private StagingCommitterConstants() {
   }
+
+  /** Name of the root partition :{@value}. */
+  public static final String TABLE_ROOT = "table_root";
+
+  /**
+   * Filename used under {@code ~/${UUID}} for the staging files.
+   */
+  public static final String STAGING_UPLOADS = "staging-uploads";
 
   // Spark configuration keys
 

@@ -63,6 +63,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   public MockS3AFileSystem(S3AFileSystem mock) {
     this.mock = mock;
+    setUri(FS_URI);
+    setBucket(BUCKET);
   }
 
   public int getLogEvents() {
@@ -90,21 +92,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public String getScheme() {
-    return FS_URI.getScheme();
-  }
-
-  @Override
-  public URI getUri() {
-    return FS_URI;
-  }
-
-  @Override
-  public String getBucket() {
-    return BUCKET;
-  }
-
-  @Override
   public Path getWorkingDirectory() {
     return new Path("s3a://" + BUCKET + "/work");
   }
@@ -112,7 +99,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public void initialize(URI name, Configuration originalConf)
       throws IOException {
-//    mock.initialize(name, originalConf);
   }
 
   /**
@@ -129,6 +115,11 @@ public class MockS3AFileSystem extends S3AFileSystem {
   public boolean exists(Path f) throws IOException {
     event("exists(%s)", f);
     return mock.exists(f);
+  }
+
+  @Override
+  public void finishedWrite(String key, long length) {
+
   }
 
   @Override

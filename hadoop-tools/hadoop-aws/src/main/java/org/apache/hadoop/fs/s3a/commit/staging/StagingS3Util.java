@@ -95,12 +95,14 @@ public final class StagingS3Util {
   public static void finishCommit(FileCommitActions actions,
       SinglePendingCommit commit) throws IOException {
     LOG.debug("Finish {}", commit);
-    try {
-      actions.getS3Client().completeMultipartUpload(commit.newCompleteRequest());
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("complete commit",
-          commit.destinationKey, e);
-    }
+    actions.commitOrFail(commit);
+//    try {
+//      actions.getS3Client()
+//          .completeMultipartUpload(commit.newCompleteRequest());
+//    } catch (AmazonClientException e) {
+//      throw S3AUtils.translateException("complete commit",
+//          commit.destinationKey, e);
+//    }
   }
 
   /**
@@ -112,7 +114,6 @@ public final class StagingS3Util {
   public static void abortCommit(FileCommitActions actions,
       SinglePendingCommit pending) throws IOException {
     LOG.debug("Abort {}", pending);
-//    abort(actions.getS3Client(), pending.destinationKey, pending.newAbortRequest());
     actions.abortMultipartCommit(pending);
   }
 

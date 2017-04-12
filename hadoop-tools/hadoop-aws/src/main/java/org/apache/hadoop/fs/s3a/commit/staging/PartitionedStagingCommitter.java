@@ -37,9 +37,9 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
  * Partitioned committer.
+ * This writes data to specific "partition" subdirectories
  */
 public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
-  protected static final String TABLE_ROOT = "table_root";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       PartitionedStagingCommitter.class);
@@ -106,7 +106,6 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     Set<Path> partitions = Sets.newLinkedHashSet();
     for (SinglePendingCommit commit : pending) {
       Path filePath = commit.destinationPath();
-//          "s3a://" + commit.getBucketName() + "/" + commit.getKey());
       partitions.add(filePath.getParent());
     }
 
@@ -131,6 +130,16 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     }
   }
 
+  /**
+   * Get the set of partitions from the list of files being staged.
+   * This is all immediate parents of those files. If a file is in the root
+   * dir, the partition is declared to be
+   * {@link StagingCommitterConstants#TABLE_ROOT}.
+   * @param attemptPath path for the attempt
+   * @param taskOutput list of output files.
+   * @return list of partitions.
+   * @throws IOException IO failure
+   */
   protected Set<String> getPartitions(Path attemptPath,
       List<FileStatus> taskOutput)
       throws IOException {
@@ -147,7 +156,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
       if (partition != null) {
         partitions.add(partition);
       } else {
-        partitions.add(TABLE_ROOT);
+        partitions.add(StagingCommitterConstants.TABLE_ROOT);
       }
     }
 

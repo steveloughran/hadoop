@@ -28,6 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,51 +41,40 @@ public final class Paths {
   private Paths() {
   }
 
-  public static String addUUID(String path, String uuid) {
+  /**
+   * Insert the UUID to a path if it is not there already.
+   * If there is a trailing "." in the prefix after the last slash, the
+   * UUID is inserted before it with a "-" prefix; otherwise appended.
+   *
+   * Examples:
+   * <pre>
+   *   /example/part-0000  ==> /example/part-0000-0ab34
+   *   /example/part-0001.gz.csv  ==> /example/part-0001-0ab34.gz.csv
+   *   /example/part-0002-0abc3.gz.csv  ==> /example/part-0002-0abc3.gz.csv
+   * </pre>
+   *
+   * @param pathStr path as a string
+   * @param uuid UUID to append
+   * @return new path.
+   */
+  public static String addUUID(String pathStr, String uuid) {
     // In some cases, Spark will add the UUID to the filename itself.
-    if (path.contains(uuid)) {
-      return path;
+    if (pathStr.contains(uuid)) {
+      return pathStr;
     }
 
     int dot; // location of the first '.' in the file name
-    int lastSlash = path.lastIndexOf('/');
+    int lastSlash = pathStr.lastIndexOf('/');
     if (lastSlash >= 0) {
-      dot = path.indexOf('.', lastSlash);
+      dot = pathStr.indexOf('.', lastSlash);
     } else {
-      dot = path.indexOf('.');
+      dot = pathStr.indexOf('.');
     }
 
     if (dot >= 0) {
-      return path.substring(0, dot) + "-" + uuid + path.substring(dot);
+      return pathStr.substring(0, dot) + "-" + uuid + pathStr.substring(dot);
     } else {
-      return path + "-" + uuid;
-    }
-  }
-
-  /**
-   * A simple tuple.
-   * @param <L> left element type
-   * @param <R> right element type
-   */
-  public static final class Pair<L, R> {
-    private final L first;
-    private final R second;
-
-    public static <L, R> Pair<L, R> of(L first, R second) {
-      return new Pair<>(first, second);
-    }
-
-    private Pair(L first, R second) {
-      this.first = first;
-      this.second = second;
-    }
-
-    public L getFirst() {
-      return first;
-    }
-
-    public R getSecond() {
-      return second;
+      return pathStr + "-" + uuid;
     }
   }
 
@@ -96,25 +86,42 @@ public final class Paths {
     return current;
   }
 
-  public static Pair<String, String> splitFilename(String path) {
-    int lastSlash = path.lastIndexOf('/');
-    return Pair.of(path.substring(0, lastSlash), path.substring(lastSlash + 1));
+  /**
+   * Split a path into its parent path and filename.
+   * @param pathStr path
+   * @return a divided path string.
+   */
+  public static Pair<String, String> splitFilename(String pathStr) {
+    int lastSlash = pathStr.lastIndexOf('/');
+    return Pair.of(pathStr.substring(0, lastSlash), pathStr.substring(lastSlash + 1));
   }
 
-  public static String getParent(String path) {
-    int lastSlash = path.lastIndexOf('/');
+  /**
+   * Get the parent path of a string path: everything up to but excluding
+   * the last "/" in the path.
+   * @param pathStr path as a string
+   * @return the parent or null if there is no parent.
+   */
+  public static String getParent(String pathStr) {
+    int lastSlash = pathStr.lastIndexOf('/');
     if (lastSlash >= 0) {
-      return path.substring(0, lastSlash);
+      return pathStr.substring(0, lastSlash);
     }
     return null;
   }
 
-  public static String getFilename(String path) {
-    int lastSlash = path.lastIndexOf('/');
+  /**
+   * Get hte filename of a path: the element after any "/", or, if there
+   * is no "/" in the string, the whole path string.
+   * @param pathStr path as a string
+   * @return the final element in the path string
+   */
+  public static String getFilename(String pathStr) {
+    int lastSlash = pathStr.lastIndexOf('/');
     if (lastSlash >= 0) {
-      return path.substring(lastSlash + 1);
+      return pathStr.substring(lastSlash + 1);
     }
-    return path;
+    return pathStr;
   }
 
   public static String getRelativePath(Path basePath,
