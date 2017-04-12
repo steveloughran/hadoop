@@ -46,20 +46,12 @@ public class TestStagingPartitionedTaskCommit
 
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedCommitterForTesting(OUTPUT_PATH,
-        getJob(),
-        getMockClient(),
-        getMockS3()
-    );
+    return new PartitionedCommitterForTesting(OUTPUT_PATH, getJob());
   }
 
   @Override
   PartitionedStagingCommitter newTaskCommitter() throws Exception {
-    return new PartitionedCommitterForTesting(
-        OUTPUT_PATH,
-        getTAC(),
-        getMockClient(),
-        getMockS3());
+    return new PartitionedCommitterForTesting(OUTPUT_PATH, getTAC());
   }
 
   // The set of files used by this test

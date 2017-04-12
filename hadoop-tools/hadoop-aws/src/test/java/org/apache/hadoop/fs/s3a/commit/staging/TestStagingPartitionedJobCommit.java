@@ -25,12 +25,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.collect.Lists;
-import org.junit.Assume;
 import org.junit.Test;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
@@ -55,8 +52,7 @@ public class TestStagingPartitionedJobCommit
 
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedStagingCommitterForTesting(getJob(),
-        mock(AmazonS3.class), getMockS3());
+    return new PartitionedStagingCommitterForTesting(getJob());
   }
 
   /**
@@ -64,12 +60,10 @@ public class TestStagingPartitionedJobCommit
    */
   private static final class PartitionedStagingCommitterForTesting
       extends PartitionedCommitterForTesting {
-    private final AmazonS3 client;
 
-    private PartitionedStagingCommitterForTesting(JobContext context,
-        AmazonS3 client, S3AFileSystem fs) throws IOException {
-      super(OUTPUT_PATH, context, client, fs);
-      this.client = client;
+    private PartitionedStagingCommitterForTesting(JobContext context)
+        throws IOException {
+      super(OUTPUT_PATH, context);
     }
 
     @Override
@@ -125,13 +119,6 @@ public class TestStagingPartitionedJobCommit
       // no directories exist
       committer.commitJob(getJob());
 
-      // no attempt to check this as the verifications never seemed to
-      // get the right number of delete calls.
-      // as this is just the original setup, not worrying about it
-/*      verify(mockS3, times(1)).delete(
-          new Path(OUTPUT_PATH, PENDING_DIR_NAME), true);
-      verifyNoMoreInteractions(mockS3);*/
-
       // parent and peer directories exist
       reset(mockS3);
       pathsExist(mockS3, "dateint=20161116",
@@ -158,7 +145,7 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testReplace() throws Exception {
-    S3AFileSystem mockS3A = getMockS3();
+    S3AFileSystem mockS3 = getMockS3();
 
     getJob().getConfiguration().set(
         FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
@@ -167,42 +154,42 @@ public class TestStagingPartitionedJobCommit
 
 //    getWrapperFS().setLogEvents(MockS3AFileSystem.LOG_STACK);
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3A);
-    verifyCompletion(mockS3A);
+    verifyReplaceCommitActions(mockS3);
+    verifyCompletion(mockS3);
 
     // parent and peer directories exist
-    reset(mockS3A);
-    pathsExist(mockS3A, "dateint=20161115",
+    reset(mockS3);
+    pathsExist(mockS3, "dateint=20161115",
         "dateint=20161115/hour=12");
 
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3A);
-    verifyCompletion(mockS3A);
+    verifyReplaceCommitActions(mockS3);
+    verifyCompletion(mockS3);
 
     // partition directories exist and should be removed
-    reset(mockS3A);
-    pathsExist(mockS3A, "dateint=20161115/hour=12",
+    reset(mockS3);
+    pathsExist(mockS3, "dateint=20161115/hour=12",
         "dateint=20161115/hour=13");
-    canDelete(mockS3A, "dateint=20161115/hour=13");
+    canDelete(mockS3, "dateint=20161115/hour=13");
 
     committer.commitJob(getJob());
-    verifyDeleted(mockS3A, "dateint=20161115/hour=13");
-    verifyReplaceCommitActions(mockS3A);
-    verifyCompletion(mockS3A);
+    verifyDeleted(mockS3, "dateint=20161115/hour=13");
+    verifyReplaceCommitActions(mockS3);
+    verifyCompletion(mockS3);
 
     // partition directories exist and should be removed
-    reset(mockS3A);
-    pathsExist(mockS3A, "dateint=20161116/hour=13",
+    reset(mockS3);
+    pathsExist(mockS3, "dateint=20161116/hour=13",
         "dateint=20161116/hour=14");
 
-    canDelete(mockS3A, "dateint=20161116/hour=13",
+    canDelete(mockS3, "dateint=20161116/hour=13",
         "dateint=20161116/hour=14");
 
     committer.commitJob(getJob());
-    verifyReplaceCommitActions(mockS3A);
-    verifyDeleted(mockS3A, "dateint=20161116/hour=13");
-    verifyDeleted(mockS3A, "dateint=20161116/hour=14");
-    verifyCompletion(mockS3A);
+    verifyReplaceCommitActions(mockS3);
+    verifyDeleted(mockS3, "dateint=20161116/hour=13");
+    verifyDeleted(mockS3, "dateint=20161116/hour=14");
+    verifyCompletion(mockS3);
   }
 
 

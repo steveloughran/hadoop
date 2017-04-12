@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.Statistic;
+import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -56,15 +57,24 @@ public class MockS3AFileSystem extends S3AFileSystem {
       LoggerFactory.getLogger(MockS3AFileSystem.class);
 
   private final S3AFileSystem mock;
+  private final Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors>
+      outcome;
   public static final int LOG_NONE = 0;
   public static final int LOG_NAME = 1;
   public static final int LOG_STACK = 2;
   private int logEvents = LOG_NAME;
 
-  public MockS3AFileSystem(S3AFileSystem mock) {
+  public MockS3AFileSystem(S3AFileSystem mock,
+      Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors> outcome) {
     this.mock = mock;
+    this.outcome = outcome;
     setUri(FS_URI);
     setBucket(BUCKET);
+  }
+
+  public Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors>
+    getOutcome() {
+    return outcome;
   }
 
   public int getLogEvents() {

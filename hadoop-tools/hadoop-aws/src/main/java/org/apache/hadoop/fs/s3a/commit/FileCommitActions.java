@@ -62,6 +62,15 @@ public class FileCommitActions {
     this.fs = fs;
   }
 
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "FileCommitActions{");
+    sb.append("fs=").append(fs.getUri());
+    sb.append('}');
+    return sb.toString();
+  }
+
   /**
    * Commit a pending file, then delete the data.
    * @param pendingFile path to the pending data

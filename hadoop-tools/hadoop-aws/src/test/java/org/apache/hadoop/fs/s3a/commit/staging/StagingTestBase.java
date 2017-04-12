@@ -56,6 +56,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.MiniDFSTestCluster;
+import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -97,15 +98,15 @@ public class StagingTestBase {
    * and config.
    * All standard mocking setup MUST go here.
    * @param conf config to use
-   * @param mockClient
+   * @param outcome tuple of outcomes to store in mock FS
    * @return the filesystem created
    * @throws IOException IO problems.
    */
   protected static S3AFileSystem createAndBindMockFSInstance(Configuration conf,
-      AmazonS3 mockClient)
+      Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors> outcome)
       throws IOException {
     S3AFileSystem mockFs = mockS3AFileSystemRobustly();
-    MockS3AFileSystem wrapperFS = new MockS3AFileSystem(mockFs);
+    MockS3AFileSystem wrapperFS = new MockS3AFileSystem(mockFs, outcome);
     URI uri = OUTPUT_PATH_URI;
     wrapperFS.initialize(uri, conf);
     FileSystemTestHelper.addFileSystemForTesting(uri, conf, wrapperFS);
@@ -289,7 +290,8 @@ public class StagingTestBase {
       this.results = new StagingTestBase.ClientResults();
       this.errors = new StagingTestBase.ClientErrors();
       this.mockClient = newMockS3Client(results, errors);
-      this.mockFS = createAndBindMockFSInstance(jobConf, mockClient);
+      this.mockFS = createAndBindMockFSInstance(jobConf,
+          Pair.of(results, errors));
       this.wrapperFS = lookupWrapperFS(jobConf);
       // and bind the FS
       wrapperFS.setAmazonS3Client(mockClient);

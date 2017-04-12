@@ -20,42 +20,27 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import java.io.IOException;
 
-import com.amazonaws.services.s3.AmazonS3;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 class PartitionedCommitterForTesting extends
     PartitionedStagingCommitter {
   private final MockFileCommitActions mockCommitActions;
-  private final AmazonS3 mockClient;
-  private final S3AFileSystem mockFS;
 
   PartitionedCommitterForTesting(Path outputPath,
-      TaskAttemptContext context,
-      AmazonS3 mockClient,
-      S3AFileSystem mockFS) throws IOException {
+      TaskAttemptContext context) throws IOException {
     super(outputPath, context);
-    this.mockFS = mockFS;
-    this.mockClient = mockClient;
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient,
-        false);
+    this.mockCommitActions = new MockFileCommitActions(getDestS3AFS());
     setCommitActions(mockCommitActions);
   }
 
   PartitionedCommitterForTesting(Path outputPath,
-      JobContext context,
-      AmazonS3 mockClient,
-      S3AFileSystem mockFS) throws IOException {
+      JobContext context) throws IOException {
     super(outputPath, context);
-    this.mockFS = mockFS;
-    this.mockClient = mockClient;
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient,
-        true);
+    this.mockCommitActions = new MockFileCommitActions(getDestS3AFS());
     setCommitActions(mockCommitActions);
   }
 
@@ -70,7 +55,7 @@ class PartitionedCommitterForTesting extends
    * @param out output path
    * @param config job/task config
    * @return a filesystem.
-   * @throws IOException
+   * @throws IOException failure to get the FS
    */
   @Override
   protected FileSystem getDestination(Path out, Configuration config)

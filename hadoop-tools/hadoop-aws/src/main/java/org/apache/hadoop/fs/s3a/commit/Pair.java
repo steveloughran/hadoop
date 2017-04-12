@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.s3a.commit.staging.Paths;
  * @param <L> left element type
  * @param <R> right element type
  */
-public final class Pair<L, R> {
+public class Pair<L, R> {
   private final L first;
   private final R second;
 
@@ -41,7 +41,7 @@ public final class Pair<L, R> {
     return new Pair<>(first, second);
   }
 
-  private Pair(L first, R second) {
+  public Pair(L first, R second) {
     this.first = first;
     this.second = second;
   }

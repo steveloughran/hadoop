@@ -49,6 +49,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -133,7 +134,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.results = new StagingTestBase.ClientResults();
     this.errors = new StagingTestBase.ClientErrors();
     this.mockClient = newMockS3Client(results, errors);
-    this.mockFS = createAndBindMockFSInstance(jobConf, mockClient);
+    this.mockFS = createAndBindMockFSInstance(jobConf,
+        Pair.of(results, errors));
     this.wrapperFS = lookupWrapperFS(jobConf);
     // and bind the FS
     wrapperFS.setAmazonS3Client(mockClient);

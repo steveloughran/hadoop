@@ -32,7 +32,7 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * Committer subclass that uses a mocked AmazonS3Client for testing.
+ * Committer subclass that uses a mocked S3A connection for testing.
  */
 class MockedStagingCommitter extends StagingS3GuardCommitter {
 
@@ -53,7 +53,7 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   private void createMockCommitActions(AmazonS3 mockClient) throws IOException {
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS(), mockClient, true);
+    mockCommitActions = new MockFileCommitActions(getDestS3AFS());
 
     setCommitActions(mockCommitActions);
   }
@@ -96,12 +96,14 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
      //skipped
   }
 
-  public ClientResults getResults() {
-    return mockCommitActions.getResults();
+  public ClientResults getResults() throws IOException {
+    MockS3AFileSystem mockFS = (MockS3AFileSystem)getDestS3AFS();
+    return mockFS.getOutcome().first();
   }
 
-  public ClientErrors getErrors() {
-    return mockCommitActions.getErrors();
+  public ClientErrors getErrors() throws IOException {
+    MockS3AFileSystem mockFS = (MockS3AFileSystem) getDestS3AFS();
+    return mockFS.getOutcome().second();
   }
 
   @Override
