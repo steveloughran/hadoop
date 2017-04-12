@@ -36,6 +36,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.S3AUtils;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
@@ -92,8 +93,7 @@ public class FileCommitActions {
    * @throws IOException on a failure
    */
   public void commitOrFail(SinglePendingCommit commit) throws IOException {
-    CommitFileOutcome outcome = commit(commit, commit.filename);
-    outcome.maybeRethrow();
+    commit(commit, commit.filename).maybeRethrow();
   }
 
   /**
@@ -104,9 +104,9 @@ public class FileCommitActions {
    * @return the outcome
    */
   public CommitFileOutcome commit(SinglePendingCommit commit, String origin) {
+    LOG.debug("Committing single commit {}", commit);
     CommitFileOutcome outcome;
     String destKey = "unknown destination";
-    LOG.debug("Committing single commit {}", commit);
     try {
       commit.validate();
       destKey = commit.destinationKey;
@@ -214,8 +214,8 @@ public class FileCommitActions {
    * @throws IOException on a failure to list the files.
    */
   public Pair<MultiplePendingCommits, List<LocatedFileStatus>>
-  loadSinglePendingCommits(Path pendingDir,
-      boolean recursive) throws IOException {
+      loadSinglePendingCommits(Path pendingDir,
+        boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     MultiplePendingCommits commits = new MultiplePendingCommits(
@@ -384,6 +384,18 @@ public class FileCommitActions {
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     LOG.debug("Touching success marker for job {}", markerPath);
     fs.create(markerPath, true).close();
+  }
+
+  /**
+   * Revert a pending commit by deleting the destination.
+   * @param actions commit actions to use
+   * @param commit pending
+   * @throws IOException failure
+   */
+  public void revertCommit(SinglePendingCommit commit) throws IOException {
+    LOG.debug("Revert {}", commit);
+    fs.createWriteOperationHelper(commit.destinationKey)
+        .revertCommit(commit.destinationKey);
   }
 
   /**

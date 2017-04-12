@@ -36,7 +36,6 @@ import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.google.common.collect.Sets;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -99,11 +98,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private StagingTestBase.ClientErrors errors = null;
   private AmazonS3 mockClient = null;
 
-  @BeforeClass
-  public static void setupMockFS() throws IOException {
-    createAndBindMockFSInstance(getConfiguration());
-  }
-
   /**
    * Describe a test in the logs.
    * @param text text to print
@@ -117,8 +111,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   public static Collection<Object[]> params() {
     return Arrays.asList(new Object[][] {
         {0, false},
-        {1, true},
-        {3, true},
+//        {1, true},
+//        {3, true},
     });
   }
 
@@ -136,11 +130,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     jobConf.set(FS_S3A_COMMITTER_STAGING_UUID,
         UUID.randomUUID().toString());
 
-    this.mockFS = createAndBindMockFSInstance(jobConf);
-    this.wrapperFS = lookupWrapperFS(jobConf);
     this.results = new StagingTestBase.ClientResults();
     this.errors = new StagingTestBase.ClientErrors();
-    this.mockClient = newMockClient(results, errors);
+    this.mockClient = newMockS3Client(results, errors);
+    this.mockFS = createAndBindMockFSInstance(jobConf, mockClient);
+    this.wrapperFS = lookupWrapperFS(jobConf);
     // and bind the FS
     wrapperFS.setAmazonS3Client(mockClient);
 
@@ -257,7 +251,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     committer.commitTask(tac);
 
-//    ClientResults results = committer.getResults();
     List<String> uploads = results.getUploads();
     assertEquals("Should initiate one upload", 1, uploads.size());
 
@@ -457,7 +450,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     committer.abortTask(tac);
 
-    ClientResults results = committer.getResults();
     assertEquals("Should not upload anything",
         0, results.getUploads().size());
     assertEquals("Should not upload anything",
@@ -478,7 +470,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     jobCommitter.commitJob(job);
-//    ClientResults results = jobCommitter.getResults();
     assertEquals("Should have aborted no uploads",
         0, results.getAborts().size());
 
@@ -502,6 +493,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     errors.failOnCommit(5);
+//    setMockLogLevel(MockS3AFileSystem.LOG_STACK);
 
     StagingTestBase.assertThrows("Should propagate the commit failure",
         AWSClientIOException.class, "Fail on commit 5",
@@ -593,11 +585,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     Path jobAttemptPath = jobCommitter.getJobAttemptPath(job);
     FileSystem fs = jobAttemptPath.getFileSystem(conf);
 
-//    Set<String> uploads = runTasks(job, 4, 3);
     Set<String> uploads = runTasks(job, 4, 3);
 
     assertPathExists(fs, "No job attempt path", jobAttemptPath);
-//    ClientResults results = jobCommitter.getResults();
     jobCommitter.abortJob(job, JobStatus.State.KILLED);
     assertEquals("Should have committed no uploads: " + jobCommitter,
         0, results.getCommits().size());
@@ -715,5 +705,14 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     }
 
     return outPath;
+  }
+
+  /**
+   * Used during debugging mock test failures; cranks up logging of method
+   * calls.
+   * @param level log level
+   */
+  private void setMockLogLevel(int level) {
+    wrapperFS.setLogEvents(level);
   }
 }

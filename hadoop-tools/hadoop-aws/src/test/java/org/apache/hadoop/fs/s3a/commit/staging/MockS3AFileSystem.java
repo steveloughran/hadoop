@@ -26,6 +26,7 @@ import java.util.List;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.MultipartUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,11 +35,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.Statistic;
 import org.apache.hadoop.util.Progressable;
 
 /**
@@ -162,7 +165,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f)
-      throws FileNotFoundException, IOException {
+      throws IOException {
     event("listStatus(%s)", f);
     return mock.listStatus(f);
   }
@@ -172,7 +175,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
       throws IOException {
     event("listFiles(%s, %s)", f, recursive);
     return new EmptyIterator();
-//    return mock.listFiles(f, recursive);
   }
 
   @Override
@@ -205,6 +207,49 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
+  protected void incrementStatistic(Statistic statistic) {
+  }
+
+  @Override
+  protected void incrementStatistic(Statistic statistic, long count) {
+  }
+
+  @Override
+  protected void incrementGauge(Statistic statistic, long count) {
+  }
+
+  @Override
+  public void incrementReadOperations() {
+  }
+
+  @Override
+  public void incrementWriteOperations() {
+  }
+
+  @Override
+  public void incrementPutStartStatistics(long bytes) {
+    super.incrementPutStartStatistics(bytes);
+  }
+
+  @Override
+  public void incrementPutCompletedStatistics(boolean success, long bytes) {
+    super.incrementPutCompletedStatistics(success, bytes);
+  }
+
+  @Override
+  public void incrementPutProgressStatistics(String key, long bytes) {
+    super.incrementPutProgressStatistics(key, bytes);
+  }
+
+/*
+  @Override
+  protected void deleteObject(String key) throws InvalidRequestException {
+    // force into sharing the existing mock entry point
+    getAmazonS3Client().deleteObject(new DeleteObjectRequest(getBucket(), key));
+  }
+*/
+
+  @Override
   public long getDefaultBlockSize() {
     return mock.getDefaultBlockSize();
   }
@@ -222,6 +267,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
     }
   }
 
+
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
@@ -231,4 +277,36 @@ public class MockS3AFileSystem extends S3AFileSystem {
     sb.append('}');
     return sb.toString();
   }
+
+  @Override
+  public WriteOperationHelper createWriteOperationHelper(String key) {
+    return new MockWriteOperationHelper(key,
+        super.createWriteOperationHelper(key));
+  }
+
+  /**
+   * Class to help mock WriteOperations & so file commit actions.
+   */
+  private class MockWriteOperationHelper extends WriteOperationHelper {
+
+    private final WriteOperationHelper wrapped;
+
+    public MockWriteOperationHelper(String key,
+        WriteOperationHelper writeOperationHelper) {
+      super(key);
+      wrapped = writeOperationHelper;
+    }
+
+    /**
+     * Abort a multipart upload operation.
+     * @param uploadId multipart operation Id
+     * @throws AmazonClientException on problems.
+     */
+    public void abortMultipartUpload(String uploadKey, String uploadId)
+        throws AmazonClientException {
+      event("Aborting multipart upload %s to %s", uploadId, uploadKey);
+      wrapped.abortMultipartUpload(uploadKey, uploadId);
+    }
+  }
+
 }

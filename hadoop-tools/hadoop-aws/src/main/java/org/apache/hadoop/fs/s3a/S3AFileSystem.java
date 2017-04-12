@@ -161,7 +161,7 @@ public class S3AFileSystem extends FileSystem {
   private CannedAccessControlList cannedACL;
   private S3AEncryptionMethods serverSideEncryptionAlgorithm;
   private S3AInstrumentation instrumentation;
-  private S3AStorageStatistics storageStatistics;
+  private final S3AStorageStatistics storageStatistics = createStorageStatistics();
   private long readAhead;
   private S3AInputPolicy inputPolicy;
   private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -202,7 +202,7 @@ public class S3AFileSystem extends FileSystem {
    */
   public void initialize(URI name, Configuration originalConf)
       throws IOException {
-    uri = S3xLoginHelper.buildFSURI(name);
+    setUri(name);
     // get the host; this is guaranteed to be non-null, non-empty
     bucket = name.getHost();
     // clone the configuration into one with propagated bucket options
@@ -238,15 +238,6 @@ public class S3AFileSystem extends FileSystem {
 
       readAhead = longBytesOption(conf, READAHEAD_RANGE,
           DEFAULT_READAHEAD_RANGE, 0);
-      storageStatistics = (S3AStorageStatistics)
-          GlobalStorageStatistics.INSTANCE
-              .put(S3AStorageStatistics.NAME,
-                  new GlobalStorageStatistics.StorageStatisticsProvider() {
-                    @Override
-                    public StorageStatistics provide() {
-                      return new S3AStorageStatistics();
-                    }
-                  });
 
       int maxThreads = conf.getInt(MAX_THREADS, DEFAULT_MAX_THREADS);
       if (maxThreads < 2) {
@@ -313,6 +304,22 @@ public class S3AFileSystem extends FileSystem {
     } catch (AmazonClientException e) {
       throw translateException("initializing ", new Path(name), e);
     }
+  }
+
+  /**
+   * Create the storage statistics or bind to an existing one.
+   * @return a storage statistics instance.
+   */
+  protected static S3AStorageStatistics createStorageStatistics() {
+    return (S3AStorageStatistics)
+        GlobalStorageStatistics.INSTANCE
+            .put(S3AStorageStatistics.NAME,
+                new GlobalStorageStatistics.StorageStatisticsProvider() {
+                  @Override
+                  public StorageStatistics provide() {
+                    return new S3AStorageStatistics();
+                  }
+                });
   }
 
   /**
@@ -429,7 +436,7 @@ public class S3AFileSystem extends FileSystem {
    */
   @VisibleForTesting
   protected void setUri(URI uri) {
-    this.uri = uri;
+    this.uri = S3xLoginHelper.buildFSURI(uri);
   }
 
   @Override
@@ -1165,7 +1172,8 @@ public class S3AFileSystem extends FileSystem {
    * operation statistics.
    * @param key key to blob to delete.
    */
-  private void deleteObject(String key) throws InvalidRequestException {
+  @VisibleForTesting
+  protected void deleteObject(String key) throws InvalidRequestException {
     blockRootDelete(key);
     incrementWriteOperations();
     incrementStatistic(OBJECT_DELETE_REQUESTS);
@@ -3065,10 +3073,6 @@ public class S3AFileSystem extends FileSystem {
         List<PartETag> partETags) throws AmazonClientException {
       Preconditions.checkNotNull(uploadId);
       Preconditions.checkNotNull(partETags);
-/*
-      Preconditions.checkArgument(!partETags.isEmpty(),
-          "No partitions have been uploaded");
-*/
       LOG.debug("Completing multipart upload {} with {} parts",
           uploadId, partETags.size());
       // a copy of the list is required, so that the AWS SDK doesn't
@@ -3240,6 +3244,22 @@ public class S3AFileSystem extends FileSystem {
         return false;
       } catch (AmazonClientException e) {
         throw translateException("deleteInCommit", f, e);
+      }
+    }
+
+    /**
+     * Revert a commit by deleting the file.
+     * TODO: Policy regarding creating a mock empty parent directory.
+     * @param destKey destination key
+     * @throws IOException due to inability to delete a directory or file.
+     */
+    public void revertCommit(String destKey) throws IOException {
+      try {
+        deleteObject(destKey);
+      } catch (AmazonClientException e) {
+        throw S3AUtils.translateException("revert commit",
+            destKey,
+            e);
       }
     }
   }

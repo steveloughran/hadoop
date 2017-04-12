@@ -78,12 +78,7 @@ public final class StagingS3Util {
    */
   public static void revertCommit(FileCommitActions actions,
       SinglePendingCommit commit) throws IOException {
-    LOG.debug("Revert {}", commit);
-    try {
-      actions.getS3Client().deleteObject(commit.newDeleteRequest());
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("revert commit", commit.destinationKey, e);
-    }
+    actions.revertCommit(commit);
   }
 
   /**
@@ -96,13 +91,6 @@ public final class StagingS3Util {
       SinglePendingCommit commit) throws IOException {
     LOG.debug("Finish {}", commit);
     actions.commitOrFail(commit);
-//    try {
-//      actions.getS3Client()
-//          .completeMultipartUpload(commit.newCompleteRequest());
-//    } catch (AmazonClientException e) {
-//      throw S3AUtils.translateException("complete commit",
-//          commit.destinationKey, e);
-//    }
   }
 
   /**
@@ -113,7 +101,6 @@ public final class StagingS3Util {
    */
   public static void abortCommit(FileCommitActions actions,
       SinglePendingCommit pending) throws IOException {
-    LOG.debug("Abort {}", pending);
     actions.abortMultipartCommit(pending);
   }
 

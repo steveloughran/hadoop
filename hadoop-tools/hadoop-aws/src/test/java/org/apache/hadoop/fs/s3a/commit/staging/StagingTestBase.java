@@ -69,14 +69,9 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.service.ServiceOperations;
 
-import static org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.when;
+import static org.apache.hadoop.test.LambdaTestUtils.*;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Test base for staging: core constants and static methods, inner classes
@@ -102,17 +97,28 @@ public class StagingTestBase {
    * and config.
    * All standard mocking setup MUST go here.
    * @param conf config to use
+   * @param mockClient
    * @return the filesystem created
    * @throws IOException IO problems.
    */
-  protected static S3AFileSystem createAndBindMockFSInstance(Configuration conf)
+  protected static S3AFileSystem createAndBindMockFSInstance(Configuration conf,
+      AmazonS3 mockClient)
       throws IOException {
-    S3AFileSystem mockFs = mock(S3AFileSystem.class);
+    S3AFileSystem mockFs = mockS3AFileSystemRobustly();
     MockS3AFileSystem wrapperFS = new MockS3AFileSystem(mockFs);
     URI uri = OUTPUT_PATH_URI;
     wrapperFS.initialize(uri, conf);
     FileSystemTestHelper.addFileSystemForTesting(uri, conf, wrapperFS);
     return mockFs;
+  }
+
+  private static S3AFileSystem mockS3AFileSystemRobustly() {
+    S3AFileSystem mockFS = mock(S3AFileSystem.class);
+    doNothing().when(mockFS).incrementReadOperations();
+    doNothing().when(mockFS).incrementWriteOperations();
+    doNothing().when(mockFS).incrementWriteOperations();
+    doNothing().when(mockFS).incrementWriteOperations();
+    return mockFS;
   }
 
   /**
@@ -279,12 +285,12 @@ public class StagingTestBase {
           CommitConstants.CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
           false);
 
-      this.mockFS = createAndBindMockFSInstance(jobConf);
-      this.wrapperFS = lookupWrapperFS(jobConf);
       this.job = new JobContextImpl(jobConf, JOB_ID);
       this.results = new StagingTestBase.ClientResults();
       this.errors = new StagingTestBase.ClientErrors();
-      this.mockClient = newMockClient(results, errors);
+      this.mockClient = newMockS3Client(results, errors);
+      this.mockFS = createAndBindMockFSInstance(jobConf, mockClient);
+      this.wrapperFS = lookupWrapperFS(jobConf);
       // and bind the FS
       wrapperFS.setAmazonS3Client(mockClient);
     }
@@ -474,7 +480,7 @@ public class StagingTestBase {
    * @param errors when (if any) to fail
    * @return the mock client to patch in to a committer/FS instance
    */
-  public static AmazonS3 newMockClient(final ClientResults results,
+  public static AmazonS3 newMockS3Client(final ClientResults results,
       final ClientErrors errors) {
     AmazonS3Client mockClient = mock(AmazonS3Client.class);
     final Object lock = new Object();
@@ -598,6 +604,24 @@ public class StagingTestBase {
         })
         .when(mockClient)
         .deleteObject(any(DeleteObjectRequest.class));
+
+    // deleteObject mocking
+    doAnswer(new Answer<Void>() {
+          @Override
+          public Void answer(
+              InvocationOnMock invocation) throws Throwable {
+            LOG.debug("deleteObject for {}", mockClient);
+            synchronized (lock) {
+              results.deletes.add(new DeleteObjectRequest(
+                  invocation.getArgumentAt(0, String.class),
+                  invocation.getArgumentAt(1, String.class)
+              ));
+              return null;
+            }
+          }
+        })
+        .when(mockClient)
+        .deleteObject(any(String.class), any(String.class));
 
     // to String returns the debug information
     when(mockClient.toString()).thenAnswer(

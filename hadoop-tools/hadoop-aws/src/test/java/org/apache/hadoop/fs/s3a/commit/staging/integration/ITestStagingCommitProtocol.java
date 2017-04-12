@@ -81,7 +81,6 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     return new StagingS3GuardCommitter(getOutDir(), context);
   }
 
-
   public AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException {
     return new CommitterWithFailedThenSucceed(getOutDir(), tContext);

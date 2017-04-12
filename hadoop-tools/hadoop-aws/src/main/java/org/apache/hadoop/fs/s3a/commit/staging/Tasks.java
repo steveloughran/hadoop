@@ -164,8 +164,8 @@ final class Tasks {
               try {
                 revertTask.run(item);
               } catch (Exception e) {
-                failed = true;
                 LOG.error("Failed to revert task", e);
+                failed = true;
                 // keep going
               }
               if (stopRevertsOnFailure && failed) {

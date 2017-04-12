@@ -51,7 +51,7 @@ public class MockFileCommitActions extends FileCommitActions {
     if (mockClient != null) {
       this.mockClient = mockClient;
     } else {
-      this.mockClient = StagingTestBase.newMockClient(
+      this.mockClient = StagingTestBase.newMockS3Client(
           getResults(), getErrors());
       // conditionally patch any mock FS with the createdclient
       if (patchFSwithMockS3Client) {
