@@ -36,6 +36,8 @@ public abstract class PathOutputCommitter extends OutputCommitter {
 
   /**
    * Get the directory that the task should write results into.
+   * Warning: there's no guarantee that this work path is on the same
+   * FS as the final output, or that it's visible across machines.
    * @return the work directory
    * @throws IOException IO problem
    */
