@@ -50,7 +50,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     Configuration conf = super.createConfiguration();
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        MagicS3GuardCommitterFactory.NAME);
+        MagicS3GuardCommitterFactory.CLASSNAME);
     return conf;
   }
 

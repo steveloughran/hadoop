@@ -36,7 +36,7 @@ public class StagingCommitterFactory
   /**
    * Name of this class: {@value}.
    */
-  public static final String NAME
+  public static final String CLASSNAME
       = "org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterFactory";
 
   public PathOutputCommitter createTaskCommitter(S3AFileSystem fileSystem,

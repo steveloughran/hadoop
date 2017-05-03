@@ -52,7 +52,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
 
@@ -115,7 +114,17 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   @Rule
   public final TemporaryFolder temp = new TemporaryFolder();
 
-  protected abstract String getCommitterFactoryClassname();
+  /**
+   * Get the classname of the factory for this committer.
+   * @return the classname to set in the job setup
+   */
+  protected abstract String committerFactoryClassname();
+
+  /**
+   * The name of the committer as returned by
+   * {@link AbstractS3GuardCommitter#getName()}.
+   */
+  protected abstract String committerName();
 
   @Test
   public void testMRJob() throws Exception {
@@ -144,7 +153,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES, uniqueFilenames);
 
     jobConf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        getCommitterFactoryClassname());
+        committerFactoryClassname());
 
     mrJob.setOutputFormatClass(LoggingTextOutputFormat.class);
     FileOutputFormat.setOutputPath(mrJob, outputPath);
@@ -180,7 +189,15 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
         expectedFiles, actualFiles);
     // now load in the success data marker: this guarantees that a s3guard
     // committer was used
-    SuccessData.load(s3, new Path(outputPath, SUCCESS_FILE_NAME));
+    SuccessData successData = SuccessData.load(s3,
+        new Path(outputPath, SUCCESS_FILE_NAME));
+    String commitDetails = successData.toString();
+    LOG.info("Committer from " + committerFactoryClassname() + "\n{}",
+        commitDetails);
+    assertEquals("Wrong committer in " + commitDetails,
+        committerName(), successData.committer);
+    assertTrue("No filenames in " + commitDetails,
+        !successData.filenames.isEmpty());
   }
 
 }

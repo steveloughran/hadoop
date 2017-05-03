@@ -43,6 +43,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       PartitionedStagingCommitter.class);
+  public static final String NAME = "PartitionedStagingCommitter";
 
   public PartitionedStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
@@ -57,7 +58,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
 
   @Override
   public String getName() {
-    return "PartitionedStagingCommitter";
+    return NAME;
   }
 
   @Override

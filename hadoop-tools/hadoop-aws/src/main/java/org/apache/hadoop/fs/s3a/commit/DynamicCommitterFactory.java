@@ -42,7 +42,7 @@ public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
   /**
    * Name of this class: {@value}.
    */
-  public static final String NAME
+  public static final String CLASSNAME
       = "org.apache.hadoop.fs.s3a.commit.DynamicCommitterFactory";
 
   /**

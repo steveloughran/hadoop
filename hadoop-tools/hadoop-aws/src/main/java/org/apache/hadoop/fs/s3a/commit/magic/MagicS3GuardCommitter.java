@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3a.commit.magic;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -40,8 +41,10 @@ import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
- * This is a dedicated committer which only works with consistent
- * S3A FileSystems.
+ * This is a dedicated committer which requires the "magic" directory feature
+ * of the S3A Filesystem to be enabled; it then uses paths for task and job
+ * attempts in magic paths, so as to ensure that the final output goes direct
+ * to the destination directory.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -49,11 +52,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(MagicS3GuardCommitter.class);
 
-  /**
-   * Name of this class: {@value}.
-   */
-  public static final String NAME
-      = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter";
+  private static final String NAME = "MagicS3GuardCommitter";
 
   /**
    * Instantiate.
@@ -84,7 +83,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public String getName() {
-    return "MagicS3GuardCommitter";
+    return NAME;
   }
 
   /**
@@ -105,7 +104,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
           context.getConfiguration());
       if (!fs.mkdirs(jobAttemptPath)) {
         throw new PathCommitException(jobAttemptPath,
-            "Failed to mkdir path -it already exists");
+            "Failed to create job attempt directory -it already exists");
       }
     }
   }
@@ -119,7 +118,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     getDestFS().getFileStatus(getJobAttemptPath(context));
 
     cleanupJob(context);
-    maybeCreateSuccessMarker(context);
+    maybeCreateSuccessMarker(context, new ArrayList<>(0));
   }
 
   /**

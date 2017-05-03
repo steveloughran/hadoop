@@ -47,7 +47,6 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-//    conf.setBoolean(COMMITTER_ENABLED, false);
     conf.setInt(CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         DIRECTORY_COMMITTER_FACTORY);

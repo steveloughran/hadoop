@@ -61,7 +61,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Configuration conf = super.createConfiguration();
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        MagicS3GuardCommitterFactory.NAME);
+        MagicS3GuardCommitterFactory.CLASSNAME);
     return conf;
   }
 
@@ -215,7 +215,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   public void testCommitterFactory() throws Throwable {
     Configuration conf = new Configuration();
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        MagicS3GuardCommitterFactory.NAME);
+        MagicS3GuardCommitterFactory.CLASSNAME);
     PathOutputCommitterFactory factory
         = PathOutputCommitterFactory.getOutputCommitterFactory(conf);
     PathOutputCommitter committer = factory.createOutputCommitter(

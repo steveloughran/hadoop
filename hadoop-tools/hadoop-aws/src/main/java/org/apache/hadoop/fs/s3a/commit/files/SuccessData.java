@@ -19,12 +19,15 @@
 package org.apache.hadoop.fs.s3a.commit.files;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,7 +42,8 @@ import org.apache.hadoop.util.JsonSerDeser;
  * to commit work.
  * <ol>
  *   <li>File length == 0: classic {@code FileOutputCommitter}.</li>
- *   <li>Loadable as {@SuccessData}: committer in {@link #committer} field.</li>
+ *   <li>Loadable as {@link SuccessData}:
+ *   A s3guard committer with name in in {@link #committer} field.</li>
  *   <li>Not loadable? Something else.</li>
  * </ol>
  *
@@ -81,6 +85,11 @@ public class SuccessData extends PersistentCommitData {
    */
   public Map<String, Long> metrics = new HashMap<>();
 
+  /**
+   * Filenames in the commit
+   */
+  public List<String> filenames = new ArrayList<>(0);
+
   @Override
   public void validate() throws ValidationFailure {
 
@@ -105,9 +114,13 @@ public class SuccessData extends PersistentCommitData {
     sb.append(", hostname='").append(hostname).append('\'');
     sb.append(", description='").append(description).append('\'');
     sb.append(", date='").append(date).append('\'');
+    sb.append(", filenames=[").append(
+        StringUtils.join(filenames, ", "))
+        .append("]");
     sb.append('}');
     return sb.toString();
   }
+
 
   /**
    * Load an instance from a file, then validate it.

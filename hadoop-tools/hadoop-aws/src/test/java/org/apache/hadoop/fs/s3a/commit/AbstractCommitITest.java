@@ -37,7 +37,6 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-//    enableMultipartPurge(conf, PURGE_DELAY_SECONDS);
     conf.setLong(MIN_MULTIPART_THRESHOLD, MULTIPART_MIN_SIZE);
     conf.setInt(MULTIPART_SIZE, MULTIPART_MIN_SIZE);
     conf.setBoolean(FAST_UPLOAD, true);

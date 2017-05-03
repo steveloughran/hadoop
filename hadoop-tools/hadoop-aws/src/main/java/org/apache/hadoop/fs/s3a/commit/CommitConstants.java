@@ -81,31 +81,31 @@ public final class CommitConstants {
    * Directory committer: {@value}.
    */
   public static final String STAGING_COMMITTER_FACTORY =
-      StagingCommitterFactory.NAME;
+      StagingCommitterFactory.CLASSNAME;
 
   /**
    * Directory committer: {@value}.
    */
   public static final String DIRECTORY_COMMITTER_FACTORY =
-      DirectoryStagingCommitterFactory.NAME;
+      DirectoryStagingCommitterFactory.CLASSNAME;
 
   /**
    * Partitioned committer: {@value}.
    */
   public static final String PARTITION_COMMITTER_FACTORY =
-      PartitonedStagingCommitterFactory.NAME;
+      PartitonedStagingCommitterFactory.CLASSNAME;
 
   /**
    * Dynamic committer: {@value}.
    */
   public static final String DYNAMIC_COMMITTER_FACTORY =
-      DynamicCommitterFactory.NAME;
+      DynamicCommitterFactory.CLASSNAME;
 
   /**
    * Magic committer: {@value}.
    */
   public static final String MAGIC_COMMITTER_FACTORY =
-      MagicS3GuardCommitterFactory.NAME;
+      MagicS3GuardCommitterFactory.CLASSNAME;
 
   /**
    * Property to identify the S3a committer when the dynamic committer is used:

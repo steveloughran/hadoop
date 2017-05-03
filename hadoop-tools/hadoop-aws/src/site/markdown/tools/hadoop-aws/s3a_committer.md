@@ -766,6 +766,28 @@ with minimal changes to the codebase.
 
 **Failure during job commit**
 
+**Failure during task/job abort**
+
+Failures in the abort process are not well handled in either the committers
+or indeed in the applications which use these committers. If an abort
+operation fails, what can be done?
+
+While somewhat hypothetical for the use case of a task being aborted due
+to the protocol (e.g. speculative jobs being aborted), the abort task/abort job
+calls may be made as part of the exception handling logic on a failure to commit.
+As such, the caller may assume that the abort does not fail: if it does,
+the newly thrown exception may hide the original problem.
+
+Two options present themselves
+
+1. Catch, log and swallow failures in the `abort()`
+1. Throw the exceptions, and expect the callers to handle them: review, fix
+and test that code as appropriate.
+
+Fixing the calling code does seem to be the best strategy, as it allows the
+failure to be explictly handled in the commit protocol, rather than hidden
+in the committer.::OpenFile
+
 **Preemption**
 
 Preemption is the explicit termination of work at the behest of the cluster
@@ -1172,14 +1194,39 @@ party could potentially create a malicious object stream read by the job committ
 
 ### Testing
 
-The code contribution already has a set of mock tests which simulate failure conditions,
-as well as one using the MiniMR cluster. This puts it ahead of the "Magic Committer"
+The code contribution came with a set of mock tests which simulate failure conditions,
+as well as one using the MiniMR cluster. This put it ahead of the "Magic Committer"
 in terms of test coverage.
 
-We can extend the protocol integration test lifted from `org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter`
-to test various state transitions of the commit mechanism.
+Since then the protocol integration test lifted from `org.apache.hadoop.mapreduce.lib.output.TestFileOutputCommitter`
+to test various state transitions of the commit mechanism has been extended
+to support the variants of the staging committer.
 
-No doubt we will need to implement some more integration tests; as usual a focus
-on execution time and cost and cost will be constraints.
+The Mock MR job test was converted to an integration test, executing
+a simple MR job in forked processes, using the chosen committer
 
- 
+
+One feature added during this testing is that the `_SUCCESS` marker file saved is
+no-longer a 0-byte file, it is a JSON manifest file, as implemented in
+`org.apache.hadoop.fs.s3a.commit.files.SuccessData`. This file includes
+the committer used, the hostname performing the commit, timestamp data and
+a list of paths committed.
+
+```
+SuccessData{
+  committer='PartitionedStagingCommitter',
+  hostname='devbox.local',
+  description='Task committer attempt_1493832493956_0001_m_000000_0',
+  date='Wed May 03 18:28:41 BST 2017',
+  filenames=[test/testMRJob/part-m-00000, test/testMRJob/part-m-00002, test/testMRJob/part-m-00001]
+}
+```
+
+This was useful a means of verifying that the correct
+committer had in fact been invoked in those forked processes: a 0-byte `_SUCCESS`
+marker implied the classic `FileOutputCommitter` had been used; if it could be read
+then it provides some details on the commit operation which are then used
+in assertions in the test suite.
+
+Without making any stability guarantees, it may be useful to extend this with
+more information, including aggregate metrics of work, filesystem metrics, etc.

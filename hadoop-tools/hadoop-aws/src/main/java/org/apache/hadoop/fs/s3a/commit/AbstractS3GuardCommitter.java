@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -297,9 +298,11 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * While the classic committers create a 0-byte file, the S3Guard committers
    * PUT up a the contents of a {@link SuccessData} file.
    * @param context job context
+   * @param filenames list of filenames.
    * @throws IOException IO failure
    */
-  protected void maybeCreateSuccessMarker(JobContext context)
+  protected void maybeCreateSuccessMarker(JobContext context,
+      List<String> filenames)
       throws IOException {
     if (context.getConfiguration().getBoolean(
         CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
@@ -312,6 +315,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       Date now = new Date();
       successData.timestamp = now.getTime();
       successData.date = now.toString();
+      successData.filenames = filenames;
       commitActions.createSuccessMarker(getOutputPath(), successData);
     }
   }

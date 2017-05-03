@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.util.List;
 
 import com.amazonaws.services.s3.AmazonS3;
 
@@ -91,7 +92,8 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   @Override
-  protected void maybeCreateSuccessMarker(JobContext context)
+  protected void maybeCreateSuccessMarker(JobContext context,
+      List<String> filenames)
       throws IOException {
      //skipped
   }

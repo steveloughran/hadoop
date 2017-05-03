@@ -98,6 +98,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       StagingS3GuardCommitter.class);
+  public static final String NAME = "StagingS3GuardCommitter";
   private final Path constructorOutputPath;
   private final long uploadPartSize;
   private final String uuid;
@@ -182,7 +183,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public String getName() {
-    return "StagingS3GuardCommitter";
+    return NAME;
   }
 
   /**
@@ -612,7 +613,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * Commit internal: do the final commit sequence.
    * <p>
    * The final commit action is to call
-   * {@link #maybeCreateSuccessMarker(JobContext)}
+   * {@link AbstractS3GuardCommitter#maybeCreateSuccessMarker(JobContext, List)}
    * to set the {@code __SUCCESS} file entry.
    * </p>
    * @param context job context
@@ -634,7 +635,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         getRole(), jobIdString(context))) {
       commitJobInternal(context, pending);
     }
-    maybeCreateSuccessMarker(context);
+    List<String> filenames = new ArrayList<>(pending.size());
+    for (SinglePendingCommit commit : pending) {
+      filenames.add(commit.destinationKey);
+    }
+    maybeCreateSuccessMarker(context, filenames);
   }
 
   /**

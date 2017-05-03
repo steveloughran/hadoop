@@ -36,7 +36,7 @@ public class MagicS3GuardCommitterFactory
   /**
    * Name of this class: {@value}.
    */
-  public static final String NAME
+  public static final String CLASSNAME
       = "org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory";
 
   public PathOutputCommitter createTaskCommitter(S3AFileSystem fileSystem,

@@ -20,13 +20,19 @@ package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitter;
 
 /**
  * Full integration test for the staging committer.
  */
 public class ITStagingCommitMRJob extends AbstractITCommitMRJob {
   @Override
-  protected String getCommitterFactoryClassname() {
+  protected String committerFactoryClassname() {
     return CommitConstants.STAGING_COMMITTER_FACTORY;
+  }
+
+  @Override
+  protected String committerName() {
+    return StagingS3GuardCommitter.NAME;
   }
 }

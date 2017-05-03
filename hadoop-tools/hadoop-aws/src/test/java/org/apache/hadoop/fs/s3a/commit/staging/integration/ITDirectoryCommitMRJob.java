@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
+import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
 
 /**
  * Full integration test for the partition committer.
@@ -27,7 +28,12 @@ import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 public class ITDirectoryCommitMRJob extends AbstractITCommitMRJob {
 
   @Override
-  protected String getCommitterFactoryClassname() {
+  protected String committerFactoryClassname() {
     return CommitConstants.DIRECTORY_COMMITTER_FACTORY;
+  }
+
+  @Override
+  protected String committerName() {
+    return DirectoryStagingCommitter.NAME;
   }
 }

@@ -43,6 +43,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
       DirectoryStagingCommitter.class);
+  public static final String NAME = "DirectoryStagingCommitter";
 
   public DirectoryStagingCommitter(Path outputPath, JobContext context)
       throws IOException {
@@ -56,7 +57,7 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
 
   @Override
   public String getName() {
-    return "DirectoryStagingCommitter";
+    return NAME;
   }
 
   @Override
