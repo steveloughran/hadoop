@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.s3a.commit.files;
 import java.io.IOException;
 import java.io.Serializable;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
@@ -28,6 +30,8 @@ import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
 /**
  * Class for single/multiple commit data structures.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public abstract class PersistentCommitData implements Serializable {
   /**
    * Supported version value: {@value}.

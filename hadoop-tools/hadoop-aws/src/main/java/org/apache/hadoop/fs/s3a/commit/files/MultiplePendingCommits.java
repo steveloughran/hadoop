@@ -30,6 +30,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
@@ -43,6 +45,8 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
  * Contains 0 or more {@link SinglePendingCommit} entries; validation logic
  * checks those values on load.
  */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
 public class MultiplePendingCommits extends PersistentCommitData {
   private static final Logger LOG = LoggerFactory.getLogger(
       MultiplePendingCommits.class);

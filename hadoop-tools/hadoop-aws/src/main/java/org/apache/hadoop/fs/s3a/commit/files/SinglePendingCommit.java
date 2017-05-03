@@ -60,7 +60,7 @@ import static org.apache.hadoop.util.StringUtils.join;
  *
  */
 @InterfaceAudience.Private
-@InterfaceStability.Evolving
+@InterfaceStability.Unstable
 public class SinglePendingCommit extends PersistentCommitData
     implements Iterable<String> {
 
