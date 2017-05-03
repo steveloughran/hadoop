@@ -91,7 +91,7 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   }
 
   @Override
-  protected void maybeTouchSuccessMarker(JobContext context)
+  protected void maybeCreateSuccessMarker(JobContext context)
       throws IOException {
      //skipped
   }

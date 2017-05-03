@@ -38,8 +38,8 @@ import java.io.IOException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
-import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 
 /**
  * Low level S3 integration.

@@ -25,6 +25,8 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

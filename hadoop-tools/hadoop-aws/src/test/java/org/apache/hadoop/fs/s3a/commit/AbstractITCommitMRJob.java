@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
 import org.apache.hadoop.fs.s3a.StorageStatisticsTracker;
+import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -34,6 +35,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.hadoop.service.ServiceOperations;
 import org.junit.AfterClass;
@@ -50,7 +52,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
 
 /** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
@@ -111,6 +115,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   @Rule
   public final TemporaryFolder temp = new TemporaryFolder();
 
+  protected abstract String getCommitterFactoryClassname();
+
   @Test
   public void testMRJob() throws Exception {
     FileSystem s3 = getFileSystem();
@@ -137,6 +143,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     Configuration jobConf = mrJob.getConfiguration();
     jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES, uniqueFilenames);
 
+    jobConf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+        getCommitterFactoryClassname());
 
     mrJob.setOutputFormatClass(LoggingTextOutputFormat.class);
     FileOutputFormat.setOutputPath(mrJob, outputPath);
@@ -170,7 +178,9 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
     assertEquals("Should commit the correct file paths",
         expectedFiles, actualFiles);
-
+    // now load in the success data marker: this guarantees that a s3guard
+    // committer was used
+    SuccessData.load(s3, new Path(outputPath, SUCCESS_FILE_NAME));
   }
 
 }

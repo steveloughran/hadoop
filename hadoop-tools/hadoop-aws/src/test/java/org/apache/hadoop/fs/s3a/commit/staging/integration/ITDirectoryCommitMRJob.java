@@ -22,11 +22,12 @@ import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 
 /**
- * Full integration test for the staging committer.
+ * Full integration test for the partition committer.
  */
-public class ITStagingCommitMRJob extends AbstractITCommitMRJob {
+public class ITDirectoryCommitMRJob extends AbstractITCommitMRJob {
+
   @Override
   protected String getCommitterFactoryClassname() {
-    return CommitConstants.STAGING_COMMITTER_FACTORY;
+    return CommitConstants.DIRECTORY_COMMITTER_FACTORY;
   }
 }

@@ -49,8 +49,8 @@ import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.MultiplePendingCommits;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -178,6 +178,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // forces evaluation and caching of the resolution mode.
     ConflictResolution mode = getConflictResolutionMode(getJobContext());
     LOG.debug("Conflict resolution mode: {}", mode);
+  }
+
+  @Override
+  public String getName() {
+    return "StagingS3GuardCommitter";
   }
 
   /**
@@ -607,7 +612,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * Commit internal: do the final commit sequence.
    * <p>
    * The final commit action is to call
-   * {@link #maybeTouchSuccessMarker(JobContext)}
+   * {@link #maybeCreateSuccessMarker(JobContext)}
    * to set the {@code __SUCCESS} file entry.
    * </p>
    * @param context job context
@@ -629,7 +634,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         getRole(), jobIdString(context))) {
       commitJobInternal(context, pending);
     }
-    maybeTouchSuccessMarker(context);
+    maybeCreateSuccessMarker(context);
   }
 
   /**

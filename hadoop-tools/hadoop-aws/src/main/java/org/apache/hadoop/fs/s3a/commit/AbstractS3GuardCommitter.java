@@ -19,15 +19,18 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
+import java.util.Date;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
+import org.apache.hadoop.net.NetUtils;
 
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
@@ -237,6 +240,12 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   public abstract Path getTempTaskAttemptPath(TaskAttemptContext context);
 
+  /**
+   * Get the name of this committer
+   * @return the committer name.
+   */
+  public abstract String getName();
+
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
@@ -282,17 +291,28 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * if the job requires output.dir marked on successful job,
+   * if the job requires a success marker on a successful job,
    * create the file {@link CommitConstants#SUCCESS_FILE_NAME}.
+   *
+   * While the classic committers create a 0-byte file, the S3Guard committers
+   * PUT up a the contents of a {@link SuccessData} file.
    * @param context job context
    * @throws IOException IO failure
    */
-  protected void maybeTouchSuccessMarker(JobContext context)
+  protected void maybeCreateSuccessMarker(JobContext context)
       throws IOException {
     if (context.getConfiguration().getBoolean(
         CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
         DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER)) {
-      commitActions.touchSuccessMarker(getOutputPath());
+      // create a success data structure and then save it
+      SuccessData successData = new SuccessData();
+      successData.committer = getName();
+      successData.description = getRole();
+      successData.hostname = NetUtils.getLocalHostname();
+      Date now = new Date();
+      successData.timestamp = now.getTime();
+      successData.date = now.toString();
+      commitActions.createSuccessMarker(getOutputPath(), successData);
     }
   }
 

@@ -16,13 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.files;
 
 import java.io.IOException;
 import java.io.Serializable;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
 
 /**
  * Class for single/multiple commit data structures.

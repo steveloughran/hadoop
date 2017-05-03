@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
@@ -40,7 +39,9 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.S3AUtils;
+import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
+import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
@@ -378,14 +379,16 @@ public class FileCommitActions {
   /**
    * Touch the success marker. This will overwrite it if it is already there.
    * @param outputPath output directory
+   * @param successData success data to save.
    * @throws IOException IO problem
    */
-  public void touchSuccessMarker(Path outputPath) throws IOException {
+  public void createSuccessMarker(Path outputPath, SuccessData successData)
+      throws IOException {
     Preconditions.checkArgument(outputPath != null, "null outputPath");
 
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     LOG.debug("Touching success marker for job {}", markerPath);
-    fs.create(markerPath, true).close();
+    successData.save(fs, markerPath, true);
   }
 
   /**

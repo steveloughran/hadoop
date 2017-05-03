@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -906,14 +907,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Assert that the output dir has the {@code _SUCCESS} marker.
-   * @throws IOException
-   */
-  protected void assertSuccessMarkerExists() throws IOException {
-    assertSuccessMarkerExists(outDir);
-  }
-
-  /**
    * Assert that the specified dir has the {@code _SUCCESS} marker.
    * @param dir dir to scan
    * @throws IOException IO Failure
@@ -931,6 +924,16 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   protected void assertSuccessMarkerDoesNotExist(Path dir) throws IOException {
     assertPathDoesNotExist("Success marker",
         new Path(dir, SUCCESS_FILE_NAME));
+  }
+
+  /**
+   * Load the success marker and return the data inside it.
+   * @param dir directory containing the marker
+   * @return the loaded data
+   * @throws IOException on any failure to load or validate the data
+   */
+  protected SuccessData loadSuccessMarker(Path dir) throws IOException {
+    return SuccessData.load(getFileSystem(), new Path(dir, SUCCESS_FILE_NAME));
   }
 
   /**
@@ -980,6 +983,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // validate output
     assertSuccessMarkerExists(outDir);
+    SuccessData successData = loadSuccessMarker(outDir);
+    LOG.info("Success data {}", successData);
+
     describe("validate output of %s", outDir);
     validateMapFileOutputContent(fs, outDir);
 

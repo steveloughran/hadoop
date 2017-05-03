@@ -82,6 +82,11 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
         getWorkPath());
   }
 
+  @Override
+  public String getName() {
+    return "MagicS3GuardCommitter";
+  }
+
   /**
    * Require delayed commit supported in the FS.
    * @return true, always.
@@ -114,7 +119,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     getDestFS().getFileStatus(getJobAttemptPath(context));
 
     cleanupJob(context);
-    maybeTouchSuccessMarker(context);
+    maybeCreateSuccessMarker(context);
   }
 
   /**

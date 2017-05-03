@@ -428,7 +428,7 @@ public final class CommitUtils {
    * @param classname classname to require
    * @throws ValidationFailure on a failure
    */
-  static void validateCollectionClass(Iterable it, Class classname)
+  public static void validateCollectionClass(Iterable it, Class classname)
       throws ValidationFailure {
     for (Object o : it) {
       verify(o.getClass().equals(classname),

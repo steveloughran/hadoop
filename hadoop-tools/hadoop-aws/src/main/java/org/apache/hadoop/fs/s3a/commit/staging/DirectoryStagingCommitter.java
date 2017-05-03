@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
-import org.apache.hadoop.fs.s3a.commit.SinglePendingCommit;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
@@ -52,6 +52,11 @@ public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
   public DirectoryStagingCommitter(Path outputPath, TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
+  }
+
+  @Override
+  public String getName() {
+    return "DirectoryStagingCommitter";
   }
 
   @Override

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.files;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -42,6 +42,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
 import org.apache.hadoop.util.JsonSerDeser;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
@@ -52,7 +53,7 @@ import static org.apache.hadoop.util.StringUtils.join;
  * This is the serialization format for the delayed commit operation.
  *
  * It's marked as {@link Serializable} so that it can be passed in RPC
- * calls; for this to work it relies on the fact that Java.io ArrayList
+ * calls; for this to work it relies on the fact that java.io ArrayList
  * and LinkedList are serializable. If any other list type is used for etags,
  * it must also be serialized. Jackson expects lists, and it is used
  * to persist to disk.
@@ -67,13 +68,6 @@ public class SinglePendingCommit extends PersistentCommitData
    * Serialization ID: {@value}.
    */
   private static final long serialVersionUID = 0x10000 + VERSION;
-
-  /**
-   * Single serializer.
-   */
-  private static final JsonSerDeser<SinglePendingCommit> SERIALIZER
-      = new JsonSerDeser<>(SinglePendingCommit.class, false, true);
-
 
   // This type is serialized/deserilized by Jackson: make all the fields visible
   // to show what is going on.
@@ -105,7 +99,7 @@ public class SinglePendingCommit extends PersistentCommitData
   /** When was the upload saved? */
   public long saved;
 
-  /** timestamp as date; no expectation of deserializability. */
+  /** timestamp as date; no expectation of parseability. */
   public String date;
 
   /** Job ID, if known. */
@@ -132,11 +126,11 @@ public class SinglePendingCommit extends PersistentCommitData
   }
 
   /**
-   * Get the singleton JSON serializer for this class.
-   * @return the serializer.
+   * Get a JSON serializer for this class.
+   * @return a serializer.
    */
-  public static JsonSerDeser<SinglePendingCommit> getSerializer() {
-    return SERIALIZER;
+  public static JsonSerDeser<SinglePendingCommit> serializer() {
+    return new JsonSerDeser<>(SinglePendingCommit.class, false, true);
   }
 
   /**
@@ -149,7 +143,7 @@ public class SinglePendingCommit extends PersistentCommitData
    */
   public static SinglePendingCommit load(FileSystem fs, Path path)
       throws IOException {
-    SinglePendingCommit instance = getSerializer().load(fs, path);
+    SinglePendingCommit instance = serializer().load(fs, path);
     instance.validate();
     instance.filename = path.toString();
     return instance;
@@ -244,13 +238,13 @@ public class SinglePendingCommit extends PersistentCommitData
   @Override
   public byte[] toBytes() throws IOException {
     validate();
-    return getSerializer().toBytes(this);
+    return serializer().toBytes(this);
   }
 
   @Override
   public void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException {
-    getSerializer().save(fs, path, this, overwrite);
+    serializer().save(fs, path, this, overwrite);
   }
 
   /**

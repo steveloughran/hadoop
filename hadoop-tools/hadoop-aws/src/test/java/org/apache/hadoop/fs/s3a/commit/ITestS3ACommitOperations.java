@@ -31,6 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
@@ -300,7 +301,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     String data = read(fs, pendingDataPath);
     LOG.info("Contents of {}: \n{}", pendingDataPath, data);
     // really read it in and parse
-    SinglePendingCommit persisted = SinglePendingCommit.getSerializer()
+    SinglePendingCommit persisted = SinglePendingCommit.serializer()
         .load(fs, pendingDataPath);
     persisted.validate();
     assertTrue("created timestamp wrong in " + persisted,

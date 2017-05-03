@@ -195,7 +195,13 @@ public class JsonSerDeser<T> {
   public T load(FileSystem fs, Path path, boolean verifyLength)
       throws IOException, JsonParseException, JsonMappingException {
     FileStatus status = fs.getFileStatus(path);
+    if (status.isDirectory()) {
+      throw new FileNotFoundException("Not a file: " + path);
+    }
     long len = status.getLen();
+    if (len == 0) {
+      throw new EOFException("File is empty: " + path);
+    }
     byte[] b = new byte[(int) len];
     FSDataInputStream dataInputStream = fs.open(path);
     int count = dataInputStream.read(b);

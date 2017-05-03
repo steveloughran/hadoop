@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.files;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingS3Util;
+import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
 import org.apache.hadoop.util.JsonSerDeser;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
@@ -60,12 +60,6 @@ public class MultiplePendingCommits extends PersistentCommitData {
   private static final long serialVersionUID = 0x11000 + VERSION;
 
 
-  /**
-   * Serializer for the operation.
-   */
-  private static final JsonSerDeser<MultiplePendingCommits> SERIALIZER
-      = new JsonSerDeser<>(MultiplePendingCommits.class, false, true);
-
   /** Version marker. */
   public int version = VERSION;
 
@@ -89,11 +83,11 @@ public class MultiplePendingCommits extends PersistentCommitData {
   }
 
   /**
-   * Get the singleton JSON serializer for this class.
-   * @return the serializer.
+   * Get a JSON serializer for this class.
+   * @return a serializer.
    */
-  public static JsonSerDeser<MultiplePendingCommits> getSerializer() {
-    return SERIALIZER;
+  public static JsonSerDeser<MultiplePendingCommits> serializer() {
+    return new JsonSerDeser<>(MultiplePendingCommits.class, false, true);
   }
 
   /**
@@ -107,7 +101,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
   public static MultiplePendingCommits load(FileSystem fs, Path path)
       throws IOException {
     LOG.debug("Reading pending commits in file {}", path);
-    MultiplePendingCommits instance = getSerializer().load(fs, path);
+    MultiplePendingCommits instance = serializer().load(fs, path);
     instance.validate();
     return instance;
   }
@@ -158,7 +152,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
 
   @Override
   public byte[] toBytes() throws IOException {
-    return SERIALIZER.toBytes(this);
+    return serializer().toBytes(this);
   }
 
   /**
@@ -172,7 +166,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
   @Override
   public void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException {
-    SERIALIZER.save(fs, path, this, overwrite);
+    serializer().save(fs, path, this, overwrite);
   }
 
 }

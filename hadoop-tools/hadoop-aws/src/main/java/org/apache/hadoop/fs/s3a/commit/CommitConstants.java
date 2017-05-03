@@ -23,6 +23,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.PartitonedStagingCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterFactory;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 
 /**
@@ -75,6 +76,12 @@ public final class CommitConstants {
 
   /** Default job marker option: {@value}. */
   public static final boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
+
+  /**
+   * Directory committer: {@value}.
+   */
+  public static final String STAGING_COMMITTER_FACTORY =
+      StagingCommitterFactory.NAME;
 
   /**
    * Directory committer: {@value}.

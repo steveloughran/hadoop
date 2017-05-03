@@ -207,8 +207,8 @@ TBD
 
 ### Requirements of an S3A Committer
 
-1. Support S3 as a reliable direct destination of work through the S3A filesystem
-   client.
+1. Support an eventually consistent S3 object store as a reliable direct
+destination of work through the S3A filesystem client.
 1. Efficient: implies no rename, and a minimal amount of delay in the job driver's
 task and job commit phases,
 1. Support task failure and speculation.
