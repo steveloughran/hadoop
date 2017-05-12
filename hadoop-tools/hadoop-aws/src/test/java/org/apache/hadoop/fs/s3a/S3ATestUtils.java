@@ -126,7 +126,7 @@ public final class S3ATestUtils {
     S3AFileSystem fs1 = new S3AFileSystem();
     //enable purging in tests
     if (purge) {
-      // purge with but a 30 minute delay so that parallel multipart tests don't
+      // purge with but a delay so that parallel multipart tests don't
       // suddenly start timing out
       enableMultipartPurge(conf, PURGE_DELAY_SECONDS);
     }

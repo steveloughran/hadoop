@@ -139,13 +139,6 @@ public final class CommitConstants {
   public static final String COMMITTER_NAME_PARTITION = "partition";
 
   /**
-   * Default option for {@link #FS_S3A_COMMITTER_NAME}: {@value}.
-   * This is <i>initially the classic one; it may change in future.</i>
-   */
-  public static final String COMMITTER_NAME_DEFAULT
-      = COMMITTER_NAME_FILE;
-
-  /**
    * Option for final files to have uniqueness through uuid or attempt info:
    * {@value}.
    * Can be used for conflict resolution, but it also means that the filenames
@@ -196,9 +189,8 @@ public final class CommitConstants {
 
   /**
    * Path for pending data in the cluster FS: {@value}.
-   * TODO: Support this somehow (i.e. not just /tmp)
    */
-  public static final String FS_S3A_COMMITTER_STAGING_PENDING_PATH =
-      "fs.s3a.committer.staging.pending.path";
+  public static final String FS_S3A_COMMITTER_TMP_PATH =
+      "fs.s3a.committer.tmp.path";
 
 }

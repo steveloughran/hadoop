@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
@@ -739,7 +740,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     S3AFileSystem fs = getFileSystem();
     if (fs != null) {
       String key = fs.pathToKey(path);
-      S3AFileSystem.WriteOperationHelper writeOps =
+      WriteOperationHelper writeOps =
           fs.createWriteOperationHelper(key);
       int count = writeOps.abortMultipartUploadsUnderPath(key);
       if (count > 0) {

@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
@@ -36,8 +38,25 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  * A committer factory which chooses the committer based on the
  * specific option chosen in a per-bucket basis from the property
  * {@link CommitConstants#FS_S3A_COMMITTER_NAME}.
+ *
+ * This should be instantiated by using the property value {@link #CLASSNAME}
+ * as the committer for the job, then set the filesystem property
+ * {@link CommitConstants#FS_S3A_COMMITTER_NAME} to one of
+ * <ul>
+ *   <li>{@link CommitConstants#COMMITTER_NAME_FILE}: File committer.</li>
+ *   <li>{@link CommitConstants#COMMITTER_NAME_DIRECTORY}:
+ *   Staging directory committer.</li>
+ *   <li>{@link CommitConstants#COMMITTER_NAME_PARTITION}:
+ *   Staging partition committer.</li>
+ *   <li>{@link CommitConstants#COMMITTER_NAME_MAGIC}:
+ *   the "Magic" committer</li>
+ * </ul>
+ * There are no checks to verify that the filesystem is compatible with
+ * the committer.
  */
-public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
+@InterfaceAudience.Public
+@InterfaceStability.Unstable
+public class DynamicCommitterFactory extends AbstractS3GuardCommitterFactory {
 
   /**
    * Name of this class: {@value}.
@@ -57,8 +76,8 @@ public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
   public PathOutputCommitter createJobCommitter(S3AFileSystem fileSystem,
       Path outputPath,
       JobContext context) throws IOException {
-    Abstract3GuardCommitterFactory factory = chooseCommitter(fileSystem,
-        outputPath, context);
+    AbstractS3GuardCommitterFactory factory = chooseCommitter(fileSystem,
+        outputPath);
     if (factory != null) {
       return factory.createJobCommitter(fileSystem, outputPath, context);
     } else {
@@ -78,8 +97,8 @@ public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
   public PathOutputCommitter createTaskCommitter(S3AFileSystem fileSystem,
       Path outputPath,
       TaskAttemptContext context) throws IOException {
-    Abstract3GuardCommitterFactory factory = chooseCommitter(fileSystem,
-        outputPath, context);
+    AbstractS3GuardCommitterFactory factory = chooseCommitter(fileSystem,
+        outputPath);
         if (factory != null) {
       return factory.createTaskCommitter(fileSystem, outputPath, context);
     } else {
@@ -91,21 +110,18 @@ public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
    * Choose a committer from the FS configuration.
    * @param fileSystem FS
    * @param outputPath destination path
-   * @param context task/job context.
    * @return A s3guard committer if chosen, or "null" for the classic value
-   * @throws IOException on a failure to identify the committer
+   * @throws PathCommitException on a failure to identify the committer
    */
-  private Abstract3GuardCommitterFactory chooseCommitter(
+  private AbstractS3GuardCommitterFactory chooseCommitter(
       S3AFileSystem fileSystem,
-      Path outputPath,
-      JobContext context) throws IOException {
-    Abstract3GuardCommitterFactory factory;
+      Path outputPath) throws PathCommitException {
+    AbstractS3GuardCommitterFactory factory;
 
     // the FS conf will have had its per-bucket values resolved, unlike
     // job/task configurations.
     Configuration conf = fileSystem.getConf();
-    String name = conf.getTrimmed(FS_S3A_COMMITTER_NAME,
-        COMMITTER_NAME_DEFAULT);
+    String name = conf.getTrimmed(FS_S3A_COMMITTER_NAME, COMMITTER_NAME_FILE);
     switch (name) {
     case COMMITTER_NAME_FILE:
       factory = null;
@@ -120,7 +136,8 @@ public class DynamicCommitterFactory extends Abstract3GuardCommitterFactory {
       factory = new MagicS3GuardCommitterFactory();
       break;
     default:
-      throw new IOException("Unknown committer: \"" + name + "\"");
+      throw new PathCommitException(outputPath,
+          "Unknown committer: \"" + name + "\"");
     }
     return factory;
   }

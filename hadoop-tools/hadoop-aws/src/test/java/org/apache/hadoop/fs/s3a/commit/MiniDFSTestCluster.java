@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.service.AbstractService;
 
 /**
@@ -47,12 +46,13 @@ public class MiniDFSTestCluster extends AbstractService {
   @Override
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
-    // if this fails with "directory is already locked" set umask to 0022
-    cluster = new MiniDFSCluster(conf, 1, true, null);
-    //cluster = new MiniDFSCluster.Builder(new Configuration()).build();
+    cluster = new MiniDFSCluster.Builder(conf)
+        .numDataNodes(1)
+        .format(true)
+        .racks(null)
+        .build();
     clusterFS = cluster.getFileSystem();
-    conf = new JobConf(clusterFS.getConf());
-    localFS = FileSystem.getLocal(conf);
+    localFS = FileSystem.getLocal(clusterFS.getConf());
   }
 
   @Override

@@ -121,7 +121,7 @@ class S3ABlockOutputStream extends OutputStream {
   /**
    * Write operation helper; encapsulation of the filesystem operations.
    */
-  private final S3AFileSystem.WriteOperationHelper writeOperationHelper;
+  private final WriteOperationHelper writeOperationHelper;
 
   /**
    * Track multipart put operation.
@@ -154,7 +154,7 @@ class S3ABlockOutputStream extends OutputStream {
       long blockSize,
       S3ADataBlocks.BlockFactory blockFactory,
       S3AInstrumentation.OutputStreamStatistics statistics,
-      S3AFileSystem.WriteOperationHelper writeOperationHelper,
+      WriteOperationHelper writeOperationHelper,
       DefaultPutTracker putTracker)
       throws IOException {
     this.fs = fs;

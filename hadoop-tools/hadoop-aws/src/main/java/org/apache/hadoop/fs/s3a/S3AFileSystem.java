@@ -44,11 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
@@ -60,7 +57,6 @@ import com.amazonaws.services.s3.model.MultipartUpload;
 import com.amazonaws.services.s3.model.MultipartUploadListing;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
@@ -448,7 +444,7 @@ public class S3AFileSystem extends FileSystem {
    * Returns the S3 client used by this filesystem.
    * @return AmazonS3Client
    */
-  public AmazonS3 getAmazonS3Client() {
+  AmazonS3 getAmazonS3Client() {
     return s3;
   }
 
@@ -517,7 +513,7 @@ public class S3AFileSystem extends FileSystem {
       Configuration conf) throws IOException {
     if (directoryAllocator == null) {
       String bufferDir = conf.get(BUFFER_DIR) != null
-          ? BUFFER_DIR : "hadoop.tmp.dir";
+          ? BUFFER_DIR : HADOOP_TMP_DIR;
       directoryAllocator = new LocalDirAllocator(bufferDir);
     }
     return directoryAllocator.createTmpFileForWrite(pathStr, size, conf);
@@ -533,11 +529,19 @@ public class S3AFileSystem extends FileSystem {
 
   /**
    * Set the bucket.
-   * @param bucket
+   * @param bucket the bucket
    */
   @VisibleForTesting
   protected void setBucket(String bucket) {
     this.bucket = bucket;
+  }
+
+  /**
+   * Get the canned ACL of this FS.
+   * @return an ACL, if any
+   */
+  CannedAccessControlList getCannedACL() {
+    return cannedACL;
   }
 
   /**
@@ -591,7 +595,7 @@ public class S3AFileSystem extends FileSystem {
    * @param key input key
    * @return the path from this key
    */
-  private Path keyToPath(String key) {
+  Path keyToPath(String key) {
     return new Path("/" + key);
   }
 
@@ -745,7 +749,7 @@ public class S3AFileSystem extends FileSystem {
   @InterfaceAudience.Private
   public WriteOperationHelper createWriteOperationHelper(String key) {
     Preconditions.checkArgument(key != null, "No key");
-    WriteOperationHelper helper = new WriteOperationHelper(key);
+    WriteOperationHelper helper = new WriteOperationHelper(this, key);
     LOG.debug("Created {}", helper);
     return helper;
   }
@@ -2868,414 +2872,5 @@ public class S3AFileSystem extends FileSystem {
     }
   }
 
-  /**
-   * Helper for an ongoing write operation.
-   * <p>
-   * It hides direct access to the S3 API from the output stream,
-   * and is a location where the object upload process can be evolved/enhanced.
-   * <p>
-   * Features
-   * <ul>
-   *   <li>Methods to create and submit requests to S3, so avoiding
-   *   all direct interaction with the AWS APIs.</li>
-   *   <li>Some extra preflight checks of arguments, so failing fast on
-   *   errors.</li>
-   *   <li>Callbacks to let the FS know of events in the output stream
-   *   upload process.</li>
-   * </ul>
-   *
-   * Each instance of this state is unique to a single output stream.
-   */
-  @InterfaceAudience.Private
-  public class WriteOperationHelper {
-    private final String key;
-
-    protected WriteOperationHelper(String key) {
-      this.key = key;
-    }
-
-    /**
-     * Create a {@link PutObjectRequest} request.
-     * If {@code length} is set, the metadata is configured with the size of
-     * the upload.
-     * @param inputStream source data.
-     * @param length size, if known. Use -1 for not known
-     * @return the request
-     */
-    public PutObjectRequest newPutRequest(InputStream inputStream,
-        long length) {
-      return createPutObjectRequest(key, inputStream, length);
-    }
-
-    /**
-     * Create a {@link PutObjectRequest} request against the specific key.
-     * @param destKey destination key
-     * @param inputStream source data.
-     * @param length size, if known. Use -1 for not known
-     * @return the request
-     */
-    public PutObjectRequest createPutObjectRequest(String destKey,
-        InputStream inputStream, long length) {
-      return newPutObjectRequest(destKey,
-          newObjectMetadata(length),
-          inputStream);
-    }
-
-    /**
-     * Create a {@link PutObjectRequest} request to upload a file.
-     * @param sourceFile source file
-     * @return the request
-     */
-    public PutObjectRequest newPutRequest(File sourceFile) {
-      return createPutObjectRequest(key, sourceFile);
-    }
-
-    /**
-     * Create a {@link PutObjectRequest} request to upload a file.
-     * @param dest key to PUT to.
-     * @param sourceFile source file
-     * @return the request
-     */
-    public PutObjectRequest createPutObjectRequest(String dest,
-        File sourceFile) {
-      int length = (int) sourceFile.length();
-      PutObjectRequest request = newPutObjectRequest(dest,
-          newObjectMetadata(length), sourceFile);
-      return request;
-    }
-
-    /**
-     * Callback on a successful write.
-     * @param length length of the write
-     */
-    public void writeSuccessful(long length) {
-      LOG.debug("Successful write to {}, len {}", key, length);
-    }
-
-    /**
-     * Callback on a write failure.
-     * @param e Any exception raised which triggered the failure.
-     */
-    public void writeFailed(Exception e) {
-      LOG.debug("Write to {} failed", this, e);
-    }
-
-    /**
-     * Create a new object metadata instance.
-     * Any standard metadata headers are added here, for example:
-     * encryption.
-     * @param length size, if known. Use -1 for not known
-     * @return a new metadata instance
-     */
-    public ObjectMetadata newObjectMetadata(long length) {
-      return S3AFileSystem.this.newObjectMetadata(length);
-    }
-
-    /**
-     * Start the multipart upload process.
-     * @return the upload result containing the ID
-     * @throws IOException IO problem
-     */
-    public String initiateMultiPartUpload() throws IOException {
-      LOG.debug("Initiating Multipart upload");
-      final InitiateMultipartUploadRequest initiateMPURequest =
-          new InitiateMultipartUploadRequest(bucket,
-              key,
-              newObjectMetadata(-1));
-      initiateMPURequest.setCannedACL(cannedACL);
-      setOptionalMultipartUploadRequestParameters(initiateMPURequest);
-      try {
-        return s3.initiateMultipartUpload(initiateMPURequest)
-            .getUploadId();
-      } catch (AmazonClientException ace) {
-        throw translateException("initiate MultiPartUpload", key, ace);
-      }
-    }
-
-    /**
-     * Abort a multipart upload operation.
-     * @param dest destination key of upload
-     * @param uploadId multipart operation Id
-     * @throws IOException on problems.
-     */
-    public void abortMultipartCommit(String dest, String uploadId)
-        throws IOException {
-      try {
-        abortMultipartUpload(dest, uploadId);
-      } catch (AmazonClientException e) {
-        throw translateException("aborting multipart commit",
-            keyToPath(dest), e);
-      }
-    }
-
-    /**
-     * Abort a multipart upload operation.
-     * @param uploadId multipart operation Id
-     * @throws IOException on problems.
-     */
-    public void abortMultipartCommit(MultipartUpload upload)
-        throws IOException {
-      abortMultipartCommit(
-          upload.getKey(),
-          upload.getUploadId());
-    }
-
-    /**
-     * Commplete the multipart commit operation.
-     * @param uploadId multipart operation Id
-     * @param partETags list of partial uploads
-     * @return the result of the operation.
-     * @throws IOException on problems.
-     */
-    public CompleteMultipartUploadResult finalizeMultipartCommit(
-        String destination,
-        String uploadId,
-        List<PartETag> partETags,
-        long length) throws IOException {
-      return finalizeMultipartUpload(destination, uploadId, partETags, length);
-    }
-
-    /**
-     * Finalize a multipart PUT operation.
-     * This completes the upload, and, if that works, calls
-     * {@link #finishedWrite(String, long)} to update the filesystem.
-     * @param uploadId multipart operation Id
-     * @param partETags list of partial uploads
-     * @return the result of the operation.
-     * @throws IOException on problems.
-     */
-    public CompleteMultipartUploadResult finalizeMultipartUpload(
-        String destination,
-        String uploadId,
-        List<PartETag> partETags,
-        long length) throws IOException {
-      try {
-        CompleteMultipartUploadResult result
-            = completeMultipartUpload(uploadId, partETags);
-        finishedWrite(destination, length);
-        return result;
-      } catch (AmazonClientException e) {
-        throw translateException("Completing multipart commit",
-            destination, e);
-      }
-    }
-
-    /**
-     * Complete a multipart upload operation.
-     * This one does not finalize the write.
-     * @param uploadId multipart operation Id
-     * @param partETags list of partial uploads
-     * @return the result of the operation.
-     * @throws AmazonClientException on problems.
-     */
-    public CompleteMultipartUploadResult completeMultipartUpload(
-        String uploadId,
-        List<PartETag> partETags) throws AmazonClientException {
-      Preconditions.checkNotNull(uploadId);
-      Preconditions.checkNotNull(partETags);
-      LOG.debug("Completing multipart upload {} with {} parts",
-          uploadId, partETags.size());
-      // a copy of the list is required, so that the AWS SDK doesn't
-      // attempt to sort an unmodifiable list.
-      return s3.completeMultipartUpload(
-          new CompleteMultipartUploadRequest(bucket,
-              key,
-              uploadId,
-              new ArrayList<>(partETags)));
-    }
-
-    /**
-     * Abort a multipart upload operation.
-     * @param uploadId multipart operation Id
-     * @throws AmazonClientException on problems.
-     */
-    public void abortMultipartUpload(String uploadKey, String uploadId)
-        throws AmazonClientException {
-      LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
-      s3.abortMultipartUpload(
-          new AbortMultipartUploadRequest(bucket, uploadKey, uploadId));
-    }
-
-    /**
-     * Abort all multipart uploads under a path.
-     * @param prefix prefix for uploads to abort
-     * @return a count of aborts
-     * @throws IOException trouble. FileNotFoundExceptions are swallowed.
-     */
-    public int abortMultipartUploadsUnderPath(String prefix)
-        throws IOException {
-      int count = 0;
-      for (MultipartUpload upload : listMultipartUploads(prefix)) {
-        try {
-          abortMultipartCommit(upload);
-          count++;
-        } catch (FileNotFoundException e) {
-          LOG.debug("Already aborted: {}", upload.getKey(), e);
-        }
-      }
-      return count;
-    }
-
-    /**
-     * Create and initialize a part request of a multipart upload.
-     * Exactly one of: {@code uploadStream} or {@code sourceFile}
-     * must be specified.
-     * A subset of the file may be posted, by providing the starting point
-     * in {@code offset} and a length of block in {@code size} equal to
-     * or less than the remaining bytes.
-     * @param uploadId ID of ongoing upload
-     * @param partNumber current part number of the upload
-     * @param size amount of data
-     * @param uploadStream source of data to upload
-     * @param sourceFile optional source file.
-     * @param offset offset in file to start reading.
-     * @return the request.
-     */
-    public UploadPartRequest newUploadPartRequest(String uploadId,
-        int partNumber,
-        int size,
-        InputStream uploadStream,
-        File sourceFile,
-        Long offset) {
-      Preconditions.checkNotNull(uploadId);
-      // exactly one source must be set; xor verifies this
-      Preconditions.checkArgument((uploadStream != null) ^ (sourceFile != null),
-          "Data source");
-      Preconditions.checkArgument(size >= 0, "Invalid partition size %s", size);
-      Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000,
-          "partNumber must be between 1 and 10000 inclusive, but is %s",
-          partNumber);
-
-      LOG.debug("Creating part upload request for {} #{} size {}",
-          uploadId, partNumber, size);
-      UploadPartRequest request = new UploadPartRequest()
-          .withBucketName(bucket)
-          .withKey(key)
-          .withUploadId(uploadId)
-          .withPartNumber(partNumber)
-          .withPartSize(size);
-      if (uploadStream != null) {
-        // there's an upload stream. Bind to it.
-        request.setInputStream(uploadStream);
-      } else {
-        Preconditions.checkArgument(sourceFile.exists(),
-            "Source file does not exist: %s", sourceFile);
-        Preconditions.checkArgument(offset >= 0, "Invalid offset %s", offset);
-        long length = sourceFile.length();
-        Preconditions.checkArgument(offset == 0 || offset < length,
-            "Offset %s beyond length of file %s", offset, length);
-        long range = Math.min(size, length - offset);
-        request.setFile(sourceFile);
-        request.setFileOffset(offset);
-      }
-      return request;
-    }
-
-    /**
-     * The toString method is intended to be used in logging/toString calls.
-     * @return a string description.
-     */
-    @Override
-    public String toString() {
-      final StringBuilder sb = new StringBuilder(
-          "WriteOperationHelper {bucket=").append(bucket);
-      sb.append(", key='").append(key).append('\'');
-      sb.append('}');
-      return sb.toString();
-    }
-
-    /**
-     * PUT an object directly (i.e. not via the transfer manager).
-     * Byte length is calculated from the file length, or, if there is no
-     * file, from the content length of the header.
-     * @param putObjectRequest the request
-     * @return the upload initiated
-     * @throws IOException on problems
-     */
-    public PutObjectResult putObject(PutObjectRequest putObjectRequest)
-        throws IOException {
-      try {
-        return putObjectDirect(putObjectRequest);
-      } catch (AmazonClientException e) {
-        throw translateException("put", putObjectRequest.getKey(), e);
-      }
-    }
-
-    /**
-     * PUT an object directly (i.e. not via the transfer manager),
-     * then finish the write (via {@link #finishedWrite(String, long)}.
-     * Byte length is calculated from the file length, or, if there is no
-     * file, from the content length of the header.
-     * After the put, any parent directory entries are deleted.
-     * @param putObjectRequest the request
-     * @param length length of data put; this is used in updating the metadata
-     * @return the upload initiated
-     * @throws IOException on problems
-     */
-    public PutObjectResult putObjectAndFinalize(
-        PutObjectRequest putObjectRequest,
-        int length) throws IOException {
-      PutObjectResult result = putObject(putObjectRequest);
-      finishedWrite(putObjectRequest.getKey(), length);
-      return result;
-    }
-
-    /**
-     * Delete a Path; a special entry point for committers.
-     * This entry point does not attempt to create a fake parent directory.
-     * @param status the status entry on the target path
-     * @param recursive if path is a directory and set to
-     * true, the directory is deleted else throws an exception. In
-     * case of a file the recursive can be set to either true or false.
-     * @return true if delete is successful else false.
-     * @throws IOException due to inability to delete a directory or file.
-     */
-    public boolean deleteInCommit(S3AFileStatus status, boolean recursive)
-        throws IOException {
-      Path f = status.getPath();
-      try {
-        return innerDelete(status, recursive, false);
-      } catch (FileNotFoundException e) {
-        LOG.debug("Couldn't delete {} - does not exist", f);
-        instrumentation.errorIgnored();
-        return false;
-      } catch (AmazonClientException e) {
-        throw translateException("deleteInCommit", f, e);
-      }
-    }
-
-    /**
-     * Revert a commit by deleting the file.
-     * TODO: Policy regarding creating a mock empty parent directory.
-     * @param destKey destination key
-     * @throws IOException due to inability to delete a directory or file.
-     */
-    public void revertCommit(String destKey) throws IOException {
-      try {
-        deleteObject(destKey);
-      } catch (AmazonClientException e) {
-        throw S3AUtils.translateException("revert commit",
-            destKey,
-            e);
-      }
-    }
-
-    /**
-     * Upload part of a multi-partition file.
-     * @param request request
-     * @return the result of the operation.
-     * @throws AmazonClientException on problems
-     */
-    public UploadPartResult uploadPart(UploadPartRequest request)
-        throws IOException {
-      try {
-        return S3AFileSystem.this.uploadPart(request);
-      } catch (AmazonClientException e) {
-        throw S3AUtils.translateException("upload part",
-            request.getKey(),
-            e);
-      }
-    }
-  }
 
 }

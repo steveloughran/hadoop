@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
@@ -115,7 +116,7 @@ public class FileCommitActions {
     try {
       commit.validate();
       destKey = commit.destinationKey;
-      S3AFileSystem.WriteOperationHelper writer
+      WriteOperationHelper writer
           = writer(destKey);
       writer.finalizeMultipartCommit(destKey,
           commit.uploadId,
@@ -139,7 +140,7 @@ public class FileCommitActions {
     return outcome;
   }
 
-  private S3AFileSystem.WriteOperationHelper writer(String destKey) {
+  private WriteOperationHelper writer(String destKey) {
     return fs.createWriteOperationHelper(destKey);
   }
 
@@ -434,7 +435,7 @@ public class FileCommitActions {
     if (!localFile.isFile()) {
       throw new IOException("Not a file: " + localFile);
     }
-    S3AFileSystem.WriteOperationHelper writer = writer(key);
+    WriteOperationHelper writer = writer(key);
     String uploadId = null;
 
     boolean threw = true;

@@ -32,13 +32,13 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public final class Constants {
 
+  private Constants() {
+  }
+
   /**
    * default hadoop temp dir on local system: {@value}.
    */
   public static final String HADOOP_TMP_DIR = "hadoop.tmp.dir";
-
-  private Constants() {
-  }
 
   /** The minimum multipart size which S3 supports. */
   public static final int MULTIPART_MIN_SIZE = 5 * 1024 * 1024;

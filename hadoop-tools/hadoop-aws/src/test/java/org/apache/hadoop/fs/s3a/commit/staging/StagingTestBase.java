@@ -53,6 +53,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.MiniDFSTestCluster;
@@ -342,9 +343,11 @@ public class StagingTestBase {
           new Configuration(getJob().getConfiguration()), AID);
 
       // get the task's configuration copy so modifications take effect
-      // TODO: This is a different property than that used in the committer
-      tac.getConfiguration().set("mapred.local.dir",
-              System.getProperty(StagingCommitterConstants.JAVA_IO_TMPDIR));
+      String tmp = System.getProperty(
+          StagingCommitterConstants.JAVA_IO_TMPDIR);
+      tac.getConfiguration().set(Constants.BUFFER_DIR, tmp + "/buffer");
+      tac.getConfiguration().set(CommitConstants.FS_S3A_COMMITTER_TMP_PATH,
+          tmp + "/cluster");
     }
 
     protected C getJobCommitter() {

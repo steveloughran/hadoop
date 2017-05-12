@@ -47,6 +47,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
+import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.Pair;
@@ -150,7 +151,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     // get the task's configuration copy so modifications take effect
     this.conf = tac.getConfiguration();
     // TODO: is this the right path?
-    this.conf.set(MAPREDUCE_CLUSTER_LOCAL_DIR, "/tmp/local-0,/tmp/local-1");
+    this.conf.set(Constants.BUFFER_DIR, "/tmp/local-0,/tmp/local-1");
     this.conf.setInt(MULTIPART_SIZE, 100);
 
     this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac, mockClient);
@@ -170,7 +171,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     // the temp directory is chosen based on a random seeded by the task and
     // attempt ids, so the result is deterministic if those ids are fixed.
     String dirs = "/tmp/mr-local-0,/tmp/mr-local-1";
-    config.set(MAPREDUCE_CLUSTER_LOCAL_DIR, dirs);
+    config.set(Constants.BUFFER_DIR, dirs);
 
     String message = "Missing scheme should produce local file paths";
     String expected = "file:/tmp/mr-local-1/" + jobUUID +
@@ -180,14 +181,14 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         getLocalTaskAttemptTempDir(config,
             jobUUID, tac.getTaskAttemptID()).toString());
 
-    config.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
+    config.set(Constants.BUFFER_DIR,
         "file:/tmp/mr-local-0,file:/tmp/mr-local-1");
     assertEquals("Path should be the same with file scheme",
         expected,
         getLocalTaskAttemptTempDir(config, jobUUID, tac.getTaskAttemptID())
             .toString());
 
-    config.set(MAPREDUCE_CLUSTER_LOCAL_DIR,
+    config.set(Constants.BUFFER_DIR,
         "hdfs://nn:8020/tmp/mr-local-0,hdfs://nn:8020/tmp/mr-local-1");
     intercept(IllegalArgumentException.class, "Wrong FS",
         new Callable<Path>() {

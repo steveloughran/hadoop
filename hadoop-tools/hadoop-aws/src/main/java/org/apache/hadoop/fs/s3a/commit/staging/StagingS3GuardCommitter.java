@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.amazonaws.services.s3.AmazonS3;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -106,7 +105,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private final FileOutputCommitter wrappedCommitter;
 
   // lazy variables
-  private AmazonS3 client = null;
   private ConflictResolution conflictResolution = null;
   private ExecutorService threadPool = null;
   private Path finalOutputPath = null;
@@ -132,7 +130,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     Configuration conf = getConf();
     this.uploadPartSize = conf.getLongBytes(
         MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
-    // Spark will use a fake app id based on the current minute and job id 0.
+    // Spark will use a fake app ID based on the current minute and job ID 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
     this.uniqueFilenames = conf.getBoolean(
@@ -158,7 +156,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     this.uploadPartSize = conf.getLongBytes(
         MULTIPART_SIZE, DEFAULT_MULTIPART_SIZE);
 
-    // Spark will use a fake app id based on the current minute and job id 0.
+    // Spark will use a fake app ID based on the current minute and job ID 0.
     // To avoid collisions, use the YARN application ID for Spark.
     this.uuid = getUploadUUID(conf, context.getJobID());
     this.uniqueFilenames = conf.getBoolean(
@@ -293,7 +291,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   /**
    * Get the filesystem for the job attempt.
    * @param context the context of the job.  This is used to get the
-   * application attempt id.
+   * application attempt ID.
    * @return the FS to store job attempt data.
    */
   public FileSystem getJobAttemptFileSystem(JobContext context)
@@ -305,7 +303,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   /**
    * Compute the path where the output of a given job attempt will be placed.
    * @param context the context of the job.  This is used to get the
-   * application attempt id.
+   * application attempt ID.
    * @param out the output path to place these in.
    * @return the path to store job attempt data.
    */
@@ -387,7 +385,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   /**
    * Compute the path where the output of a committed task is stored until the
    * entire job is committed for a specific application attempt.
-   * @param appAttemptId the id of the application attempt to use
+   * @param appAttemptId the ID of the application attempt to use
    * @param context the context of any task.
    * @return the path where the output of a committed task is stored.
    */
@@ -428,7 +426,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     LOG.debug("Scanning {} for files to commit", attemptPath);
     FileSystem attemptFS = getTaskAttemptFilesystem(context);
     RemoteIterator<LocatedFileStatus> iter = attemptFS
-        .listFiles(attemptPath, true /* recursive */);
+        .listFiles(attemptPath, true);
 
     List<FileStatus> stats = Lists.newArrayList();
     while (iter.hasNext()) {

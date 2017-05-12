@@ -20,10 +20,6 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.mapreduce.MRConfig;
-
-import static org.apache.hadoop.fs.s3a.Constants.DEFAULT_MULTIPART_SIZE;
-import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
 
 /**
  * Internal staging committer constants.
@@ -57,12 +53,6 @@ public final class StagingCommitterConstants {
 
   public static final String SPARK_APP_ID = "spark.app.id";
 
-  /**
-   * This constant is lifted from the {@code MRConfig} class, which
-   * is tagged private. Putting here makes is public, albeit unstable.
-   */
-  public static final String MAPREDUCE_CLUSTER_LOCAL_DIR =
-      MRConfig.LOCAL_DIR;
 
   /**
    * Filename of the commit data for a task: {@value}.

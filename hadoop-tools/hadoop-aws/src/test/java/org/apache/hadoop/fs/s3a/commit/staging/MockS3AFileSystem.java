@@ -245,14 +245,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
   public void incrementPutProgressStatistics(String key, long bytes) {
   }
 
-/*
-  @Override
-  protected void deleteObject(String key) throws InvalidRequestException {
-    // force into sharing the existing mock entry point
-    getAmazonS3Client().deleteObject(new DeleteObjectRequest(getBucket(), key));
-  }
-*/
-
   @Override
   protected void setOptionalMultipartUploadRequestParameters(
       InitiateMultipartUploadRequest req) {
@@ -283,7 +275,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
     final StringBuilder sb = new StringBuilder(
         "MockS3AFileSystem{");
     sb.append("inner mockFS=").append(mock);
-    sb.append("S3A client=").append(getAmazonS3Client());
     sb.append('}');
     return sb.toString();
   }

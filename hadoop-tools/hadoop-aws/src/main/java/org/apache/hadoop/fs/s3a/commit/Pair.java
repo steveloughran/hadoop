@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.apache.hadoop.fs.s3a.commit.staging.Paths;
-
 /**
  * A typed tuple.
  * @param <L> left element type

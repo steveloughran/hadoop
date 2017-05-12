@@ -100,6 +100,9 @@ public class JsonSerDeser<T> {
   @SuppressWarnings("unchecked")
   public synchronized T fromJson(String json)
       throws IOException, JsonParseException, JsonMappingException {
+    if (json.length() == 0) {
+      throw new EOFException("No data");
+    }
     try {
       return mapper.readValue(json, classType);
     } catch (IOException e) {
@@ -119,6 +122,12 @@ public class JsonSerDeser<T> {
   @SuppressWarnings("unchecked")
   public synchronized T fromFile(File jsonFile)
       throws IOException, JsonParseException, JsonMappingException {
+    if (!jsonFile.isFile()) {
+      throw new FileNotFoundException("Not a file: " + jsonFile);
+    }
+    if (jsonFile.length() == 0) {
+      throw new EOFException("File is empty: " + jsonFile);
+    }
     try {
       return mapper.readValue(jsonFile, classType);
     } catch (IOException e) {
@@ -246,7 +255,6 @@ public class JsonSerDeser<T> {
    */
   public byte[] toBytes(T instance) throws IOException {
     return mapper.writeValueAsBytes(instance);
-
   }
 
   /**
@@ -258,7 +266,6 @@ public class JsonSerDeser<T> {
    */
   public T fromBytes(String path, byte[] bytes) throws IOException {
     return fromJson(new String(bytes, 0, bytes.length, UTF_8));
-
   }
 
   /**

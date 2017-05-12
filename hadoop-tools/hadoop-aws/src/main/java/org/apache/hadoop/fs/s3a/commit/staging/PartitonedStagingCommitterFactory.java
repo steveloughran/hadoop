@@ -22,7 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.Abstract3GuardCommitterFactory;
+import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
@@ -31,7 +31,8 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
  * Creates the {@link PartitionedStagingCommitter}.
  */
 public class PartitonedStagingCommitterFactory
-    extends Abstract3GuardCommitterFactory {
+    extends AbstractS3GuardCommitterFactory {
+
   /**
    * Name of this class: {@value}.
    */

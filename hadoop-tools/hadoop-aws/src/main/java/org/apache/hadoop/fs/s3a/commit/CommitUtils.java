@@ -84,7 +84,6 @@ public final class CommitUtils {
       // special case: empty list
       return new ArrayList<>(0);
     }
-    path.depth();
     List<String> elements = new ArrayList<>();
     int len = uriPath.length();
     int firstElementChar = 1;
@@ -270,7 +269,7 @@ public final class CommitUtils {
   }
 
   /**
-   * Verify that that path is a delayed commit path.
+   * Verify that the path is a delayed commit path.
    * @param fs filesystem
    * @param path path
    * @throws PathCommitException if the path isn't a delayed commit path
@@ -284,7 +283,7 @@ public final class CommitUtils {
   }
 
   /**
-   * Verify that an FS is a delayed commit FS.
+   * Verify that an S3A FS instance is a delayed commit FS.
    * @param fs filesystem
    * @throws PathCommitException if the FS isn't a delayed commit FS.
    */
@@ -344,9 +343,9 @@ public final class CommitUtils {
   }
 
   /**
-   * Get the Application Attempt Id for this job.
+   * Get the Application Attempt ID for this job.
    * @param context the context to look in
-   * @return the Application Attempt Id for a given job.
+   * @return the Application Attempt ID for a given job.
    */
   public static int getAppAttemptId(JobContext context) {
     return context.getConfiguration().getInt(

@@ -37,10 +37,10 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
  * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
  * use the classic committer.
  */
-public abstract class Abstract3GuardCommitterFactory
+public abstract class AbstractS3GuardCommitterFactory
     extends PathOutputCommitterFactory {
   public static final Logger LOG = LoggerFactory.getLogger(
-      Abstract3GuardCommitterFactory.class);
+      AbstractS3GuardCommitterFactory.class);
 
   @Override
   public PathOutputCommitter createOutputCommitter(Path outputPath,

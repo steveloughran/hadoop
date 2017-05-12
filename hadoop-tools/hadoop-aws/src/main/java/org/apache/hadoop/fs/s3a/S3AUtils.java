@@ -757,13 +757,13 @@ public final class S3AUtils {
       boolean recursive) {
     try {
       fs.delete(path, recursive);
-    } catch (Exception e) {
+    } catch (IOException e) {
       LOG.debug("Failed to delete {}", path, e);
     }
   }
 
   /**
-   * Delete a path quietly: failures are logged at DEBUG.
+   * Delete a path: failures are logged at WARN.
    * @param fs filesystem
    * @param path path
    * @param recursive recursive?
@@ -773,7 +773,7 @@ public final class S3AUtils {
       boolean recursive) {
     try {
       fs.delete(path, recursive);
-    } catch (Exception e) {
+    } catch (IOException e) {
       LOG.warn("Failed to delete {}", path, e);
     }
   }

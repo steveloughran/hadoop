@@ -210,7 +210,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * Compute the path where the output of a given job attempt will be placed.
    * @param context the context of the job.  This is used to get the
-   * application attempt id.
+   * application attempt ID.
    * @return the path to store job attempt data.
    */
   public Path getJobAttemptPath(JobContext context) {

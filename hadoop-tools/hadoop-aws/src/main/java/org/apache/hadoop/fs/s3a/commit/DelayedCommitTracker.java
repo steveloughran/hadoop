@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 
 /**
@@ -44,7 +44,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
 
   private final String pendingPartKey;
   private final Path path;
-  private final S3AFileSystem.WriteOperationHelper writer;
+  private final WriteOperationHelper writer;
   private final String bucket;
 
   /**
@@ -59,7 +59,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
       String bucket,
       String destKey,
       String pendingPartKey,
-      S3AFileSystem.WriteOperationHelper writer) {
+      WriteOperationHelper writer) {
     super(destKey);
     this.bucket = bucket;
     this.path = path;
@@ -92,7 +92,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
       long bytesWritten)
       throws IOException {
     Preconditions.checkArgument(StringUtils.isNotEmpty(uploadId),
-        "empty/null upload Id: "+ uploadId);
+        "empty/null upload ID: "+ uploadId);
     Preconditions.checkArgument(parts != null,
         "No uploaded parts list");
     Preconditions.checkArgument(!parts.isEmpty(),

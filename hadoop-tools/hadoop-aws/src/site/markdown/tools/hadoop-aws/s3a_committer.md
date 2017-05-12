@@ -70,9 +70,26 @@ The initial option set:
 | `fs.s3a.committer.staging.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
 | `fs.s3a.committer.staging.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
 | `fs.s3a.committer.staging.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
+| `fs.s3a.committer.tmp.path` | Directory in the cluster filesystem used for storing information on the uncommitted files. |
 | `mapreduce.fileoutputcommitter.marksuccessfuljobs` | flag to control creation of `_SUCCESS` marker file on job completion. Default: true |
 | `fs.s3a.multipart.size` | Size in bytes of each part of a multipart upload. Default: "100M" |
+| `fs.s3a.buffer.dir` | Directory in local filesystem under which data is saved before being uploaded |
 
+Generated files are initially written to a local directory underneath one of the temporary
+directories listed in `fs.s3a.buffer.dir`.  
+
+Temporary files are saved in HDFS (or other cluster filesystem )under the path
+`${fs.s3a.committer.tmp.path}/${user}` where `user` is the name of the user running the job.
+The default value of `fs.s3a.committer.tmp.path` is `/tmp`, so the temporary directory 
+for any application attempt will be a path `/tmp/${user}.
+In the special case in which the local `file:` filesystem is the cluster filesystem, the
+location of the temporary directory is that of the JVM system property
+`java.io.tmpdir`.
+
+The application attempt ID is used to create a unique path under this directory, 
+resulting in a path `/tmp/${user}/${application-attempt-id}/` under which
+summary data of each task's pending commits are managed using the standard
+`FileOutputFormat` committer.
 
 
 ## Terminology
@@ -408,8 +425,8 @@ a multipart request with the final destination of `/results/latest/latest.orc.lz
 individual multipart PUT opreations
 
 1. On `close()`, summary data would be written to the file
-`/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`.  This would list: upload Id
-and all the parts and etags of uploaded data.
+`/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`. 
+This would contain the upload ID and all the parts and etags of uploaded data.
 
 1. The task commit operation would do nothing.
 

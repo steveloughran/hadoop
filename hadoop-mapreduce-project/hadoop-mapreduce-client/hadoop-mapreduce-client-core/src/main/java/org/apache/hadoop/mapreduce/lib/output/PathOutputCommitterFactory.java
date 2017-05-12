@@ -33,7 +33,7 @@ import java.io.IOException;
 /**
  * A factory for committers implementing the {@link PathOutputCommitter}
  * methods, and so can be used from {@link FileOutputFormat}.
- * The base implementation returns {@link FileOutputFormat} instances.
+ * The base implementation returns {@link FileOutputCommitter} instances.
  */
 public class PathOutputCommitterFactory extends Configured {
   private static final Logger LOG =

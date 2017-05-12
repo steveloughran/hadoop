@@ -28,6 +28,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.s3a.Constants;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -78,6 +80,11 @@ public final class Paths {
     }
   }
 
+  /**
+   * Iterate up a path's parents until the root element is found.
+   * @param path path to scan
+   * @return the root element
+   */
   public static Path getRoot(Path path) {
     Path current = path;
     while (!current.isRoot()) {
@@ -124,9 +131,17 @@ public final class Paths {
     return pathStr;
   }
 
+  /**
+   * Using {@code URI.relativize()}, build the relative path from the
+   * base path to the full path.
+   * TODO: test this thoroughly
+   * @param basePath base path
+   * @param fullPath full path under the base path.
+   * @return the relative path
+   */
   public static String getRelativePath(Path basePath,
                                        Path fullPath) {
-    // TODO: test this thoroughly
+    //
     // Use URI.create(Path#toString) to avoid URI character escape bugs
     URI relative = URI.create(basePath.toString())
         .relativize(URI.create(fullPath.toString()));
@@ -150,6 +165,14 @@ public final class Paths {
     return p;
   }
 
+  /**
+   * Get the local task attempt temporary directory
+   * @param conf configuration
+   * @param uuid some UUID, such as a job UUID
+   * @param attempt attempt ID
+   * @return a local task attempt directory.
+   * @throws IOException IO problem.
+   */
   public static Path getLocalTaskAttemptTempDir(Configuration conf,
       String uuid, TaskAttemptID attempt) throws IOException {
     int taskId = attempt.getTaskID().getId();
@@ -165,7 +188,7 @@ public final class Paths {
    * @param fs filesystem
    * @return a path under which temporary work can go.
    */
-  public static Path tempDirForFileSystem(FileSystem fs) {
+  public static Path tempDirForFileSystem(Configuration conf, FileSystem fs) {
     Path temp;
     switch (fs.getScheme()) {
     case "file":
@@ -179,15 +202,17 @@ public final class Paths {
     // here assume that /tmp is valid
     case "hdfs":
     default:
-      temp = fs.makeQualified(new Path("/tmp"));
+      String pathname = conf.getTrimmed(
+          CommitConstants.FS_S3A_COMMITTER_TMP_PATH, "/tmp");
+      temp = fs.makeQualified(new Path(pathname));
     }
     return temp;
   }
 
   /**
-   * Get the Application Attempt Id for this job.
+   * Get the Application Attempt ID for this job.
    * @param conf the config to look in
-   * @return the Application Attempt Id for a given job.
+   * @return the Application Attempt ID for a given job.
    */
   private static int getAppAttemptId(Configuration conf) {
     return conf.getInt(
@@ -205,7 +230,7 @@ public final class Paths {
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
                                                         String uuid)
       throws IOException {
-    Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf)),
+    Path userTmp = new Path(tempDirForFileSystem(conf, FileSystem.get(conf)),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
     return new Path(work, StagingCommitterConstants.STAGING_UPLOADS);
@@ -215,7 +240,7 @@ public final class Paths {
   private static Path localTemp(Configuration conf, int taskId, int attemptId)
       throws IOException {
     String[] dirs = conf.getStrings(
-        StagingCommitterConstants.MAPREDUCE_CLUSTER_LOCAL_DIR);
+        Constants.BUFFER_DIR);
     Random rand = new Random(Objects.hashCode(taskId, attemptId));
     String dir = dirs[rand.nextInt(dirs.length)];
 
@@ -239,7 +264,7 @@ public final class Paths {
   /**
    * path filter.
    */
-  public static final class HiddenPathFilter implements PathFilter {
+  static final class HiddenPathFilter implements PathFilter {
     private static final HiddenPathFilter INSTANCE = new HiddenPathFilter();
   
     public static HiddenPathFilter get() {

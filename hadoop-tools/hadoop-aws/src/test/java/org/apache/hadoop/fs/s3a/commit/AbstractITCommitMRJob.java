@@ -48,12 +48,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
@@ -128,10 +128,10 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   @Test
   public void testMRJob() throws Exception {
-    FileSystem s3 = getFileSystem();
+    FileSystem fs = getFileSystem();
     // final dest is in S3A
     Path outputPath = path("testMRJob");
-    StorageStatisticsTracker tracker = new StorageStatisticsTracker(s3);
+    StorageStatisticsTracker tracker = new StorageStatisticsTracker(fs);
 
     String commitUUID = UUID.randomUUID().toString();
     String suffix = uniqueFilenames ? ("-" + commitUUID) : "";
@@ -178,7 +178,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
     assertPathExists("Output directory", outputPath);
     Set<String> actualFiles = Sets.newHashSet();
-    FileStatus[] results = s3.listStatus(outputPath, TEMP_FILE_FILTER);
+    FileStatus[] results = fs.listStatus(outputPath, TEMP_FILE_FILTER);
     LOG.info("Found {} files", results.length);
     for (FileStatus result : results) {
       LOG.debug("result: {}", result);
@@ -189,15 +189,16 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
         expectedFiles, actualFiles);
     // now load in the success data marker: this guarantees that a s3guard
     // committer was used
-    SuccessData successData = SuccessData.load(s3,
+    SuccessData successData = SuccessData.load(fs,
         new Path(outputPath, SUCCESS_FILE_NAME));
     String commitDetails = successData.toString();
     LOG.info("Committer from " + committerFactoryClassname() + "\n{}",
         commitDetails);
     assertEquals("Wrong committer in " + commitDetails,
         committerName(), successData.committer);
+    List<String> successFiles = successData.filenames;
     assertTrue("No filenames in " + commitDetails,
-        !successData.filenames.isEmpty());
+        !successFiles.isEmpty());
   }
 
 }

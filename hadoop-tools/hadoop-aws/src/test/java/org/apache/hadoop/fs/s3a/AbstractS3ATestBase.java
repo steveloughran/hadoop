@@ -91,7 +91,8 @@ public abstract class AbstractS3ATestBase extends AbstractFSContractTestBase
       conf.set(Constants.HADOOP_TMP_DIR, tmpDir);
     }
     conf.set(Constants.BUFFER_DIR, tmpDir);
-    // add this so that even on tests where the FS is shared, the FS is always "magic"
+    // add this so that even on tests where the FS is shared,
+    // the FS is always "magic"
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     return conf;
   }
