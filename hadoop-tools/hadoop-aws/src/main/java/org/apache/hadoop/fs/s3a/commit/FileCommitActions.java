@@ -29,7 +29,6 @@ import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +58,10 @@ public class FileCommitActions {
 
   private final S3AFileSystem fs;
 
+  /**
+   * Instantiate.
+   * @param fs FS to bind to
+   */
   public FileCommitActions(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
@@ -116,9 +119,8 @@ public class FileCommitActions {
     try {
       commit.validate();
       destKey = commit.destinationKey;
-      WriteOperationHelper writer
-          = writer(destKey);
-      writer.finalizeMultipartCommit(destKey,
+      // finalize the commit
+      writer(destKey).completeMultipartCommit(destKey,
           commit.uploadId,
           CommitUtils.toPartEtags(commit.etags),
           commit.size);
@@ -140,6 +142,11 @@ public class FileCommitActions {
     return outcome;
   }
 
+  /**
+   * Create a new {@link WriteOperationHelper} for working with the destination.
+   * @param destKey destination key
+   * @return a new instance
+   */
   private WriteOperationHelper writer(String destKey) {
     return fs.createWriteOperationHelper(destKey);
   }
@@ -155,9 +162,14 @@ public class FileCommitActions {
   public void verifyCommitExists(SinglePendingCommit commit)
       throws FileNotFoundException, ValidationFailure, IOException {
     commit.validate();
+    // this will force an existence check
+    Path path = fs.keyToQualifiedPath(commit.destinationKey);
     FileStatus status = fs.getFileStatus(
-        fs.keyToQualifiedPath(commit.destinationKey));
+        path);
     LOG.debug("Destination entry: {}", status);
+    if (!status.isFile()) {
+      throw new PathCommitException(path, "Not a file: " + status);
+    }
   }
 
   /**
@@ -189,7 +201,8 @@ public class FileCommitActions {
    * @return the list of all located entries
    * @throws IOException if there is a problem listing the path.
    */
-  public List<LocatedFileStatus> locateAllSinglePendingCommits(Path pendingDir,
+  public List<LocatedFileStatus> locateAllSinglePendingCommits(
+      Path pendingDir,
       boolean recursive) throws IOException {
     final List<LocatedFileStatus> result = new ArrayList<>();
     FileStatus fileStatus = fs.getFileStatus(pendingDir);
@@ -213,8 +226,9 @@ public class FileCommitActions {
   }
 
   /**
-   * Load all single pending commits in the directory. All load failures are
-   * logged and then added the failures part of the results.
+   * Load all single pending commits in the directory.
+   * All load failures are logged and then added to list of files which would
+   * not load.
    * @param pendingDir directory containing commits
    * @param recursive do a recursive scan?
    * @return tuple of loaded entries and those pending files which would
@@ -250,9 +264,8 @@ public class FileCommitActions {
   public CommitFileOutcome abortSinglePendingCommitFile(Path pendingFile) {
     CommitFileOutcome outcome;
     try {
-      // really read it in and parse
-      SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
-      outcome = abort(commit);
+      // read it in and abort
+      outcome = abort(SinglePendingCommit.load(fs, pendingFile));
     } catch (IOException e) {
       // abort failed to load/validate
       String origin = pendingFile.toString();
@@ -269,8 +282,7 @@ public class FileCommitActions {
    * {@link CommitOutcomes#ABORTED} describing the operation.
    * Failures are caught and result in an outcome of the type
    * {@link CommitOutcomes#ABORT_FAILED}
-   * @param origin filename of data; used for error messages. Set to ""
-   * and {@code commit.filename} is used instead
+   * @param commit commit data
    * @return the outcome
    */
   public CommitFileOutcome abort(SinglePendingCommit commit) {
@@ -284,9 +296,11 @@ public class FileCommitActions {
     } catch (IOException | IllegalArgumentException e) {
       // download to an abort + exception
       LOG.warn("Failed to abort upload against {}," +
-          " described in {}", destKey, origin, e);
+          " described in {}",
+          destKey, origin, e);
       outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
-          origin, destKey,
+          origin,
+          destKey,
           e instanceof IOException ? (IOException) e
               : new PathCommitException(destKey, e.toString(), e));
     }
@@ -378,7 +392,7 @@ public class FileCommitActions {
   }
 
   /**
-   * Touch the success marker. This will overwrite it if it is already there.
+   * Save the success data to the {@code _SUCCESS} file.
    * @param outputPath output directory
    * @param successData success data to save.
    * @throws IOException IO problem
@@ -394,8 +408,7 @@ public class FileCommitActions {
 
   /**
    * Revert a pending commit by deleting the destination.
-   * @param actions commit actions to use
-   * @param commit pending
+   * @param commit pending commit
    * @throws IOException failure
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
@@ -408,7 +421,6 @@ public class FileCommitActions {
   /**
    * Upload all the data in the local file, returning the information
    * needed to commit the work.
-   * @param actions commit actions to use
    * @param localFile local file (be  a file)
    * @param partition partition/subdir. Not used
    * @param bucket dest bucket
@@ -427,6 +439,7 @@ public class FileCommitActions {
       throws IOException {
 
     LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
+            "" +
             " partition={} partSize={}",
         localFile, bucket, key, partition, uploadPartSize);
     if (!localFile.exists()) {
@@ -533,12 +546,7 @@ public class FileCommitActions {
      */
     public Iterable<CommitFileOutcome> select(final CommitOutcomes expected) {
       return Iterables.filter(outcomes,
-          new Predicate<CommitFileOutcome>() {
-            @Override
-            public boolean apply(CommitFileOutcome input) {
-              return input.outcome == expected;
-            }
-          });
+          input -> input.outcome == expected);
     }
 
     /**
@@ -597,6 +605,18 @@ public class FileCommitActions {
     }
   }
 
+
+  /**
+   * Possible outcomes of a commit operation.
+   */
+  enum CommitOutcomes {
+    SUCCEEDED,
+    FAILED,
+    ABORTED,
+    ABORT_FAILED,
+    REVERTED
+  }
+
   /**
    * Outcome of a commit to a single file.
    */
@@ -625,7 +645,8 @@ public class FileCommitActions {
         String destination,
         IOException exception) {
       this(exception == null ?
-              CommitOutcomes.SUCCEEDED : CommitOutcomes.FAILED, origin, destination,
+              CommitOutcomes.SUCCEEDED : CommitOutcomes.FAILED,
+          origin, destination,
           exception);
     }
 
@@ -701,12 +722,5 @@ public class FileCommitActions {
     }
   }
 
-  enum CommitOutcomes {
-    SUCCEEDED,
-    FAILED,
-    ABORTED,
-    ABORT_FAILED,
-    REVERTED
-  }
 
 }

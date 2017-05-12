@@ -206,6 +206,8 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
 
   /**
    * Inner routine for committing a task.
+   * TODO: this is the wrong place to commit work.
+   *
    * @param context context
    * @return the outcome
    * @throws IOException exception

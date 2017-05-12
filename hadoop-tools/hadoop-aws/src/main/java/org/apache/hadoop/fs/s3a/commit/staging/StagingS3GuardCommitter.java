@@ -591,7 +591,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         .run(new Tasks.Task<FileStatus, IOException>() {
           @Override
           public void run(FileStatus pendingCommitFile) throws IOException {
-            MultiplePendingCommits commits = StagingS3Util.readPendingCommits(
+            MultiplePendingCommits commits = MultiplePendingCommits.load(
                 attemptFS, pendingCommitFile.getPath());
             pending.addAll(commits.commits);
           }
@@ -676,25 +676,25 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
                 @Override
                 public void run(SinglePendingCommit commit,
                     Exception exception) throws IOException {
-                  StagingS3Util.abortCommit(getCommitActions(), commit);
+                  getCommitActions().abortMultipartCommit(commit);
                 }
               })
           .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              StagingS3Util.abortCommit(getCommitActions(), commit);
+              getCommitActions().abortMultipartCommit(commit);
             }
           })
           .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              StagingS3Util.revertCommit(getCommitActions(), commit);
+              getCommitActions().revertCommit(commit);
             }
           })
           .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              StagingS3Util.finishCommit(getCommitActions(), commit);
+              getCommitActions().commitOrFail(commit);
             }
           });
 
@@ -768,13 +768,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             @Override
             public void run(SinglePendingCommit commit,
                             Exception exception) throws IOException {
-              StagingS3Util.abortCommit(getCommitActions(), commit);
+              getCommitActions().abortMultipartCommit(commit);
             }
           })
           .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              StagingS3Util.abortCommit(getCommitActions(), commit);
+              getCommitActions().abortMultipartCommit(commit);
             }
           });
 
@@ -952,13 +952,14 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
               String destURI = String.format("s3a://%s/%s", commitBucket, key);
-              SinglePendingCommit commit = StagingS3Util.multipartUpload(
-                  getCommitActions(),
-                  localFile,
-                  partition,
-                  commitBucket, key,
-                  destURI,
-                  uploadPartSize);
+              SinglePendingCommit commit = getCommitActions()
+                  .uploadFileToPendingCommit(
+                      localFile,
+                      partition,
+                      commitBucket,
+                      key,
+                      destURI,
+                      uploadPartSize);
               LOG.debug("{}: adding pending commit {}", getRole(), commit);
               commits.add(commit);
             }
@@ -986,7 +987,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             .run(new Tasks.Task<SinglePendingCommit, IOException>() {
               @Override
               public void run(SinglePendingCommit commit) throws IOException {
-                StagingS3Util.abortCommit(getCommitActions(), commit);
+                getCommitActions().abortMultipartCommit(commit);
               }
             });
         deleteTaskAttemptPathQuietly(context);

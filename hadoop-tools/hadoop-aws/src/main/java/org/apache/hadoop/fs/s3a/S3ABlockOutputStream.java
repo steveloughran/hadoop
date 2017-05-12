@@ -436,8 +436,7 @@ class S3ABlockOutputStream extends OutputStream {
             try {
               // the putObject call automatically closes the input
               // stream afterwards.
-              result = writeOperationHelper.putObjectAndFinalize(
-                  putObjectRequest, size);
+              result = writeOperationHelper.putObject(putObjectRequest);
             } finally {
               closeAll(LOG, uploadData, block);
             }

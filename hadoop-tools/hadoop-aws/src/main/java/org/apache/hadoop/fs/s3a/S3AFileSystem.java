@@ -748,7 +748,6 @@ public class S3AFileSystem extends FileSystem {
    */
   @InterfaceAudience.Private
   public WriteOperationHelper createWriteOperationHelper(String key) {
-    Preconditions.checkArgument(key != null, "No key");
     WriteOperationHelper helper = new WriteOperationHelper(this, key);
     LOG.debug("Created {}", helper);
     return helper;
@@ -1171,17 +1170,36 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Delete an object.
+   * Delete an object. This is the low-level internal call which
+   * <i>does not</i> update the metastore.
    * Increments the {@code OBJECT_DELETE_REQUESTS} and write
    * operation statistics.
    * @param key key to blob to delete.
    */
-  @VisibleForTesting
-  protected void deleteObject(String key) throws InvalidRequestException {
+  private void deleteObject(String key) throws InvalidRequestException {
     blockRootDelete(key);
     incrementWriteOperations();
     incrementStatistic(OBJECT_DELETE_REQUESTS);
     s3.deleteObject(bucket, key);
+  }
+
+  /**
+   * Delete an object, also updating the filesystem and metastore.
+   * @param f path path to delete
+   * @param key key of entry
+   * @param isFile is the path a file (used for instrumentation only)
+   *  @throws AmazonClientException problems working with S3
+   * @throws IOException IO failure
+   */
+  void deleteObjectAtPath(Path f, String key, boolean isFile)
+      throws AmazonClientException, IOException {
+    if (isFile) {
+      instrumentation.fileDeleted(1);
+    } else {
+      instrumentation.directoryDeleted();
+    }
+    deleteObject(key);
+    metadataStore.delete(f);
   }
 
   /**
@@ -1342,6 +1360,8 @@ public class S3AFileSystem extends FileSystem {
     try {
       PutObjectResult result = s3.putObject(putObjectRequest);
       incrementPutCompletedStatistics(true, len);
+      // update metadata
+      finishedWrite(putObjectRequest.getKey(), len);
       return result;
     } catch (AmazonClientException e) {
       incrementPutCompletedStatistics(false, len);
@@ -1548,9 +1568,7 @@ public class S3AFileSystem extends FileSystem {
       if (status.isEmptyDirectory() == Tristate.TRUE) {
         LOG.debug("Deleting fake empty directory {}", key);
         // HADOOP-13761 s3guard: retries here
-        deleteObject(key);
-        metadataStore.delete(f);
-        instrumentation.directoryDeleted();
+        deleteObjectAtPath(f, key, false);
       } else {
         LOG.debug("Getting objects for directory prefix {} to delete", key);
 
@@ -1584,9 +1602,7 @@ public class S3AFileSystem extends FileSystem {
       metadataStore.deleteSubtree(f);
     } else {
       LOG.debug("delete: Path is a file");
-      instrumentation.fileDeleted(1);
-      deleteObject(key);
-      metadataStore.delete(f);
+      deleteObjectAtPath(f, key, true);
     }
 
     Path parent = f.getParent();

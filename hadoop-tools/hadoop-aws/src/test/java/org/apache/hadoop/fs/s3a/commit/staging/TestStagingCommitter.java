@@ -227,7 +227,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID: " + results,
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = StagingS3Util.readPendingCommits(dfs,
+    MultiplePendingCommits pending = MultiplePendingCommits.load(dfs,
         stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
     SinglePendingCommit commit = pending.commits.get(0);
@@ -268,8 +268,8 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = StagingS3Util.
-        readPendingCommits(dfs, stats[0].getPath());
+    MultiplePendingCommits pending = MultiplePendingCommits.load(dfs,
+        stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
   }
 
@@ -292,7 +292,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
     List<SinglePendingCommit> pending =
-        StagingS3Util.readPendingCommits(dfs, stats[0].getPath()).commits;
+        MultiplePendingCommits.load(dfs, stats[0].getPath()).commits;
     assertEquals("Should have correct number of pending commits",
         files.size(), pending.size());
 

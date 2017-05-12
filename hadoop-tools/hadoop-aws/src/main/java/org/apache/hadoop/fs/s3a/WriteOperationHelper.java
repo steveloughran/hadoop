@@ -37,12 +37,16 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
-import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
+
 
 /**
  * Helper for low-level operations against an S3 Bucket for writing data
@@ -63,14 +67,18 @@ import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
  *   <li>Integration with instrumentation and S3Guard<./li>
  * </ul>
  *
- * This API is for internal use only
+ * This API is for internal use only.
  */
 @InterfaceAudience.Private
 public class WriteOperationHelper {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(WriteOperationHelper.class);
   private final S3AFileSystem owner;
   private final String key;
+  private final AwsCall calls = new AwsCall();
 
   protected WriteOperationHelper(S3AFileSystem owner, String key) {
+    checkArgument(key != null, "No key");
     this.owner = owner;
     this.key = key;
   }
@@ -130,7 +138,7 @@ public class WriteOperationHelper {
    * @param length length of the write
    */
   public void writeSuccessful(long length) {
-    S3AFileSystem.LOG.debug("Successful write to {}, len {}", key, length);
+    LOG.debug("Successful write to {}, len {}", key, length);
   }
 
   /**
@@ -138,7 +146,7 @@ public class WriteOperationHelper {
    * @param e Any exception raised which triggered the failure.
    */
   public void writeFailed(Exception e) {
-    S3AFileSystem.LOG.debug("Write to {} failed", this, e);
+    LOG.debug("Write to {} failed", this, e);
   }
 
   /**
@@ -158,19 +166,18 @@ public class WriteOperationHelper {
    * @throws IOException IO problem
    */
   public String initiateMultiPartUpload() throws IOException {
-    S3AFileSystem.LOG.debug("Initiating Multipart upload");
+    LOG.debug("Initiating Multipart upload to {}", key);
     final InitiateMultipartUploadRequest initiateMPURequest =
         new InitiateMultipartUploadRequest(owner.getBucket(),
             key,
             newObjectMetadata(-1));
     initiateMPURequest.setCannedACL(owner.getCannedACL());
     owner.setOptionalMultipartUploadRequestParameters(initiateMPURequest);
-    try {
-      return owner.getAmazonS3Client().initiateMultipartUpload(initiateMPURequest)
-          .getUploadId();
-    } catch (AmazonClientException ace) {
-      throw translateException("initiate MultiPartUpload", key, ace);
-    }
+
+    return calls.execute("initiate MultiPartUpload", key,
+        () ->
+            owner.getAmazonS3Client()
+                .initiateMultipartUpload(initiateMPURequest).getUploadId());
   }
 
   /**
@@ -181,34 +188,29 @@ public class WriteOperationHelper {
    */
   public void abortMultipartCommit(String dest, String uploadId)
       throws IOException {
-    try {
-      abortMultipartUpload(dest, uploadId);
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("aborting multipart commit",
-          owner.keyToPath(dest), e);
-    }
+    calls.execute("aborting multipart commit", dest,
+        () -> abortMultipartUpload(dest, uploadId));
   }
 
   /**
    * Abort a multipart upload operation.
-   * @param uploadId multipart operation Id
+   * @param upload multipart upload
    * @throws IOException on problems.
    */
   public void abortMultipartCommit(MultipartUpload upload)
       throws IOException {
-    abortMultipartCommit(
-        upload.getKey(),
-        upload.getUploadId());
+    abortMultipartCommit(upload.getKey(), upload.getUploadId());
   }
 
   /**
-   * Commplete the multipart commit operation.
+   * Complete the multipart commit operation.
+   * @param destination destination of the commit
    * @param uploadId multipart operation Id
    * @param partETags list of partial uploads
    * @return the result of the operation.
    * @throws IOException on problems.
    */
-  public CompleteMultipartUploadResult finalizeMultipartCommit(
+  public CompleteMultipartUploadResult completeMultipartCommit(
       String destination,
       String uploadId,
       List<PartETag> partETags,
@@ -230,31 +232,39 @@ public class WriteOperationHelper {
       String uploadId,
       List<PartETag> partETags,
       long length) throws IOException {
-    try {
-      CompleteMultipartUploadResult result
-          = completeMultipartUpload(uploadId, partETags);
-      owner.finishedWrite(destination, length);
-      return result;
-    } catch (AmazonClientException e) {
-      throw translateException("Completing multipart commit",
-          destination, e);
-    }
+    return calls.execute("Completing multipart commit", destination,
+        () -> {
+          CompleteMultipartUploadResult result
+              = completeMultipartUpload(uploadId, partETags);
+          finishedWrite(destination, length);
+          return result;
+        });
+  }
+
+  /**
+   * Report to the owner that the write has finished; this may update
+   * any metastore.
+   * @param destination destination path
+   * @param size size of committed write.
+   */
+  private void finishedWrite(String destination, long size) {
+    owner.finishedWrite(destination, size);
   }
 
   /**
    * Complete a multipart upload operation.
-   * This one does not finalize the write.
+   * This does not finalize the write.
    * @param uploadId multipart operation Id
    * @param partETags list of partial uploads
    * @return the result of the operation.
    * @throws AmazonClientException on problems.
    */
-  public CompleteMultipartUploadResult completeMultipartUpload(
+  private CompleteMultipartUploadResult completeMultipartUpload(
       String uploadId,
       List<PartETag> partETags) throws AmazonClientException {
-    Preconditions.checkNotNull(uploadId);
-    Preconditions.checkNotNull(partETags);
-    S3AFileSystem.LOG.debug("Completing multipart upload {} with {} parts",
+    checkNotNull(uploadId);
+    checkNotNull(partETags);
+    LOG.debug("Completing multipart upload {} with {} parts",
         uploadId, partETags.size());
     // a copy of the list is required, so that the AWS SDK doesn't
     // attempt to sort an unmodifiable list.
@@ -272,9 +282,10 @@ public class WriteOperationHelper {
    */
   public void abortMultipartUpload(String uploadKey, String uploadId)
       throws AmazonClientException {
-    S3AFileSystem.LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
+    LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
     owner.getAmazonS3Client().abortMultipartUpload(
-        new AbortMultipartUploadRequest(owner.getBucket(), uploadKey, uploadId));
+        new AbortMultipartUploadRequest(owner.getBucket(), uploadKey,
+            uploadId));
   }
 
   /**
@@ -291,7 +302,7 @@ public class WriteOperationHelper {
         abortMultipartCommit(upload);
         count++;
       } catch (FileNotFoundException e) {
-        S3AFileSystem.LOG.debug("Already aborted: {}", upload.getKey(), e);
+        LOG.debug("Already aborted: {}", upload.getKey(), e);
       }
     }
     return count;
@@ -318,16 +329,16 @@ public class WriteOperationHelper {
       InputStream uploadStream,
       File sourceFile,
       Long offset) {
-    Preconditions.checkNotNull(uploadId);
+    checkNotNull(uploadId);
     // exactly one source must be set; xor verifies this
-    Preconditions.checkArgument((uploadStream != null) ^ (sourceFile != null),
+    checkArgument((uploadStream != null) ^ (sourceFile != null),
         "Data source");
-    Preconditions.checkArgument(size >= 0, "Invalid partition size %s", size);
-    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000,
+    checkArgument(size >= 0, "Invalid partition size %s", size);
+    checkArgument(partNumber > 0 && partNumber <= 10000,
         "partNumber must be between 1 and 10000 inclusive, but is %s",
         partNumber);
 
-    S3AFileSystem.LOG.debug("Creating part upload request for {} #{} size {}",
+    LOG.debug("Creating part upload request for {} #{} size {}",
         uploadId, partNumber, size);
     UploadPartRequest request = new UploadPartRequest()
         .withBucketName(owner.getBucket())
@@ -339,13 +350,12 @@ public class WriteOperationHelper {
       // there's an upload stream. Bind to it.
       request.setInputStream(uploadStream);
     } else {
-      Preconditions.checkArgument(sourceFile.exists(),
+      checkArgument(sourceFile.exists(),
           "Source file does not exist: %s", sourceFile);
-      Preconditions.checkArgument(offset >= 0, "Invalid offset %s", offset);
+      checkArgument(offset >= 0, "Invalid offset %s", offset);
       long length = sourceFile.length();
-      Preconditions.checkArgument(offset == 0 || offset < length,
+      checkArgument(offset == 0 || offset < length,
           "Offset %s beyond length of file %s", offset, length);
-      long range = Math.min(size, length - offset);
       request.setFile(sourceFile);
       request.setFileOffset(offset);
     }
@@ -375,55 +385,10 @@ public class WriteOperationHelper {
    */
   public PutObjectResult putObject(PutObjectRequest putObjectRequest)
       throws IOException {
-    try {
-      return owner.putObjectDirect(putObjectRequest);
-    } catch (AmazonClientException e) {
-      throw translateException("put", putObjectRequest.getKey(), e);
-    }
+    return calls.execute("put", putObjectRequest.getKey(),
+        () -> owner.putObjectDirect(putObjectRequest));
   }
 
-  /**
-   * PUT an object directly (i.e. not via the transfer manager),
-   * then finish the write (via {@link #finishedWrite(String, long)}.
-   * Byte length is calculated from the file length, or, if there is no
-   * file, from the content length of the header.
-   * After the put, any parent directory entries are deleted.
-   * @param putObjectRequest the request
-   * @param length length of data put; this is used in updating the metadata
-   * @return the upload initiated
-   * @throws IOException on problems
-   */
-  public PutObjectResult putObjectAndFinalize(
-      PutObjectRequest putObjectRequest,
-      int length) throws IOException {
-    PutObjectResult result = putObject(putObjectRequest);
-    owner.finishedWrite(putObjectRequest.getKey(), length);
-    return result;
-  }
-
-  /**
-   * Delete a Path; a special entry point for committers.
-   * This entry point does not attempt to create a fake parent directory.
-   * @param status the status entry on the target path
-   * @param recursive if path is a directory and set to
-   * true, the directory is deleted else throws an exception. In
-   * case of a file the recursive can be set to either true or false.
-   * @return true if delete is successful else false.
-   * @throws IOException due to inability to delete a directory or file.
-   */
-  public boolean deleteInCommit(S3AFileStatus status, boolean recursive)
-      throws IOException {
-    Path f = status.getPath();
-    try {
-      return owner.innerDelete(status, recursive, false);
-    } catch (FileNotFoundException e) {
-      S3AFileSystem.LOG.debug("Couldn't delete {} - does not exist", f);
-      owner.getInstrumentation().errorIgnored();
-      return false;
-    } catch (AmazonClientException e) {
-      throw translateException("deleteInCommit", f, e);
-    }
-  }
 
   /**
    * Revert a commit by deleting the file.
@@ -431,13 +396,15 @@ public class WriteOperationHelper {
    * @param destKey destination key
    * @throws IOException due to inability to delete a directory or file.
    */
-  public void revertCommit(String destKey) throws IOException {
+  public boolean revertCommit(String destKey) throws IOException {
     try {
-      owner.deleteObject(destKey);
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("revert commit",
-          destKey,
-          e);
+      calls.execute("revert commit", destKey,
+          () ->
+              owner.deleteObjectAtPath(owner.keyToPath(destKey),
+                  destKey, true));
+      return true;
+    } catch (IOException e) {
+      return false;
     }
   }
 
@@ -445,16 +412,12 @@ public class WriteOperationHelper {
    * Upload part of a multi-partition file.
    * @param request request
    * @return the result of the operation.
-   * @throws AmazonClientException on problems
+   * @throws IOException on problems
    */
   public UploadPartResult uploadPart(UploadPartRequest request)
       throws IOException {
-    try {
-      return owner.uploadPart(request);
-    } catch (AmazonClientException e) {
-      throw S3AUtils.translateException("upload part",
-          request.getKey(),
-          e);
-    }
+    return calls.execute("upload part",
+        request.getKey(),
+        () -> owner.uploadPart(request));
   }
 }
