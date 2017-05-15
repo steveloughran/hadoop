@@ -64,15 +64,10 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
-import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.CallOnLocatedFileStatus;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.TEMP_FILE_FILTER;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.iterateOverFiles;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.lsR;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
-import static org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
+import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 /**
  * Test the job/task commit actions of an S3A Committer, including trying to

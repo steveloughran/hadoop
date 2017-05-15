@@ -18,12 +18,12 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.IOException;
+import java.util.List;
+
 import com.amazonaws.services.s3.model.PartETag;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-
-import java.io.IOException;
-import java.util.List;
 
 /**
  * Multipart put tracker.

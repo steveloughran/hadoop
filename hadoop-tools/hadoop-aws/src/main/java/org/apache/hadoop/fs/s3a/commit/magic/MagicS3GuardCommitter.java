@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
@@ -45,8 +46,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
+import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.*;
 
 /**
  * This is a dedicated committer which requires the "magic" directory feature
@@ -60,7 +61,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(MagicS3GuardCommitter.class);
 
-  private static final String NAME = "MagicS3GuardCommitter";
+  public static final String NAME = "MagicS3GuardCommitter";
 
   /**
    * Instantiate.
@@ -120,17 +121,16 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void commitJob(JobContext context) throws IOException {
     List<SinglePendingCommit> pending = Collections.emptyList();
-    try (DurationInfo d =
-             new DurationInfo("%s: preparing to commit Job", getRole())) {
+    String r = getRole();
+    String id = jobIdString(context);
+    try (DurationInfo d = new DurationInfo("%s: preparing to commit Job", r)) {
       pending = getPendingUploadsToCommit(context);
     } catch (IOException e) {
-      LOG.warn("Precommit failure for job {}", jobIdString(context), e);
+      LOG.warn("Precommit failure for job {}", id, e);
       abortJobInternal(context, pending, true);
       throw e;
     }
-    try (DurationInfo d = new DurationInfo("%s: committing Job %s",
-        getRole(), jobIdString(context))) {
-      // TODO
+    try (DurationInfo d = new DurationInfo("%s: committing Job %s", r, id)) {
       commitJobInternal(context, pending);
     }
     maybeCreateSuccessMarkerFromCommits(context, pending);
@@ -154,14 +154,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
         commitFiles);
   }
 
-  /**
-   * Get the list of pending uploads for this job attempt, swallowing
-   * exceptions.
-   * @param context job context
-   * @return a list of pending uploads. If an exception was swallowed,
-   * then this may not match the actual set of pending operations
-   * @throws IOException shouldn't be raised, but retained for compiler
-   */
+  @Override
   protected List<SinglePendingCommit> getPendingUploadsToAbort(
       JobContext context)
       throws IOException {
@@ -170,11 +163,17 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     FileStatus[] commitFiles = fs.listStatus(jobAttemptPath,
         PENDING_MANY_FILTER);
     fs.listFiles(jobAttemptPath, true);
-    List<SinglePendingCommit> commits
-        = loadMultiplePendingCommitFiles(
-        context, true, fs,
-        commitFiles);
+    List<SinglePendingCommit> commits = loadMultiplePendingCommitFiles(
+        context, true, fs, commitFiles);
     return commits;
+  }
+
+  /**
+   * Delete the magic directory.
+   * @throws IOException IO problems
+   */
+  public void cleanupStagingDirs() throws IOException {
+    deleteQuietly(getDestFS(), magicSubdir(getOutputPath()), true);
   }
 
   /**
@@ -183,15 +182,16 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
    * @throws IOException IO failure
    */
   @Override
-  public void cleanupJob(JobContext context) throws IOException {
+  protected void cleanup(JobContext context, boolean suppressExceptions)
+      throws IOException {
+    FileCommitActions.CommitAllFilesOutcome outcome = null;
     try (DurationInfo d =
              new DurationInfo("Aborting outstanding uploads for Job %s",
                  jobIdString(context))) {
       if (getCommitActions() != null) {
         Path pending = getJobAttemptPath(context);
-        FileCommitActions.CommitAllFilesOutcome outcome
-            = getCommitActions().abortAllSinglePendingCommits(pending, true);
-        outcome.maybeRethrow();
+        outcome = getCommitActions()
+            .abortAllSinglePendingCommits(pending, true);
       }
     }
     try (DurationInfo d = new DurationInfo("Cleanup job %s",
@@ -201,7 +201,12 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       deleteWithWarning(getDestFS(),
           getTempJobAttemptPath(getAppAttemptId(context),
               getMagicJobAttemptsPath(getOutputPath())), true);
+      cleanupStagingDirs();
     }
+    if (!suppressExceptions && outcome != null) {
+      outcome.maybeRethrow();
+    }
+
   }
 
   @Override
@@ -276,15 +281,16 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
         loaded = actions.loadSinglePendingCommits(
             taskAttemptPath, true);
-    List<Pair<LocatedFileStatus, IOException>> failures = loaded.second();
+    List<Pair<LocatedFileStatus, IOException>> failures = loaded._2();
     if (!failures.isEmpty()) {
-      // TODO: at least one file failed to load
-      // proposed: revert all which did; report failure with first exception
+      // At least one file failed to load
+      // revert all which did; report failure with first exception
       LOG.error("At least one commit file could not be read: failing");
-      actions.abortAllSinglePendingCommits(taskAttemptPath, true);
-      throw failures.get(0).second();
+      abortPendingUploads(context, loaded._1().commits,
+          true);
+      throw failures.get(0)._2();
     }
-    MultiplePendingCommits commits = loaded.first();
+    MultiplePendingCommits commits = loaded._1();
     // patch in IDs
     String jobId = String.valueOf(context.getJobID());
     String taskId = String.valueOf(context.getTaskAttemptID());
@@ -294,11 +300,10 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     }
 
     Path jobAttemptPath = getJobAttemptPath(context);
-
     TaskAttemptID taskAttemptID = context.getTaskAttemptID();
     Path taskOutcomePath = new Path(jobAttemptPath,
         taskAttemptID.getTaskID().toString() +
-        MagicCommitterConstants.PENDINGSET_SUFFIX);
+        CommitConstants.PENDINGSET_SUFFIX);
     LOG.info("Saving work of {} to {}", taskAttemptID, taskOutcomePath);
     commits.save(getDestFS(),taskOutcomePath, false);
     return commits;
@@ -323,6 +328,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       deleteQuietly(getDestFS(), attemptPath, true);
     }
   }
+
 
   /**
    * Compute the path where the output of a given job attempt will be placed.
@@ -362,7 +368,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   private static final PathFilter PENDING_MANY_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path path) {
-      return path.toString().endsWith(PENDINGSET_SUFFIX);
+      return path.toString().endsWith(CommitConstants.PENDINGSET_SUFFIX);
     }
   };
 }

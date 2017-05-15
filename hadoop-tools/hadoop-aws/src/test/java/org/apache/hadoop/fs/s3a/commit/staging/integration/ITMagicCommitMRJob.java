@@ -18,22 +18,39 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging.integration;
 
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
-import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
+import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
- * Full integration test for the directory committer.
+ * Full integration test for the Magic committer.
  */
-public class ITDirectoryCommitMRJob extends AbstractITCommitMRJob {
+public class ITMagicCommitMRJob extends AbstractITCommitMRJob {
 
   @Override
   protected String committerFactoryClassname() {
-    return CommitConstants.DIRECTORY_COMMITTER_FACTORY;
+    return MAGIC_COMMITTER_FACTORY;
   }
 
   @Override
   protected String committerName() {
-    return DirectoryStagingCommitter.NAME;
+    return MagicS3GuardCommitter.NAME;
+  }
+
+  @Override
+  protected void applyCustomConfigOptions(Configuration conf) {
+    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
+  }
+
+  @Override
+  protected void customPostExecutionValidation(Path destPath,
+      SuccessData successData) throws IOException {
+    assertPathDoesNotExist("No cleanup", new Path(destPath, MAGIC_DIR_NAME));
+
   }
 }

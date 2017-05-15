@@ -48,7 +48,7 @@ public class Pair<L, R> {
    * Get the first element.
    * @return the first element
    */
-  public L first() {
+  public L _1() {
     return first;
   }
 
@@ -56,7 +56,7 @@ public class Pair<L, R> {
    * Get the second element.
    * @return the second element.
    */
-  public R second() {
+  public R _2() {
     return second;
   }
 

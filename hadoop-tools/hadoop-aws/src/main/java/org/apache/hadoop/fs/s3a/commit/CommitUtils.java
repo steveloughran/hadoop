@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import com.amazonaws.services.s3.model.PartETag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,17 +31,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.StringUtils;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static com.google.common.base.Preconditions.*;
@@ -64,7 +63,7 @@ public final class CommitUtils {
 
   /** Error message for a path without a magic element in the list: {@value}. */
   public static final String E_NO_MAGIC_PATH_ELEMENT
-      = "No " + MagicCommitterConstants.MAGIC_DIR_NAME + " element in path";
+      = "No " + MAGIC_DIR_NAME + " element in path";
 
   private CommitUtils() {
   }
@@ -107,7 +106,7 @@ public final class CommitUtils {
    * @return true if a path is considered pending
    */
   public static boolean isMagicPath(List<String> elements) {
-    return elements.contains(MagicCommitterConstants.MAGIC_DIR_NAME);
+    return elements.contains(MAGIC_DIR_NAME);
   }
 
   /**
@@ -117,7 +116,7 @@ public final class CommitUtils {
    * @return true if a path has a pending directory
    */
   public static boolean containsBasePath(List<String> pendingPathElements) {
-    return pendingPathElements.contains(MagicCommitterConstants.BASE_PATH);
+    return pendingPathElements.contains(BASE_PATH);
   }
 
   /**
@@ -127,7 +126,7 @@ public final class CommitUtils {
    * @throws IllegalArgumentException if there is no pending element
    */
   public static int magicElementIndex(List<String> elements) {
-    return getElementIndex(MagicCommitterConstants.MAGIC_DIR_NAME, elements);
+    return getElementIndex(MAGIC_DIR_NAME, elements);
   }
 
   protected static int getElementIndex(String name, List<String> elements) {
@@ -175,7 +174,7 @@ public final class CommitUtils {
    * @return the child elements; may be empty
    */
   public static List<String> basePathChildren(List<String> elements) {
-    int index = elements.indexOf(MagicCommitterConstants.BASE_PATH);
+    int index = elements.indexOf(BASE_PATH);
     if (index < 0) {
       return Collections.emptyList();
     }
@@ -217,7 +216,7 @@ public final class CommitUtils {
    * @return a new path.
    */
   public static Path magicSubdir(Path destDir) {
-    return new Path(destDir.getParent(), MagicCommitterConstants.MAGIC_DIR_NAME);
+    return new Path(destDir.getParent(), MAGIC_DIR_NAME);
   }
 
   /**
@@ -238,13 +237,13 @@ public final class CommitUtils {
       List<String> destDir = magicPathParents(elements);
       List<String> children = magicPathChildren(elements);
       checkArgument(!children.isEmpty(), "No path found under " +
-          MagicCommitterConstants.MAGIC_DIR_NAME);
+          MAGIC_DIR_NAME);
       ArrayList<String> dest = new ArrayList<>(destDir);
       if (containsBasePath(children)) {
         // there's a base marker in the path
         List<String> baseChildren = basePathChildren(children);
         checkArgument(!baseChildren.isEmpty(),
-            "No path found under " + MagicCommitterConstants.BASE_PATH);
+            "No path found under " + BASE_PATH);
         dest.addAll(baseChildren);
       } else {
         dest.add(filename(children));
@@ -339,7 +338,7 @@ public final class CommitUtils {
    * @return the location of pending job attempts.
    */
   public static Path getMagicJobAttemptsPath(Path out) {
-    return new Path(out, MagicCommitterConstants.MAGIC_DIR_NAME);
+    return new Path(out, MAGIC_DIR_NAME);
   }
 
   /**
@@ -393,7 +392,7 @@ public final class CommitUtils {
   public static Path getMagicTaskAttemptPath(TaskAttemptContext context,
       Path dest) {
     return new Path(getBaseMagicTaskAttemptPath(context, dest),
-        MagicCommitterConstants.BASE_PATH);
+        BASE_PATH);
   }
 
   /**

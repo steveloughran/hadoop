@@ -18,14 +18,13 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
@@ -87,7 +86,7 @@ public class DelayedCommitFSIntegration {
     DefaultPutTracker tracker;
     if (isDelayedCommitPath(elements)) {
       final String destKey = keyOfFinalDestination(elements, key);
-      String pendingKey = key + MagicCommitterConstants.PENDING_SUFFIX;
+      String pendingKey = key + CommitConstants.PENDING_SUFFIX;
       tracker = new DelayedCommitTracker(path,
           owner.getBucket(),
           destKey, pendingKey,
@@ -151,8 +150,8 @@ public class DelayedCommitFSIntegration {
    */
   private boolean isPendingFile(List<String> elements) {
     String last = elements.get(elements.size() - 1);
-    return last.endsWith(MagicCommitterConstants.PENDING_SUFFIX)
-        || last.endsWith(MagicCommitterConstants.PENDINGSET_SUFFIX);
+    return last.endsWith(CommitConstants.PENDING_SUFFIX)
+        || last.endsWith(CommitConstants.PENDINGSET_SUFFIX);
   }
 
 }

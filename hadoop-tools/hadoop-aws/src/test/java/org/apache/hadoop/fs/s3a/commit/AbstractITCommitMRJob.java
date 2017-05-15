@@ -23,7 +23,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.StorageStatisticsTracker;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -47,6 +49,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
@@ -58,6 +61,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 /** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
+  private static final int TEST_FILE_COUNT = 1;
   private static MiniDFSTestCluster hdfs;
   private static MiniMRYarnCluster yarn = null;
   private static JobConf conf = null;
@@ -69,17 +73,19 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   @BeforeClass
   public static void setupClusters() throws IOException {
+    // the HDFS and YARN clusters share the same configuration, so
+    // the HDFS cluster binding is implicitly propagated to YARN
     JobConf c = new JobConf();
     hdfs = new MiniDFSTestCluster();
     hdfs.init(c);
     hdfs.start();
     conf = c;
-    yarn = new MiniMRYarnCluster(
-        "TestStagingMRJobr", 2);
+    yarn = new MiniMRYarnCluster("TestMRJob", 2);
     yarn.init(c);
     yarn.start();
   }
 
+  @SuppressWarnings("ThrowableNotThrown")
   @AfterClass
   public static void teardownClusters() throws IOException {
     conf = null;
@@ -104,6 +110,15 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   /** Test Mapper. */
   public static class MapClass
       extends Mapper<LongWritable, Text, LongWritable, Text> {
+
+    @Override
+    protected void setup(Context context)
+        throws IOException, InterruptedException {
+      super.setup(context);
+      // force in Log4J logging
+      org.apache.log4j.BasicConfigurator.configure();
+    }
+
     @Override
     protected void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
@@ -128,15 +143,16 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   @Test
   public void testMRJob() throws Exception {
-    FileSystem fs = getFileSystem();
+    S3AFileSystem fs = getFileSystem();
     // final dest is in S3A
     Path outputPath = path("testMRJob");
     StorageStatisticsTracker tracker = new StorageStatisticsTracker(fs);
 
     String commitUUID = UUID.randomUUID().toString();
     String suffix = uniqueFilenames ? ("-" + commitUUID) : "";
-    int numFiles = 3;
-    Set<String> expectedFiles = Sets.newHashSet();
+    int numFiles = TEST_FILE_COUNT;
+    Set<String> expectedPaths = Sets.newHashSet();
+    Set<String> expectedKeys = Sets.newHashSet();
     for (int i = 0; i < numFiles; i += 1) {
       File file = temp.newFile(String.valueOf(i) + ".text");
       try (FileOutputStream out = new FileOutputStream(file)) {
@@ -144,13 +160,15 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
       }
       String filename = "part-m-0000" + i +
           suffix;
-      expectedFiles.add(new Path(
-          outputPath, filename).toString());
+      Path path = new Path(outputPath, filename);
+      expectedPaths.add(path.toString());
+      expectedKeys.add(fs.pathToKey(path));
     }
 
     Job mrJob = Job.getInstance(yarn.getConfig(), "test-committer-job");
-    Configuration jobConf = mrJob.getConfiguration();
-    jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES, uniqueFilenames);
+    JobConf jobConf = (JobConf)mrJob.getConfiguration();
+    jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
+        uniqueFilenames);
 
     jobConf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         committerFactoryClassname());
@@ -165,20 +183,34 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     jobConf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, commitUUID);
 
     mrJob.setInputFormatClass(TextInputFormat.class);
-    FileInputFormat.addInputPath(mrJob,
-        new Path(temp.getRoot().toURI()));
+    FileInputFormat.addInputPath(mrJob, new Path(temp.getRoot().toURI()));
 
     mrJob.setMapperClass(MapClass.class);
     mrJob.setNumReduceTasks(0);
 
-    describe("Submitting Job");
+    // an attempt to set up log4j properly, which clearly doesn't work
+    URL log4j = getClass().getClassLoader().getResource("log4j.properties");
+    if (log4j != null && log4j.getProtocol().equals("file")) {
+      Path log4jPath = new Path(log4j.toURI());
+      LOG.debug("Using log4j path {}", log4jPath);
+      mrJob.addFileToClassPath(log4jPath);
+      String sysprops = String.format("-Xmx256m -Dlog4j.configuration=%s",
+          log4j);
+      jobConf.set(JobConf.MAPRED_MAP_TASK_JAVA_OPTS, sysprops);
+      jobConf.set("yarn.app.mapreduce.am.command-opts", sysprops);
+    }
+
+    applyCustomConfigOptions(jobConf);
+    mrJob.setMaxMapAttempts(1);
+
     mrJob.submit();
     boolean succeeded = mrJob.waitForCompletion(true);
     assertTrue("MR job failed", succeeded);
 
-    assertPathExists("Output directory", outputPath);
+    assertIsDirectory(outputPath);
     Set<String> actualFiles = Sets.newHashSet();
     FileStatus[] results = fs.listStatus(outputPath, TEMP_FILE_FILTER);
+    assertTrue("No files in output directory", results.length != 0);
     LOG.info("Found {} files", results.length);
     for (FileStatus result : results) {
       LOG.debug("result: {}", result);
@@ -186,7 +218,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     }
 
     assertEquals("Should commit the correct file paths",
-        expectedFiles, actualFiles);
+        expectedPaths, actualFiles);
     // now load in the success data marker: this guarantees that a s3guard
     // committer was used
     SuccessData successData = SuccessData.load(fs,
@@ -199,6 +231,27 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     List<String> successFiles = successData.filenames;
     assertTrue("No filenames in " + commitDetails,
         !successFiles.isEmpty());
+    Set<String> summaryKeys = Sets.newHashSet();
+    summaryKeys.addAll(successFiles);
+    assertEquals("Summary keyset doesn't list the the expected paths "
+            + commitDetails, expectedKeys, summaryKeys);
+    assertPathDoesNotExist("temporary dir",
+        new Path(outputPath, CommitConstants.PENDING_DIR_NAME));
+    customPostExecutionValidation(outputPath, successData);
+  }
+
+  /**
+   * Override point to let implementations tune the MR Job conf.
+   * @param conf configuration
+   */
+  protected void applyCustomConfigOptions(Configuration conf) {
+
+  }
+
+  protected void customPostExecutionValidation(Path destPath,
+      SuccessData successData)
+      throws IOException {
+
   }
 
 }

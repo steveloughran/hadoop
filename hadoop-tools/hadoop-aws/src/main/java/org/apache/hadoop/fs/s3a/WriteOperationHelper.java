@@ -142,10 +142,10 @@ public class WriteOperationHelper {
 
   /**
    * Callback on a write failure.
-   * @param e Any exception raised which triggered the failure.
+   * @param ex Any exception raised which triggered the failure.
    */
-  public void writeFailed(Exception e) {
-    LOG.debug("Write to {} failed", this, e);
+  public void writeFailed(Exception ex) {
+    LOG.debug("Write to {} failed", this, ex);
   }
 
   /**
@@ -235,8 +235,8 @@ public class WriteOperationHelper {
       long length) throws IOException {
     return calls.execute("Completing multipart commit", destination,
         () -> {
-          CompleteMultipartUploadResult result
-              = completeMultipartUpload(uploadId, partETags);
+          CompleteMultipartUploadResult result =
+              completeMultipartUpload(uploadId, partETags);
           finishedWrite(destination, length);
           return result;
         });

@@ -42,7 +42,6 @@ import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
@@ -186,7 +185,7 @@ public class FileCommitActions {
         results
         = loadSinglePendingCommits(pendingDir, recursive);
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
-    for (SinglePendingCommit singlePendingCommit : results.first().commits) {
+    for (SinglePendingCommit singlePendingCommit : results._1().commits) {
       CommitFileOutcome commit = commit(singlePendingCommit,
           singlePendingCommit.filename);
       outcome.add(commit);
@@ -219,7 +218,7 @@ public class FileCommitActions {
     while (pendingFiles.hasNext()) {
       LocatedFileStatus next = pendingFiles.next();
       if (next.getPath().getName().endsWith(
-          MagicCommitterConstants.PENDING_SUFFIX) && next.isFile()) {
+          CommitConstants.PENDING_SUFFIX) && next.isFile()) {
         result.add(next);
       }
     }
@@ -373,7 +372,7 @@ public class FileCommitActions {
     while (pendingFiles.hasNext()) {
       LocatedFileStatus next = pendingFiles.next();
       Path pending = next.getPath();
-      if (pending.getName().endsWith(MagicCommitterConstants.PENDING_SUFFIX)) {
+      if (pending.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
         outcome.add(abortSinglePendingCommitFile(pending));
       }
     }
@@ -414,10 +413,8 @@ public class FileCommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.warn("Revert {}", commit);
-    writer(commit.destinationKey)
-        .revertCommit(commit.destinationKey);
+    writer(commit.destinationKey).revertCommit(commit.destinationKey);
   }
-
 
   /**
    * Upload all the data in the local file, returning the information
@@ -440,7 +437,6 @@ public class FileCommitActions {
       throws IOException {
 
     LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
-            "" +
             " partition={} partSize={}",
         localFile, bucket, key, partition, uploadPartSize);
     if (!localFile.exists()) {

@@ -118,20 +118,6 @@ public final class Paths {
   }
 
   /**
-   * Get hte filename of a path: the element after any "/", or, if there
-   * is no "/" in the string, the whole path string.
-   * @param pathStr path as a string
-   * @return the final element in the path string
-   */
-  public static String getFilename(String pathStr) {
-    int lastSlash = pathStr.lastIndexOf('/');
-    if (lastSlash >= 0) {
-      return pathStr.substring(lastSlash + 1);
-    }
-    return pathStr;
-  }
-
-  /**
    * Using {@code URI.relativize()}, build the relative path from the
    * base path to the full path.
    * TODO: test this thoroughly
@@ -228,8 +214,7 @@ public final class Paths {
    * @throws IOException on an IO failure.
    */
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
-                                                        String uuid)
-      throws IOException {
+      String uuid) throws IOException {
     Path userTmp = new Path(tempDirForFileSystem(conf, FileSystem.get(conf)),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
@@ -245,20 +230,6 @@ public final class Paths {
     String dir = dirs[rand.nextInt(dirs.length)];
 
     return FileSystem.getLocal(conf).makeQualified(new Path(dir));
-  }
-
-  public static String removeStartingAndTrailingSlash(String path) {
-    int start = 0;
-    if (path.startsWith("/")) {
-      start = 1;
-    }
-
-    int end = path.length();
-    if (path.endsWith("/")) {
-      end -= 1;
-    }
-
-    return path.substring(start, end);
   }
 
   /**

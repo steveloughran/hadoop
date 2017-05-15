@@ -40,7 +40,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.mockito.Mockito.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 
-/** Test suite.*/
+/** Mocking test of the partitioned committer. */
 public class TestStagingPartitionedTaskCommit
     extends StagingTestBase.TaskCommitterTest<PartitionedStagingCommitter> {
 

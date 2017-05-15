@@ -32,8 +32,7 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
-import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.MAGIC_DIR_NAME;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Test the magic committer's commit protocol.

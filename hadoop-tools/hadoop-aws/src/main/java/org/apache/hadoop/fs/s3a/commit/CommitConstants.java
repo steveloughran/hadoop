@@ -37,6 +37,28 @@ public final class CommitConstants {
   }
 
   /**
+   * Path for "magic" pending writes: path and {@link #PENDING_SUFFIX} files:
+   * {@value}.
+   */
+  public static final String MAGIC_DIR_NAME = "__magic";
+
+  /**
+   * Marker of the start of a directory tree for calculating
+   * the final path names: {@value}.
+   */
+  public static final String BASE_PATH = "__base";
+
+  /**
+   * Suffix applied to pending commit data: {@value}.
+   */
+  public static final String PENDING_SUFFIX = ".pending";
+
+  /**
+   * Suffix applied to multiple pending commits data: {@value}.
+   */
+  public static final String PENDINGSET_SUFFIX = ".pendingset";
+
+  /**
    * Flag to indicate whether support for the Magic committer is enabled
    * in the filesystem.
    * Value: {@value}.

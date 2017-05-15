@@ -29,8 +29,8 @@ import org.junit.Test;
 import org.apache.hadoop.fs.Path;
 
 import static org.apache.hadoop.test.LambdaTestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
  * Tests for {@link CommitUtils} methods.
@@ -189,13 +189,15 @@ public class TestCommitUtils extends Assert {
   @Test(expected = IllegalArgumentException.class)
   public void testFinalDestinationBaseNoChild() throws Throwable {
     assertEquals(l(),
-        finalDestination(l(MAGIC_DIR_NAME, BASE_PATH)));
+        finalDestination(l(
+            MAGIC_DIR_NAME, BASE_PATH)));
   }
 
   @Test
   public void testFinalDestinationBaseSubdirsChild() throws Throwable {
     assertEquals(l("2", "3.txt"),
-        finalDestination(l(MAGIC_DIR_NAME, "4", BASE_PATH, "2", "3.txt")));
+        finalDestination(l(
+            MAGIC_DIR_NAME, "4", BASE_PATH, "2", "3.txt")));
   }
 
   /**
@@ -204,7 +206,8 @@ public class TestCommitUtils extends Assert {
   @Test
   public void testFinalDestinationIgnoresBaseBeforePending() throws Throwable {
     assertEquals(l(BASE_PATH, "home", "3.txt"),
-        finalDestination(l(BASE_PATH, "home", MAGIC_DIR_NAME, "2", "3.txt")));
+        finalDestination(l(
+            BASE_PATH, "home", MAGIC_DIR_NAME, "2", "3.txt")));
   }
 
   /** varargs to array. */

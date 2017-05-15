@@ -267,7 +267,8 @@ public class S3AFileSystem extends FileSystem {
       serverSideEncryptionAlgorithm = getEncryptionAlgorithm(conf);
       inputPolicy = S3AInputPolicy.getPolicy(
           conf.getTrimmed(INPUT_FADVISE, INPUT_FADV_NORMAL));
-      boolean committerEnabled = conf.getBoolean(CommitConstants.MAGIC_COMMITTER_ENABLED,
+      boolean committerEnabled = conf.getBoolean(
+          CommitConstants.MAGIC_COMMITTER_ENABLED,
           CommitConstants.DEFAULT_MAGIC_COMMITTER_ENABLED);
       if (committerEnabled) {
         LOG.info("S3Guard Committer is enabled");
@@ -1360,9 +1361,11 @@ public class S3AFileSystem extends FileSystem {
     incrementPutStartStatistics(len);
     try {
       PutObjectResult result = s3.putObject(putObjectRequest);
-      incrementPutCompletedStatistics(true, len);
+      long putLen = result.getMetadata().getContentLength();
+      putLen = len;
+      incrementPutCompletedStatistics(true, putLen);
       // update metadata
-      finishedWrite(putObjectRequest.getKey(), len);
+      finishedWrite(putObjectRequest.getKey(), putLen);
       return result;
     } catch (AmazonClientException e) {
       incrementPutCompletedStatistics(false, len);

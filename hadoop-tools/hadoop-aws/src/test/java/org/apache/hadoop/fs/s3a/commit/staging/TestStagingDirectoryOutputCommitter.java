@@ -30,7 +30,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.mockito.Mockito.*;
 
-/** Test suite.*/
+/** Mocking test of directory committer. */
 public class TestStagingDirectoryOutputCommitter
     extends StagingTestBase.JobCommitterTest<DirectoryStagingCommitter> {
   @Override

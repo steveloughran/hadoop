@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +26,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -40,12 +47,6 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.net.NetUtils;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
@@ -156,6 +157,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     return outputPath;
   }
 
+  /**
+   * Set the output path
+   * @param outputPath new value
+   */
   protected void setOutputPath(Path outputPath) {
     Preconditions.checkNotNull(outputPath, "Null output path");
     this.outputPath = outputPath;
@@ -486,22 +491,82 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     }
   }
 
-  /**
-   * Abort the job: hand off to {@link #cleanupJob(JobContext)}.
-   * @param context job
-   * @param state final runstate of the job
-   * @throws IOException failure
-   */
   @Override
   public void abortJob(JobContext context, JobStatus.State state)
       throws IOException {
-    LOG.info("{}: abort Job {} in state {}", role, jobIdString(context), state);
-    cleanupJob(context);
+    IOException ex = null;
+    String r = getRole();
+    try (DurationInfo d = new DurationInfo("%s: aborting job in state %s ",
+        r, CommitUtils.jobIdString(context), state)) {
+      List<SinglePendingCommit> pending = getPendingUploadsToAbort(context);
+      if (!pending.isEmpty()) {
+        abortJobInternal(context, pending, false);
+      }
+    } catch (FileNotFoundException e) {
+      // nothing to list
+      LOG.debug("No job directory to read uploads from");
+    } catch (IOException e) {
+      LOG.error("{}: exception when aborting job {} in state {}",
+          r, jobIdString(context), state, e);
+      ex = e;
+    }
+
+    try (DurationInfo d =
+             new DurationInfo("%s: aborting all pending commits", r)) {
+      int count = getCommitActions()
+          .abortPendingUploadsUnderPath(getOutputPath());
+      if (count > 0) {
+        LOG.warn("{}: deleted {} extra pending upload(s)", r, count);
+      }
+    } catch (IOException e) {
+      ex = ex == null ? e : ex;
+    }
+    // final cleanup operations
+    cleanup(context, ex != null);
+    if (ex != null) {
+      throw ex;
+    }
+  }
+
+  /**
+   * Clean up any staging directories.
+   * @throws IOException IO problem
+   */
+  public void cleanupStagingDirs() throws IOException {
+
+  }
+
+  /**
+   * Get the list of pending uploads for this job attempt, swallowing
+   * exceptions.
+   * @param context job context
+   * @return a list of pending uploads. If an exception was swallowed,
+   * then this may not match the actual set of pending operations
+   * @throws IOException shouldn't be raised, but retained for compiler
+   */
+  protected abstract List<SinglePendingCommit> getPendingUploadsToAbort(
+      JobContext context)
+      throws IOException;
+
+  /**
+   * Cleanup the job context, including aborting anything pending.
+   * @param context job context
+   * @param suppressExceptions should exceptions be suppressed?
+   * @throws IOException any failure if exceptions were not suppressed.
+   */
+  protected void cleanup(JobContext context, boolean suppressExceptions)
+      throws IOException {
+
   }
 
   @Override
   public void cleanupJob(JobContext context) throws IOException {
-    super.cleanupJob(context);
+    String r = getRole();
+    String id = jobIdString(context);
+    LOG.warn("{}: using deprecated cleanupJob call for {}", r, id);
+    try (DurationInfo d = new DurationInfo("%s: cleanup Job %s", r, id)) {
+      cleanup(context, true);
+    }
   }
 
   /**
@@ -627,14 +692,4 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     }
   }
 
-  /**
-   * Clenup the job context, including aborting anything pending.
-   * @param context job context
-   * @param suppressExceptions should exceptions be suppressed?
-   * @throws IOException any failure if exceptions were not suppressed.
-   */
-  protected void cleanup(JobContext context, boolean suppressExceptions)
-      throws IOException {
-
-  }
 }

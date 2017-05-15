@@ -26,6 +26,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
+/**
+ * Partitioned committer which uses an instance of
+ * {@link MockFileCommitActions} for committing.
+ */
 class PartitionedCommitterForTesting extends
     PartitionedStagingCommitter {
   private final MockFileCommitActions mockCommitActions;

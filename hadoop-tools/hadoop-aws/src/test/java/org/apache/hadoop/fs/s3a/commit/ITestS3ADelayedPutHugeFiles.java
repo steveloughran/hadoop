@@ -30,9 +30,7 @@ import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles;
 
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
-import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.MAGIC_DIR_NAME;
-import static org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants.PENDING_SUFFIX;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 
 /**

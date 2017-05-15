@@ -100,12 +100,12 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
 
   public ClientResults getResults() throws IOException {
     MockS3AFileSystem mockFS = (MockS3AFileSystem)getDestS3AFS();
-    return mockFS.getOutcome().first();
+    return mockFS.getOutcome()._1();
   }
 
   public ClientErrors getErrors() throws IOException {
     MockS3AFileSystem mockFS = (MockS3AFileSystem) getDestS3AFS();
-    return mockFS.getOutcome().second();
+    return mockFS.getOutcome()._2();
   }
 
   @Override

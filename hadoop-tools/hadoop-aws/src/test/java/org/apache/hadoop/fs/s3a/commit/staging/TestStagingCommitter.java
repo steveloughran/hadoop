@@ -72,6 +72,7 @@ import static org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase.*;
 import static org.apache.hadoop.test.LambdaTestUtils.*;
 
 /**
+ * The main unit test suite of the staging committer.
  * Parameterized on thread count and unique filename policy.
  */
 @RunWith(Parameterized.class)

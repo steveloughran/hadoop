@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitterConstants;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -43,7 +42,7 @@ import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
 /**
@@ -113,11 +112,11 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     assertEquals("tracker destination key", origKey, tracker.getDestKey());
 
     Path pendingSuffixedPath = new Path(pendingPath,
-        "part-0000" + MagicCommitterConstants.PENDING_SUFFIX);
+        "part-0000" + PENDING_SUFFIX);
     assertFalse("still a delayed complete path " + pendingSuffixedPath,
         fs.isDelayedCompletePath(pendingSuffixedPath));
     Path pendingSet = new Path(pendingPath,
-        "part-0000" + MagicCommitterConstants.PENDINGSET_SUFFIX);
+        "part-0000" + PENDINGSET_SUFFIX);
     assertFalse("still a delayed complete path " + pendingSet,
         fs.isDelayedCompletePath(pendingSet));
   }
@@ -169,7 +168,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   private static Path makePendingChild(Path destFile, String name) {
     return new Path(destFile.getParent(),
-        MagicCommitterConstants.MAGIC_DIR_NAME + '/' + name);
+        MAGIC_DIR_NAME + '/' + name);
   }
 
   @Test
@@ -240,8 +239,8 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
         " up in where expected");
     Path destDir = methodPath("testBaseRelativePath");
     Path pendingBaseDir = new Path(destDir,
-        MagicCommitterConstants.MAGIC_DIR_NAME + "/child/"
-            + MagicCommitterConstants.BASE_PATH);
+        MAGIC_DIR_NAME + "/child/"
+            + BASE_PATH);
     String child = "subdir/child.txt";
     Path pendingChildPath = new Path(pendingBaseDir, child);
     Path expectedDestPath = new Path(destDir, child);
@@ -303,7 +302,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
       Path pendingFilePath) throws IOException {
     S3AFileSystem fs = getFileSystem();
     Path pendingDataPath = new Path(pendingFilePath.getParent(),
-        filename + MagicCommitterConstants.PENDING_SUFFIX);
+        filename + PENDING_SUFFIX);
     FileStatus fileStatus = verifyPathExists(fs, "no pending data",
         pendingDataPath);
     assertTrue("No data in " + fileStatus, fileStatus.getLen() > 0);
