@@ -276,7 +276,6 @@ public class MockS3AFileSystem extends S3AFileSystem {
     }
   }
 
-
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(

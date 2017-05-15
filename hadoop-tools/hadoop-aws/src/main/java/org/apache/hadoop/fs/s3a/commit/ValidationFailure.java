@@ -26,7 +26,6 @@ import java.io.IOException;
  */
 public class ValidationFailure extends IOException {
 
-
   /**
    * Create an instance with string formatting applied to the message
    * and arguments

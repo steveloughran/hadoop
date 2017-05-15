@@ -100,7 +100,7 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testDefaultFailAndAppend() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     // both fail and append don't check. fail is enforced at the task level.
     for (String mode : Arrays.asList(null, CONFLICT_MODE_FAIL,
@@ -144,7 +144,7 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testReplace() throws Exception {
-    S3AFileSystem mockS3 = getMockS3();
+    S3AFileSystem mockS3 = getMockS3A();
 
     getJob().getConfiguration().set(
         FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
@@ -211,7 +211,7 @@ public class TestStagingPartitionedJobCommit
    */
 //  @Test
   public void testReplaceWithExistsFailure() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     getJob().getConfiguration().set(
         FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
@@ -244,7 +244,7 @@ public class TestStagingPartitionedJobCommit
 
   @Test
   public void testReplaceWithDeleteFailure() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     getJob().getConfiguration().set(
         FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);

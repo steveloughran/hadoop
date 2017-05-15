@@ -123,7 +123,7 @@ public class FileCommitActions {
           commit.uploadId,
           CommitUtils.toPartEtags(commit.etags),
           commit.size);
-      LOG.debug("Successfull commit");
+      LOG.debug("Successful commit");
       outcome = commitSuccess(origin, destKey);
     } catch (IOException e) {
       String msg = String.format("Failed to commit upload against %s: %s",
@@ -238,7 +238,7 @@ public class FileCommitActions {
   public Pair<MultiplePendingCommits,
       List<Pair<LocatedFileStatus, IOException>>>
       loadSinglePendingCommits(Path pendingDir,
-        boolean recursive) throws IOException {
+      boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     MultiplePendingCommits commits = new MultiplePendingCommits(
@@ -337,12 +337,12 @@ public class FileCommitActions {
     writer(destKey).abortMultipartCommit(destKey, uploadId);
   }
 
-  public static CommitFileOutcome commitSuccess(String origin,
+  private static CommitFileOutcome commitSuccess(String origin,
       String destKey) {
     return new CommitFileOutcome(origin, destKey);
   }
 
-  public static CommitFileOutcome commitFailure(String origin,
+  private static CommitFileOutcome commitFailure(String origin,
       String destKey, IOException e) {
     return new CommitFileOutcome(origin, destKey, e);
   }
@@ -479,10 +479,8 @@ public class FileCommitActions {
             (int) size,
             null,
             localFile,
-            offset
-        );
+            offset);
         part.setLastPart(partNumber == numParts);
-
         UploadPartResult partResult = writer.uploadPart(part);
         offset += uploadPartSize;
         parts.add(partResult.getPartETag());

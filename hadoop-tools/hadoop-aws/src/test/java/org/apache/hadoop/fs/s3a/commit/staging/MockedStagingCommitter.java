@@ -40,20 +40,20 @@ class MockedStagingCommitter extends StagingS3GuardCommitter {
   private MockFileCommitActions mockCommitActions;
 
   MockedStagingCommitter(Path outputPath,
-      JobContext context, AmazonS3 mockClient)
+      JobContext context)
       throws IOException {
     super(outputPath, context);
-    createMockCommitActions(mockClient);
+    createMockCommitActions();
   }
 
   MockedStagingCommitter(Path outputPath,
-      TaskAttemptContext context, AmazonS3 mockClient)
+      TaskAttemptContext context)
       throws IOException {
     super(outputPath, context);
-    createMockCommitActions(mockClient);
+    createMockCommitActions();
   }
 
-  private void createMockCommitActions(AmazonS3 mockClient) throws IOException {
+  private void createMockCommitActions() throws IOException {
     mockCommitActions = new MockFileCommitActions(getDestS3AFS());
 
     setCommitActions(mockCommitActions);

@@ -28,7 +28,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 
 /**
- * Creates the {@link PartitionedStagingCommitter}.
+ * Factory for the {@link PartitionedStagingCommitter}.
  */
 public class PartitonedStagingCommitterFactory
     extends AbstractS3GuardCommitterFactory {

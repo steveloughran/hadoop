@@ -41,7 +41,6 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
-import org.apache.hadoop.fs.s3a.commit.staging.Tasks;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -247,7 +246,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * or it may be a subdirectory.
    * The default implementation returns the value of
    * {@link #getBaseTaskAttemptPath(TaskAttemptContext)};
-   * subclasseses may return different values.
+   * subclasses may return different values.
    * @param context the context of the task attempt.
    * @return the path where a task attempt should be stored.
    */

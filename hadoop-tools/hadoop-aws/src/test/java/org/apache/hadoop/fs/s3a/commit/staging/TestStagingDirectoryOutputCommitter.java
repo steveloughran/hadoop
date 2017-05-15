@@ -62,7 +62,7 @@ public class TestStagingDirectoryOutputCommitter
   }
 
   protected void verifyFailureConflictOutcome() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
     pathExists(mockS3, OUTPUT_PATH);
     final DirectoryStagingCommitter committer = newJobCommitter();
 
@@ -100,7 +100,7 @@ public class TestStagingDirectoryOutputCommitter
 
   @Test
   public void testAppendConflictResolution() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     pathExists(mockS3, OUTPUT_PATH);
 
@@ -121,7 +121,7 @@ public class TestStagingDirectoryOutputCommitter
 
   @Test
   public void testReplaceConflictResolution() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     pathExists(mockS3, OUTPUT_PATH);
 

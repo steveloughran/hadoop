@@ -143,7 +143,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     wrapperFS.setAmazonS3Client(mockClient);
 
     this.job = new JobContextImpl(jobConf, JOB_ID);
-    this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job, mockClient);
+    this.jobCommitter = new MockedStagingCommitter(OUTPUT_PATH, job);
     jobCommitter.setupJob(job);
 
     this.tac = new TaskAttemptContextImpl(
@@ -155,7 +155,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     this.conf.set(Constants.BUFFER_DIR, "/tmp/local-0,/tmp/local-1");
     this.conf.setInt(MULTIPART_SIZE, 100);
 
-    this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac, mockClient);
+    this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
   }
 
   @Test
@@ -628,7 +628,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
       TaskAttemptContext attempt = new TaskAttemptContextImpl(
           new Configuration(jobContext.getConfiguration()), attemptID);
       MockedStagingCommitter taskCommitter = new MockedStagingCommitter(
-          OUTPUT_PATH, attempt, mockClient);
+          OUTPUT_PATH, attempt);
       commitTask(taskCommitter, attempt, numFiles);
     }
 

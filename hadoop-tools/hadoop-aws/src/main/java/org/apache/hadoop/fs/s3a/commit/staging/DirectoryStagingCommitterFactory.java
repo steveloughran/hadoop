@@ -28,7 +28,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 
 /**
- * Creates the Directory committer.
+ * Factory for the Directory committer.
  */
 public class DirectoryStagingCommitterFactory
     extends AbstractS3GuardCommitterFactory {

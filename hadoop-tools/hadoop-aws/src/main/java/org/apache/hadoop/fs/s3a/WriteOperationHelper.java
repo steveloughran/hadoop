@@ -61,7 +61,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *   errors.</li>
  *   <li>Callbacks to let the FS know of events in the output stream
  *   upload process.</li>
- *   <li>Failure handling, including converting exceptions to IOEs</li>
+ *   <li>Failure handling, including converting exceptions to IOEs.</li>
  *   <li>Integration with instrumentation and S3Guard<./li>
  * </ul>
  *

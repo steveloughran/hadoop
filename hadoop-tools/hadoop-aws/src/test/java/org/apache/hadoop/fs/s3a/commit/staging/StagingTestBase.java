@@ -76,7 +76,8 @@ import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Test base for staging: core constants and static methods, inner classes
+ * Test base for mock tests of staging committers:
+ * core constants and static methods, inner classes
  * for specific test types.
  */
 public class StagingTestBase {
@@ -298,7 +299,7 @@ public class StagingTestBase {
       wrapperFS.setAmazonS3Client(mockClient);
     }
 
-    public S3AFileSystem getMockS3() {
+    public S3AFileSystem getMockS3A() {
       return mockFS;
     }
 

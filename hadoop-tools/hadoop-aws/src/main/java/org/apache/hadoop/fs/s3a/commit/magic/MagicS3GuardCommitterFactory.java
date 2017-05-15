@@ -28,7 +28,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 
 /**
- * Creates the Magic committer.
+ * Factory for the Magic committer.
  */
 public class MagicS3GuardCommitterFactory
     extends AbstractS3GuardCommitterFactory {

@@ -49,7 +49,6 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
     return new DirectoryStagingCommitter(getOutDir(), context);
   }
 
-
   @Override
   public AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException {

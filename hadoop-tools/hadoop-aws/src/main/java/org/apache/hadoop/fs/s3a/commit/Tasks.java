@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging;
+package org.apache.hadoop.fs.s3a.commit;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class for parallel execution, takes closures for the various
  * actions.
- * TODO: retries
+ * There is no retry logic: it is expected to be handled by the closures.
  */
 public final class Tasks {
   private static final Logger LOG = LoggerFactory.getLogger(Tasks.class);

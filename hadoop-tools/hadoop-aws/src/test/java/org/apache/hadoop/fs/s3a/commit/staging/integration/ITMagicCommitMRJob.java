@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
+
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /**
@@ -51,6 +52,5 @@ public class ITMagicCommitMRJob extends AbstractITCommitMRJob {
   protected void customPostExecutionValidation(Path destPath,
       SuccessData successData) throws IOException {
     assertPathDoesNotExist("No cleanup", new Path(destPath, MAGIC_DIR_NAME));
-
   }
 }

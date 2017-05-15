@@ -446,7 +446,6 @@ public final class CommitUtils {
     }
   }
 
-
   /**
    * Get a string value of a job ID; returns meaningful text if there is no ID.
    * @param context job context

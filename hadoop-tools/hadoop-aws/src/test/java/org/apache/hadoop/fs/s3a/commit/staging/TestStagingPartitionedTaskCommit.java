@@ -46,12 +46,12 @@ public class TestStagingPartitionedTaskCommit
 
   @Override
   PartitionedStagingCommitter newJobCommitter() throws IOException {
-    return new PartitionedCommitterForTesting(OUTPUT_PATH, getJob());
+    return new PartitionedStagingCommitter(OUTPUT_PATH, getJob());
   }
 
   @Override
   PartitionedStagingCommitter newTaskCommitter() throws Exception {
-    return new PartitionedCommitterForTesting(OUTPUT_PATH, getTAC());
+    return new PartitionedStagingCommitter(OUTPUT_PATH, getTAC());
   }
 
   // The set of files used by this test
@@ -78,7 +78,7 @@ public class TestStagingPartitionedTaskCommit
 
   @Test
   public void testDefault() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     JobContext job = getJob();
     job.getConfiguration().unset(
@@ -124,7 +124,7 @@ public class TestStagingPartitionedTaskCommit
 
   @Test
   public void testFail() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     getTAC().getConfiguration()
         .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_FAIL);
@@ -169,7 +169,7 @@ public class TestStagingPartitionedTaskCommit
 
   @Test
   public void testAppend() throws Exception {
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     getTAC().getConfiguration()
         .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_APPEND);
@@ -203,7 +203,7 @@ public class TestStagingPartitionedTaskCommit
   public void testReplace() throws Exception {
     // TODO: this committer needs to delete the data that already exists
     // This test should assert that the delete was done
-    FileSystem mockS3 = getMockS3();
+    FileSystem mockS3 = getMockS3A();
 
     getTAC().getConfiguration()
         .set(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CONFLICT_MODE_REPLACE);
