@@ -1176,7 +1176,8 @@ public class S3AFileSystem extends FileSystem {
    * operation statistics.
    * @param key key to blob to delete.
    */
-  private void deleteObject(String key) throws InvalidRequestException {
+  @VisibleForTesting
+  protected void deleteObject(String key) throws InvalidRequestException {
     blockRootDelete(key);
     incrementWriteOperations();
     incrementStatistic(OBJECT_DELETE_REQUESTS);
@@ -1188,10 +1189,10 @@ public class S3AFileSystem extends FileSystem {
    * @param f path path to delete
    * @param key key of entry
    * @param isFile is the path a file (used for instrumentation only)
-   *  @throws AmazonClientException problems working with S3
+   * @throws AmazonClientException problems working with S3
    * @throws IOException IO failure
    */
-  void deleteObjectAtPath(Path f, String key, boolean isFile)
+  public void deleteObjectAtPath(Path f, String key, boolean isFile)
       throws AmazonClientException, IOException {
     if (isFile) {
       instrumentation.fileDeleted(1);

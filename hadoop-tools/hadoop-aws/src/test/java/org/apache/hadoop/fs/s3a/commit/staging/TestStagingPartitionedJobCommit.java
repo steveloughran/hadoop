@@ -61,14 +61,16 @@ public class TestStagingPartitionedJobCommit
   private static final class PartitionedStagingCommitterForTesting
       extends PartitionedCommitterForTesting {
 
+    private boolean aborted = false;
+
     private PartitionedStagingCommitterForTesting(JobContext context)
         throws IOException {
       super(OUTPUT_PATH, context);
     }
 
     @Override
-    protected List<SinglePendingCommit> getPendingUploads(JobContext context)
-        throws IOException {
+    protected List<SinglePendingCommit> getPendingUploadsToCommit(
+        JobContext context) throws IOException {
       List<SinglePendingCommit> pending = Lists.newArrayList();
 
       for (String dateint : Arrays.asList("20161115", "20161116")) {
@@ -84,11 +86,8 @@ public class TestStagingPartitionedJobCommit
           pending.add(commit);
         }
       }
-
       return pending;
     }
-
-    private boolean aborted = false;
 
     @Override
     protected void abortJobInternal(JobContext context,

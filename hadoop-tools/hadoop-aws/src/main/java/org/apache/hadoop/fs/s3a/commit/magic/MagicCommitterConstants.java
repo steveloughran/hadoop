@@ -48,7 +48,7 @@ public final class MagicCommitterConstants {
   /**
    * Suffix applied to multiple pending commits data: {@value}.
    */
-  public static final String PENDING_MANY_SUFFIX = ".pending-many";
+  public static final String PENDINGSET_SUFFIX = ".pendingset";
 
   private MagicCommitterConstants() {
   }

@@ -134,11 +134,25 @@ public class DelayedCommitFSIntegration {
 
   /**
    * Is this path a delayed commit path in this filesystem?
+   * True if delayed commit is enabled, the path is magic
+   * and the path is not already a pending path.
    * @param elements element list
    * @return true if the path is for delayed commits
    */
   private boolean isDelayedCommitPath(List<String> elements) {
-    return delayedCommitEnabled && isMagicPath(elements);
+    return delayedCommitEnabled && isMagicPath(elements) &&
+        !isPendingFile(elements);
+  }
+
+  /**
+   * Is this a pending file?
+   * @param elements path element list
+   * @return true if this file is one of the pending files.
+   */
+  private boolean isPendingFile(List<String> elements) {
+    String last = elements.get(elements.size() - 1);
+    return last.endsWith(MagicCommitterConstants.PENDING_SUFFIX)
+        || last.endsWith(MagicCommitterConstants.PENDINGSET_SUFFIX);
   }
 
 }

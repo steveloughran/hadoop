@@ -26,12 +26,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,7 +103,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   // lazy variables
   private ConflictResolution conflictResolution = null;
-  private ExecutorService threadPool = null;
   private Path finalOutputPath = null;
   private String bucket = null;
   private String s3KeyPrefix = null;
@@ -170,13 +166,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   /**
    * Actions called by all constructors after creation.
    * Private/non-subclassable as subclasses will not have been instantiated
-   * at the time this method is invoked
+   * at the time this method is invoked.
+   * <i>Important: do not call non-final methods.</i>
    * @throws IOException on a failure
    */
   private void postCreationActions() throws IOException {
     // forces evaluation and caching of the resolution mode.
     ConflictResolution mode = getConflictResolutionMode(getJobContext());
     LOG.debug("Conflict resolution mode: {}", mode);
+    initPathFields(getJobContext());
   }
 
   @Override
@@ -421,7 +419,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     // get files on the local FS in the attempt path
     Path attemptPath = getTaskAttemptPath(context);
-    Preconditions.checkNotNull(attemptPath, "No attemptPath path in {}", this);
+    Preconditions.checkNotNull(attemptPath,
+        "No attemptPath path in {}", this);
 
     LOG.debug("Scanning {} for files to commit", attemptPath);
     FileSystem attemptFS = getTaskAttemptFilesystem(context);
@@ -483,8 +482,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
   */
 
+  /**
+   * Return the local work path as the destination for writing work.
+   * @param context the context of the task attempt.
+   * @return a path in the local filesystem.
+   */
   @Override
-  public Path getTaskAttemptPath(TaskAttemptContext context) {
+  public Path getBaseTaskAttemptPath(TaskAttemptContext context) {
     // a path on the local FS for files that will be uploaded
     return getWorkPath();
   }
@@ -525,7 +529,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   public void setupJob(JobContext context) throws IOException {
     LOG.debug("{}, Setting up job {}", getRole(), jobIdString(context));
-    context.getConfiguration().set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, uuid);
+    context.getConfiguration().set(FS_S3A_COMMITTER_STAGING_UUID, uuid);
     wrappedCommitter.setupJob(context);
   }
 
@@ -535,7 +539,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return a list of pending uploads.
    * @throws IOException Any IO failure
    */
-  protected List<SinglePendingCommit> getPendingUploads(JobContext context)
+  protected List<SinglePendingCommit> getPendingUploadsToCommit(JobContext context)
       throws IOException {
     return getPendingUploads(context, false);
   }
@@ -561,13 +565,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * then this may not match the actual set of pending operations
    * @throws IOException Any IO failure which wasn't swallowed.
    */
-  private List<SinglePendingCommit> getPendingUploads(
+  protected List<SinglePendingCommit> getPendingUploads(
       JobContext context, boolean suppressExceptions) throws IOException {
     Path jobAttemptPath = wrappedCommitter.getJobAttemptPath(context);
     final FileSystem attemptFS = jobAttemptPath.getFileSystem(
         context.getConfiguration());
-    final List<SinglePendingCommit> pending = Collections.synchronizedList(
-        Lists.newArrayList());
     FileStatus[] pendingCommitFiles;
     try {
       pendingCommitFiles = attemptFS.listStatus(
@@ -576,28 +578,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       // unable to work with endpoint, if suppressing errors decide our actions
       if (suppressExceptions) {
         LOG.info("{} failed to list pending upload dir", getRole(), e);
-        return pending;
+        return new ArrayList<>(0);
       } else {
         throw e;
       }
     }
-
-    // try to read every pending file and add all results to pending.
-    // in the case of a failure to read the file, exceptions are held until all
-    // reads have been attempted.
-    Tasks.foreach(pendingCommitFiles)
-        .throwFailureWhenFinished(!suppressExceptions)
-        .executeWith(getThreadPool(context))
-        .run(new Tasks.Task<FileStatus, IOException>() {
-          @Override
-          public void run(FileStatus pendingCommitFile) throws IOException {
-            MultiplePendingCommits commits = MultiplePendingCommits.load(
-                attemptFS, pendingCommitFile.getPath());
-            pending.addAll(commits.commits);
-          }
-        });
-
-    return pending;
+    return loadMultiplePendingCommitFiles(context,
+        suppressExceptions, attemptFS, pendingCommitFiles);
   }
 
   /**
@@ -610,9 +597,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * <p>
    * Commit internal: do the final commit sequence.
    * <p>
-   * The final commit action is to call
-   * {@link AbstractS3GuardCommitter#maybeCreateSuccessMarker(JobContext, List)}
-   * to set the {@code __SUCCESS} file entry.
+   * The final commit action is to build the {@code __SUCCESS} file entry.
    * </p>
    * @param context job context
    * @throws IOException any failure
@@ -622,7 +607,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     List<SinglePendingCommit> pending = Collections.emptyList();
     try (DurationInfo d =
              new DurationInfo("%s: preparing to commit Job", getRole())) {
-      pending = getPendingUploads(context);
+      pending = getPendingUploadsToCommit(context);
       preCommitJob(context, pending);
     } catch (IOException e) {
       LOG.warn("Precommit failure for job {}", jobIdString(context), e);
@@ -633,11 +618,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         getRole(), jobIdString(context))) {
       commitJobInternal(context, pending);
     }
-    List<String> filenames = new ArrayList<>(pending.size());
-    for (SinglePendingCommit commit : pending) {
-      filenames.add(commit.destinationKey);
-    }
-    maybeCreateSuccessMarker(context, filenames);
+    maybeCreateSuccessMarkerFromCommits(context, pending);
   }
 
   /**
@@ -648,61 +629,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected void preCommitJob(JobContext context,
       List<SinglePendingCommit> pending) throws IOException {
-  }
-
-  /**
-   * Internal Job commit operation: where the S3 requests are made
-   * (potentially in parallel).
-   * @param context job context
-   * @param pending pending request
-   * @throws IOException any failure
-   */
-  protected void commitJobInternal(JobContext context,
-                                   List<SinglePendingCommit> pending)
-      throws IOException {
-
-    if (pending.isEmpty()) {
-      LOG.warn("{}: No pending uploads to commit", getRole());
-    }
-    LOG.debug("{}: committing the output of {} task(s)",
-        getRole(), pending.size());
-    boolean threw = true;
-    try {
-      Tasks.foreach(pending)
-          .stopOnFailure().throwFailureWhenFinished()
-          .executeWith(getThreadPool(context))
-          .onFailure(
-              new Tasks.FailureTask<SinglePendingCommit, IOException>() {
-                @Override
-                public void run(SinglePendingCommit commit,
-                    Exception exception) throws IOException {
-                  getCommitActions().abortMultipartCommit(commit);
-                }
-              })
-          .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
-            @Override
-            public void run(SinglePendingCommit commit) throws IOException {
-              getCommitActions().abortMultipartCommit(commit);
-            }
-          })
-          .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
-            @Override
-            public void run(SinglePendingCommit commit) throws IOException {
-              getCommitActions().revertCommit(commit);
-            }
-          })
-          .run(new Tasks.Task<SinglePendingCommit, IOException>() {
-            @Override
-            public void run(SinglePendingCommit commit) throws IOException {
-              getCommitActions().commitOrFail(commit);
-            }
-          });
-
-      threw = false;
-
-    } finally {
-      cleanup(context, threw);
-    }
   }
 
   @Override
@@ -734,62 +660,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     if (workPath != null) {
       LOG.debug("Cleaning up work path {}", workPath);
       FileSystem fs = workPath.getFileSystem(getConf());
-      try {
-        fs.delete(workPath, true);
-      } catch (IOException e) {
-        LOG.error("{}: exception cleaning up work path of job {}",
-            getRole(), jobIdString(context), e);
-        if (ex != null) {
-          ex = e;
-        }
-      }
+      deleteQuietly(fs, workPath, true);
     }
     if (ex != null) {
       throw ex;
     }
   }
 
-  protected void abortJobInternal(JobContext context,
-      List<SinglePendingCommit> pending,
-      boolean suppressExceptions)
-      throws IOException {
-    LOG.warn("{}: aborting Job", getRole());
-    if (pending == null || pending.isEmpty()) {
-      LOG.info("{}: no pending commits to abort", getRole());
-      return;
-    }
-
-    boolean threw = true;
-    try {
-      Tasks.foreach(pending)
-          .throwFailureWhenFinished(!suppressExceptions)
-          .executeWith(getThreadPool(context))
-          .onFailure(new Tasks.FailureTask<SinglePendingCommit, IOException>() {
-            @Override
-            public void run(SinglePendingCommit commit,
-                            Exception exception) throws IOException {
-              getCommitActions().abortMultipartCommit(commit);
-            }
-          })
-          .run(new Tasks.Task<SinglePendingCommit, IOException>() {
-            @Override
-            public void run(SinglePendingCommit commit) throws IOException {
-              getCommitActions().abortMultipartCommit(commit);
-            }
-          });
-
-      // and any other outstanding uploads
-
-      // at this point, no exceptions were raised
-
-      threw = false;
-
-    } finally {
-      cleanup(context, threw || suppressExceptions);
-    }
-  }
-
-  private void cleanup(JobContext context, boolean suppressExceptions)
+  @Override
+  protected void cleanup(JobContext context, boolean suppressExceptions)
       throws IOException {
     try {
       wrappedCommitter.cleanupJob(context);
@@ -987,7 +866,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             .run(new Tasks.Task<SinglePendingCommit, IOException>() {
               @Override
               public void run(SinglePendingCommit commit) throws IOException {
-                getCommitActions().abortMultipartCommit(commit);
+                getCommitActions().abortSingleCommit(commit);
               }
             });
         deleteTaskAttemptPathQuietly(context);
@@ -1043,27 +922,20 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return context.getTaskAttemptID().getId();
   }
 
-  protected void deleteTaskAttemptPathQuietly(TaskAttemptContext context)
-      throws IOException {
-    Path attemptPath = getTaskAttemptPath(context);
+  /**
+   * Delete the working path of a task; no-op if there is none, that
+   * is: this is a job.
+   * @param context job/task context
+   */
+  protected void deleteTaskWorkingPathQuietly(JobContext context) {
     try {
-      FileSystem taskFS = getTaskAttemptFilesystem(context);
-      deleteQuietly(taskFS, attemptPath, true);
-    } catch (IOException e) {
-      LOG.debug("{}: failed to delete task attempt path {}",
-          getRole(), attemptPath, e);
-    }
-  }
-
-  protected void deleteTaskWorkingPathQuietly(JobContext context)
-      throws IOException {
-    Path path = buildWorkPath(context, getUUID());
-    if (path != null) {
-      try {
+      Path path = buildWorkPath(context, getUUID());
+      if (path != null) {
         deleteQuietly(path.getFileSystem(getConf()), path, true);
-      } catch (IOException e) {
-        LOG.debug("{}: Failed to delete path {}", getRole(), path, e);
       }
+    } catch (IOException e) {
+      // the attempt to build the working path failed
+      LOG.debug("{}: Failed to delete working path" , getRole(), e);
     }
   }
 
@@ -1078,64 +950,68 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return Paths.getParent(relative);
   }
 
-  protected final Path getOutputPath(JobContext context) throws IOException {
+  /**
+   * Get the output path.
+   * This will dynamically set {@code finalOutputPath} if it is unset.
+   * @param context job context
+   * @return the output path
+   */
+  protected final Path getOutputPath(JobContext context)
+      throws IOException {
     if (finalOutputPath == null) {
-      this.finalOutputPath = getFinalOutputPath(constructorOutputPath, context);
-      Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
-
-      S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
-          context.getConfiguration(), false);
-      this.bucket = fs.getBucket();
-      this.s3KeyPrefix = fs.pathToKey(finalOutputPath);
-      LOG.debug("{}: final output path is {}", getRole(), finalOutputPath);
+      initPathFields(context);
     }
     return finalOutputPath;
   }
 
+
+  /**
+   * Initialize path fields
+   * @param context job context
+   * @throws IOException failure to load the filesystem
+   */
+  private synchronized void initPathFields(JobContext context)
+      throws IOException {
+    this.finalOutputPath = getFinalOutputPath(constructorOutputPath, context);
+    Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
+
+    S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
+        context.getConfiguration(), false);
+    this.bucket = fs.getBucket();
+    this.s3KeyPrefix = fs.pathToKey(finalOutputPath);
+    LOG.debug("{}: final output path is {}", getRole(), finalOutputPath);
+  }
+
+  /**
+   * Get the bucket of the final FS of the job.
+   * @param context job context
+   * @return bucket name
+   * @throws IOException failure to load the filesystem
+   */
   private String getBucket(JobContext context) throws IOException {
     if (bucket == null) {
       // getting the output path sets the bucket from the path
-      getOutputPath(context);
+      initPathFields(context);
     }
     return bucket;
   }
 
+  /**
+   * Get the key of the destination "directory" of the job/task
+   * @param context job context
+   * @return key to write to
+   * @throws IOException failure to load the filesystem
+   */
   private String getS3KeyPrefix(JobContext context) throws IOException {
     if (s3KeyPrefix == null) {
       // getting the output path sets the s3 key prefix from the path
-      getOutputPath(context);
+      initPathFields(context);
     }
     return s3KeyPrefix;
   }
 
   protected String getUUID() {
     return uuid;
-  }
-
-  /**
-   * Returns an {@link ExecutorService} for parallel tasks. The number of
-   * threads in the thread-pool is set by s3.multipart.committer.num-threads.
-   * If num-threads is 0, this will return null;
-   *
-   * @param context the JobContext for this commit
-   * @return an {@link ExecutorService} or null for the number of threads
-   */
-  protected final ExecutorService getThreadPool(JobContext context) {
-    if (threadPool == null) {
-      int numThreads = context.getConfiguration().getInt(
-          CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS, CommitConstants.DEFAULT_STAGING_COMMITTER_THREADS);
-      LOG.debug("{}: creating thread pool of size {}", getRole(), numThreads);
-      if (numThreads > 0) {
-        this.threadPool = Executors.newFixedThreadPool(numThreads,
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("s3-committer-pool-%d")
-                .build());
-      } else {
-        return null;
-      }
-    }
-    return threadPool;
   }
 
   /**
@@ -1174,7 +1050,8 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public static String getConfictModeOption(JobContext context) {
     return context
         .getConfiguration()
-        .getTrimmed(CommitConstants.FS_S3A_COMMITTER_STAGING_CONFLICT_MODE, CommitConstants.DEFAULT_CONFLICT_MODE)
+        .getTrimmed(FS_S3A_COMMITTER_STAGING_CONFLICT_MODE,
+            DEFAULT_CONFLICT_MODE)
         .toUpperCase(Locale.ENGLISH);
   }
 }

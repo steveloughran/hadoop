@@ -182,7 +182,8 @@ public class FileCommitActions {
   public CommitAllFilesOutcome commitSinglePendingCommitFiles(Path pendingDir,
       boolean recursive) throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
-    Pair<MultiplePendingCommits, List<LocatedFileStatus>> results
+    Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
+        results
         = loadSinglePendingCommits(pendingDir, recursive);
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
     for (SinglePendingCommit singlePendingCommit : results.first().commits) {
@@ -235,20 +236,21 @@ public class FileCommitActions {
    * not load/validate.
    * @throws IOException on a failure to list the files.
    */
-  public Pair<MultiplePendingCommits, List<LocatedFileStatus>>
+  public Pair<MultiplePendingCommits,
+      List<Pair<LocatedFileStatus, IOException>>>
       loadSinglePendingCommits(Path pendingDir,
         boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     MultiplePendingCommits commits = new MultiplePendingCommits(
         statusList.size());
-    List<LocatedFileStatus> failures = new ArrayList<>(1);
+    List<Pair<LocatedFileStatus, IOException>> failures = new ArrayList<>(1);
     for (LocatedFileStatus status : statusList) {
       try {
         commits.add(SinglePendingCommit.load(fs, status.getPath()));
       } catch (IOException e) {
         LOG.warn("Failed to load commit file {}", status.getPath(), e);
-        failures.add(status);
+        failures.add(new Pair<>(status, e));
       }
     }
     return Pair.of(commits, failures);
@@ -290,7 +292,7 @@ public class FileCommitActions {
     String destKey = commit.destinationKey;
     String origin = commit.filename;
     try {
-      abortMultipartCommit(commit);
+      abortSingleCommit(commit);
       outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
           origin, destKey, null);
     } catch (IOException | IllegalArgumentException e) {
@@ -313,7 +315,7 @@ public class FileCommitActions {
    * @param commit pending commit to abort
    * @throws IOException on any failure
    */
-  public void abortMultipartCommit(SinglePendingCommit commit)
+  public void abortSingleCommit(SinglePendingCommit commit)
       throws IOException {
     String destKey = commit.destinationKey;
     String origin = commit.filename !=null ?
@@ -326,8 +328,7 @@ public class FileCommitActions {
   }
 
   /**
-   * Create an {@code AbortMultipartUpload} request and POST it
-   * to S3.
+   * Create an {@code AbortMultipartUpload} request and POST it to S3.
    * @param destKey destination key
    * @param uploadId upload to cancel
    * @throws IOException on any failure
@@ -412,7 +413,7 @@ public class FileCommitActions {
    * @throws IOException failure
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
-    LOG.debug("Revert {}", commit);
+    LOG.warn("Revert {}", commit);
     writer(commit.destinationKey)
         .revertCommit(commit.destinationKey);
   }
@@ -721,6 +722,5 @@ public class FileCommitActions {
       }
     }
   }
-
 
 }

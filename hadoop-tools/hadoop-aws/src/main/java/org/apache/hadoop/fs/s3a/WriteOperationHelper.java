@@ -41,11 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.Path;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
 
 
 /**
@@ -129,7 +127,8 @@ public class WriteOperationHelper {
       File sourceFile) {
     int length = (int) sourceFile.length();
     PutObjectRequest request = owner.newPutObjectRequest(dest,
-        newObjectMetadata(length), sourceFile);
+        newObjectMetadata(length),
+        sourceFile);
     return request;
   }
 
@@ -181,7 +180,9 @@ public class WriteOperationHelper {
   }
 
   /**
-   * Abort a multipart upload operation.
+   * Abort a multipart upload operation. This is similar to
+   * {@link #abortMultipartUpload(String, String)} except that
+   * failures are processed.
    * @param dest destination key of upload
    * @param uploadId multipart operation Id
    * @throws IOException on problems.
@@ -284,7 +285,8 @@ public class WriteOperationHelper {
       throws AmazonClientException {
     LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
     owner.getAmazonS3Client().abortMultipartUpload(
-        new AbortMultipartUploadRequest(owner.getBucket(), uploadKey,
+        new AbortMultipartUploadRequest(owner.getBucket(),
+            uploadKey,
             uploadId));
   }
 
@@ -297,7 +299,7 @@ public class WriteOperationHelper {
   public int abortMultipartUploadsUnderPath(String prefix)
       throws IOException {
     int count = 0;
-    for (MultipartUpload upload : owner.listMultipartUploads(prefix)) {
+    for (MultipartUpload upload: owner.listMultipartUploads(prefix)) {
       try {
         abortMultipartCommit(upload);
         count++;
@@ -385,7 +387,8 @@ public class WriteOperationHelper {
    */
   public PutObjectResult putObject(PutObjectRequest putObjectRequest)
       throws IOException {
-    return calls.execute("put", putObjectRequest.getKey(),
+    return calls.execute("put",
+        putObjectRequest.getKey(),
         () -> owner.putObjectDirect(putObjectRequest));
   }
 

@@ -37,17 +37,17 @@ import org.slf4j.LoggerFactory;
  * actions.
  * TODO: retries
  */
-final class Tasks {
+public final class Tasks {
   private static final Logger LOG = LoggerFactory.getLogger(Tasks.class);
 
   private Tasks() {
   }
 
-  interface FailureTask<I, E extends Exception> {
+  public interface FailureTask<I, E extends Exception> {
     void run(I item, Exception exception) throws E;
   }
 
-  interface Task<I, E extends Exception> {
+  public interface Task<I, E extends Exception> {
     void run(I item) throws E;
   }
 

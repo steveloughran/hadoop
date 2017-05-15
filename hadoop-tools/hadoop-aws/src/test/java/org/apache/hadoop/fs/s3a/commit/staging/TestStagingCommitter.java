@@ -496,7 +496,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertPathExists(fs, "No job attempt path", jobAttemptPath);
 
     errors.failOnCommit(5);
-//    setMockLogLevel(MockS3AFileSystem.LOG_STACK);
+    setMockLogLevel(MockS3AFileSystem.LOG_NAME);
 
     StagingTestBase.assertThrows("Should propagate the commit failure",
         AWSClientIOException.class, "Fail on commit 5",

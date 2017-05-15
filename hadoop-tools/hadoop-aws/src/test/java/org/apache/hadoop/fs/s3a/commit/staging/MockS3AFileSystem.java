@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.MultipartUpload;
@@ -254,6 +255,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public long getDefaultBlockSize() {
     return mock.getDefaultBlockSize();
+  }
+
+  @Override
+  public void deleteObjectAtPath(Path f, String key, boolean isFile)
+      throws AmazonClientException, IOException {
+    deleteObject(key);
   }
 
   private static class EmptyIterator implements

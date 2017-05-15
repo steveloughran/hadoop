@@ -805,7 +805,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("4. Validating content");
     validateContent(outDir, shouldExpectSuccessMarker());
     assertNoMultipartUploadsPending(outDir);
-
   }
 
   @Test

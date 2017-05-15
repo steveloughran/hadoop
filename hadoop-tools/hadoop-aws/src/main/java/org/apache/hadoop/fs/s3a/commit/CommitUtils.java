@@ -387,14 +387,26 @@ public final class CommitUtils {
    * This path is marked as a base path for relocations, so subdirectory
    * information is preserved.
    * @param context the context of the task attempt.
-   * @param out The output path to put things in.
+   * @param dest The output path to commit work into
    * @return the path where a task attempt should be stored.
    */
   public static Path getMagicTaskAttemptPath(TaskAttemptContext context,
-      Path out) {
-    Path p1 = new Path(getMagicTaskAttemptsPath(context, out),
-        String.valueOf(context.getTaskAttemptID()));
-    return new Path(p1, MagicCommitterConstants.BASE_PATH);
+      Path dest) {
+    return new Path(getBaseMagicTaskAttemptPath(context, dest),
+        MagicCommitterConstants.BASE_PATH);
+  }
+
+  /**
+   * Get the base Magic attempt path, without any annotations to mark relative
+   * references.
+   * @param context task context.
+   * @param dest The output path to commit work into
+   * @return the path under which all attempts go
+   */
+  public static Path getBaseMagicTaskAttemptPath(TaskAttemptContext context,
+      Path dest) {
+    return new Path(getMagicTaskAttemptsPath(context, dest),
+          String.valueOf(context.getTaskAttemptID()));
   }
 
   /**

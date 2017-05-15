@@ -111,6 +111,15 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     assertTrue("wrong type: " + tracker + " for " + pendingPathKey,
         tracker instanceof DelayedCommitTracker);
     assertEquals("tracker destination key", origKey, tracker.getDestKey());
+
+    Path pendingSuffixedPath = new Path(pendingPath,
+        "part-0000" + MagicCommitterConstants.PENDING_SUFFIX);
+    assertFalse("still a delayed complete path " + pendingSuffixedPath,
+        fs.isDelayedCompletePath(pendingSuffixedPath));
+    Path pendingSet = new Path(pendingPath,
+        "part-0000" + MagicCommitterConstants.PENDINGSET_SUFFIX);
+    assertFalse("still a delayed complete path " + pendingSet,
+        fs.isDelayedCompletePath(pendingSet));
   }
 
   @Test

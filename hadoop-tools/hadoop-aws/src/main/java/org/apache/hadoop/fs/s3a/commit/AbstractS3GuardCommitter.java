@@ -19,14 +19,22 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
+import org.apache.hadoop.fs.s3a.commit.staging.Tasks;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -34,9 +42,12 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.net.NetUtils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
@@ -54,6 +65,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
+  protected ExecutorService threadPool = null;
   private FileCommitActions commitActions;
   private Path outputPath;
 
@@ -116,7 +128,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   protected AbstractS3GuardCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     this("Task committer "+ context.getTaskAttemptID(),
-        outputPath, (JobContext) context);
+        outputPath, context);
     LOG.debug("{}} instantiated for {} ID {}",
         role, jobName(context), jobIdString(context));
   }
@@ -132,7 +144,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * Get the job/task context this committer was instantiated with.
    * @return the context.
    */
-  public JobContext getJobContext() {
+  public final JobContext getJobContext() {
     return jobContext;
   }
 
@@ -226,12 +238,28 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
 
   /**
    * Compute the path where the output of a task attempt is stored until
-   * that task is committed.
+   * that task is committed. This may be the normal Task attempt path
+   * or it may be a subdirectory.
+   * The default implementation returns the value of
+   * {@link #getBaseTaskAttemptPath(TaskAttemptContext)};
+   * subclasseses may return different values.
+   * @param context the context of the task attempt.
+   * @return the path where a task attempt should be stored.
+   */
+  public Path getTaskAttemptPath(TaskAttemptContext context) {
+    return getBaseTaskAttemptPath(context);
+  }
+
+  /**
+   * Compute the base path where the output of a task attempt is written.
+   * This is the path which will be deleted when a task is cleaned up and
+   * aborted.
+
    *
    * @param context the context of the task attempt.
    * @return the path where a task attempt should be stored.
    */
-  protected abstract Path getTaskAttemptPath(TaskAttemptContext context);
+  protected abstract Path getBaseTaskAttemptPath(TaskAttemptContext context);
 
   /**
    * Get a temporary directory for data. When a task is aborted/cleaned
@@ -298,6 +326,25 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * While the classic committers create a 0-byte file, the S3Guard committers
    * PUT up a the contents of a {@link SuccessData} file.
    * @param context job context
+   * @param pending the pending commits
+   * @throws IOException IO failure
+   */
+  protected void maybeCreateSuccessMarkerFromCommits(JobContext context,
+      List<SinglePendingCommit> pending) throws IOException {
+    List<String> filenames = new ArrayList<>(pending.size());
+    for (SinglePendingCommit commit : pending) {
+      filenames.add(commit.destinationKey);
+    }
+    maybeCreateSuccessMarker(context, filenames);
+  }
+
+  /**
+   * if the job requires a success marker on a successful job,
+   * create the file {@link CommitConstants#SUCCESS_FILE_NAME}.
+   *
+   * While the classic committers create a 0-byte file, the S3Guard committers
+   * PUT up a the contents of a {@link SuccessData} file.
+   * @param context job context
    * @param filenames list of filenames.
    * @throws IOException IO failure
    */
@@ -343,6 +390,103 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
+   * Commit a list of pending uploads.
+   * @param context job context
+   * @param pending list of pending uploads
+   * @throws IOException on any failure
+   */
+  protected void commitPendingUploads(JobContext context,
+      List<SinglePendingCommit> pending) throws IOException {
+    if (pending.isEmpty()) {
+      LOG.warn("{}: No pending uploads to commit", getRole());
+    }
+    LOG.debug("{}: committing the output of {} task(s)",
+        getRole(), pending.size());
+    Tasks.foreach(pending)
+        .stopOnFailure().throwFailureWhenFinished()
+        .executeWith(getThreadPool(context))
+        .onFailure(
+            new Tasks.FailureTask<SinglePendingCommit, IOException>() {
+              @Override
+              public void run(SinglePendingCommit commit,
+                  Exception exception) throws IOException {
+                getCommitActions().abortSingleCommit(commit);
+              }
+            })
+        .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
+          @Override
+          public void run(SinglePendingCommit commit) throws IOException {
+            getCommitActions().abortSingleCommit(commit);
+          }
+        })
+        .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
+          @Override
+          public void run(SinglePendingCommit commit) throws IOException {
+            getCommitActions().revertCommit(commit);
+          }
+        })
+        .run(new Tasks.Task<SinglePendingCommit, IOException>() {
+          @Override
+          public void run(SinglePendingCommit commit) throws IOException {
+            getCommitActions().commitOrFail(commit);
+          }
+        });
+  }
+
+  /**
+   * Try to read every pending file and add all results to pending.
+   * in the case of a failure to read the file, exceptions are held until all
+   * reads have been attempted.
+   * @param context job context
+   * @param suppressExceptions whether to suppress exceptions.
+   * @param fs job attempt fs
+   * @param pendingCommitFiles list of files found in the listing scan
+   * @return the list of commits
+   * @throws IOException on a failure
+   */
+  protected List<SinglePendingCommit> loadMultiplePendingCommitFiles(
+      JobContext context,
+      boolean suppressExceptions,
+      FileSystem fs,
+      FileStatus[] pendingCommitFiles) throws IOException {
+
+    final List<SinglePendingCommit> pending = Collections.synchronizedList(
+        Lists.newArrayList());
+    Tasks.foreach(pendingCommitFiles)
+        .throwFailureWhenFinished(!suppressExceptions)
+        .executeWith(getThreadPool(context))
+        .run(new Tasks.Task<FileStatus, IOException>() {
+          @Override
+          public void run(FileStatus pendingCommitFile) throws IOException {
+            MultiplePendingCommits commits = MultiplePendingCommits.load(
+                fs, pendingCommitFile.getPath());
+            pending.addAll(commits.commits);
+          }
+        });
+    return pending;
+  }
+
+  /**
+   * Internal Job commit operation: where the S3 requests are made
+   * (potentially in parallel).
+   * @param context job context
+   * @param pending pending request
+   * @throws IOException any failure
+   */
+  protected void commitJobInternal(JobContext context,
+      List<SinglePendingCommit> pending)
+      throws IOException {
+
+    boolean threw = true;
+    try {
+      commitPendingUploads(context, pending);
+      threw = false;
+    } finally {
+      cleanup(context, threw);
+    }
+  }
+
+  /**
    * Abort the job: hand off to {@link #cleanupJob(JobContext)}.
    * @param context job
    * @param state final runstate of the job
@@ -383,5 +527,114 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected String getRole() {
     return role;
+  }
+
+  /**
+   * Returns an {@link ExecutorService} for parallel tasks. The number of
+   * threads in the thread-pool is set by s3.multipart.committer.num-threads.
+   * If num-threads is 0, this will return null;
+   *
+   * @param context the JobContext for this commit
+   * @return an {@link ExecutorService} or null for the number of threads
+   */
+  protected final ExecutorService getThreadPool(JobContext context) {
+    if (threadPool == null) {
+      int numThreads = context.getConfiguration().getInt(
+          CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS,
+          CommitConstants.DEFAULT_STAGING_COMMITTER_THREADS);
+      LOG.debug("{}: creating thread pool of size {}", getRole(), numThreads);
+      if (numThreads > 0) {
+        this.threadPool = Executors.newFixedThreadPool(numThreads,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("s3-committer-pool-%d")
+                .build());
+      } else {
+        return null;
+      }
+    }
+    return threadPool;
+  }
+
+  /**
+   * Delete the task attempt path without raising any errors
+   * @param context task context
+   */
+  protected void deleteTaskAttemptPathQuietly(TaskAttemptContext context) {
+    Path attemptPath = getBaseTaskAttemptPath(context);
+    try {
+      FileSystem taskFS = getTaskAttemptFilesystem(context);
+      deleteQuietly(taskFS, attemptPath, true);
+    } catch (IOException e) {
+      LOG.debug("{}: failed to delete task attempt path {}",
+          getRole(), attemptPath, e);
+    }
+  }
+
+  /**
+   * The internal job abort operation.
+   * @param context job context
+   * @param pending list of pending commits
+   * @param suppressExceptions should exceptions be suppressed?
+   * @throws IOException any IO problem raised when suppressExceptions is false.
+   */
+  protected void abortJobInternal(JobContext context,
+      List<SinglePendingCommit> pending,
+      boolean suppressExceptions)
+      throws IOException {
+    LOG.warn("{}: aborting Job with {} files", getRole(),
+        pending == null ? 0 : pending.size());
+    boolean threw = true;
+    try {
+      abortPendingUploads(context, pending, suppressExceptions);
+      // at this point, no exceptions were raised
+      threw = false;
+    } finally {
+      cleanup(context, threw || suppressExceptions);
+    }
+  }
+
+  /**
+   * Abort all pending uploads in the list.
+   * @param context job context
+   * @param pending pending uploads
+   * @param suppressExceptions should exceptions be suppressed
+   * @throws IOException any exception raised
+   */
+  protected void abortPendingUploads(JobContext context,
+      List<SinglePendingCommit> pending,
+      boolean suppressExceptions)
+      throws IOException {
+    if (pending == null || pending.isEmpty()) {
+      LOG.info("{}: no pending commits to abort", getRole());
+    } else {
+      Tasks.foreach(pending)
+          .throwFailureWhenFinished(!suppressExceptions)
+          .executeWith(getThreadPool(context))
+          .onFailure(new Tasks.FailureTask<SinglePendingCommit, IOException>() {
+            @Override
+            public void run(SinglePendingCommit commit,
+                Exception exception) throws IOException {
+              getCommitActions().abortSingleCommit(commit);
+            }
+          })
+          .run(new Tasks.Task<SinglePendingCommit, IOException>() {
+            @Override
+            public void run(SinglePendingCommit commit) throws IOException {
+              getCommitActions().abortSingleCommit(commit);
+            }
+          });
+    }
+  }
+
+  /**
+   * Clenup the job context, including aborting anything pending.
+   * @param context job context
+   * @param suppressExceptions should exceptions be suppressed?
+   * @throws IOException any failure if exceptions were not suppressed.
+   */
+  protected void cleanup(JobContext context, boolean suppressExceptions)
+      throws IOException {
+
   }
 }
