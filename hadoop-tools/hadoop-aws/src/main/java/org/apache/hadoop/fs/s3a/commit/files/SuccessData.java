@@ -52,43 +52,43 @@ import org.apache.hadoop.util.JsonSerialization;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class SuccessData extends PersistentCommitData {
-  private static final Logger LOG = LoggerFactory.getLogger(
-      SuccessData.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SuccessData.class);
+
   /**
    * Serialization ID: {@value}.
    */
   private static final long serialVersionUID = 507133045258460084L;
 
   /** Timestamp of creation. */
-  public long timestamp;
+  private long timestamp;
 
   /** Timestamp as date; no expectation of parseability. */
-  public String date;
+  private String date;
 
   /**
    * Host which created the file (implicitly: committed the work).
    */
-  public String hostname;
+  private String hostname;
 
   /**
    * Committer name.
    */
-  public String committer;
+  private String committer;
 
   /**
    * Description text.
    */
-  public String description;
+  private String description;
 
   /**
    * Metrics.
    */
-  public Map<String, Long> metrics = new HashMap<>();
+  private Map<String, Long> metrics = new HashMap<>();
 
   /**
    * Filenames in the commit.
    */
-  public List<String> filenames = new ArrayList<>(0);
+  private List<String> filenames = new ArrayList<>(0);
 
   @Override
   public void validate() throws ValidationFailure {
@@ -146,4 +146,76 @@ public class SuccessData extends PersistentCommitData {
     return new JsonSerialization<>(SuccessData.class, false, true);
   }
 
+  /** Timestamp of creation. */
+  public long getTimestamp() {
+    return timestamp;
+  }
+
+  public void setTimestamp(long timestamp) {
+    this.timestamp = timestamp;
+  }
+
+  /** Timestamp as date; no expectation of parseability. */
+  public String getDate() {
+    return date;
+  }
+
+  public void setDate(String date) {
+    this.date = date;
+  }
+
+  /**
+   * Host which created the file (implicitly: committed the work).
+   */
+  public String getHostname() {
+    return hostname;
+  }
+
+  public void setHostname(String hostname) {
+    this.hostname = hostname;
+  }
+
+  /**
+   * Committer name.
+   */
+  public String getCommitter() {
+    return committer;
+  }
+
+  public void setCommitter(String committer) {
+    this.committer = committer;
+  }
+
+  /**
+   * Description text.
+   */
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
+  /**
+   * Metrics.
+   */
+  public Map<String, Long> getMetrics() {
+    return metrics;
+  }
+
+  public void setMetrics(Map<String, Long> metrics) {
+    this.metrics = metrics;
+  }
+
+  /**
+   * Filenames in the commit.
+   */
+  public List<String> getFilenames() {
+    return filenames;
+  }
+
+  public void setFilenames(List<String> filenames) {
+    this.filenames = filenames;
+  }
 }

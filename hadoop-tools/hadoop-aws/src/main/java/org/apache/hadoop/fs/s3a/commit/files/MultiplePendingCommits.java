@@ -65,17 +65,17 @@ public class MultiplePendingCommits extends PersistentCommitData {
 
 
   /** Version marker. */
-  public int version = VERSION;
+  private int version = VERSION;
 
   /**
    * Commit list.
    */
-  public List<SinglePendingCommit> commits;
+  private List<SinglePendingCommit> commits;
 
   /**
    * Any custom extra data committer subclasses may choose to add.
    */
-  public Map<String, String> extraData = new HashMap<>(0);
+  private Map<String, String> extraData = new HashMap<>(0);
 
   public MultiplePendingCommits() {
     this(0);
@@ -146,10 +146,10 @@ public class MultiplePendingCommits extends PersistentCommitData {
     validateCollectionClass(commits, SinglePendingCommit.class);
     for (SinglePendingCommit c : commits) {
       c.validate();
-      verify(!destinations.contains(c.destinationKey),
+      verify(!destinations.contains(c.getDestinationKey()),
           "Destination %s is written to by more than one pending commit",
-          c.destinationKey);
-      destinations.add(c.destinationKey);
+          c.getDestinationKey());
+      destinations.add(c.getDestinationKey());
     }
 
   }
@@ -173,4 +173,34 @@ public class MultiplePendingCommits extends PersistentCommitData {
     serializer().save(fs, path, this, overwrite);
   }
 
+  /** Version marker. */
+  public int getVersion() {
+    return version;
+  }
+
+  public void setVersion(int version) {
+    this.version = version;
+  }
+
+  /**
+   * Commit list.
+   */
+  public List<SinglePendingCommit> getCommits() {
+    return commits;
+  }
+
+  public void setCommits(List<SinglePendingCommit> commits) {
+    this.commits = commits;
+  }
+
+  /**
+   * Any custom extra data committer subclasses may choose to add.
+   */
+  public Map<String, String> getExtraData() {
+    return extraData;
+  }
+
+  public void setExtraData(Map<String, String> extraData) {
+    this.extraData = extraData;
+  }
 }

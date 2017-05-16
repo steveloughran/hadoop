@@ -78,11 +78,11 @@ public class TestStagingPartitionedJobCommit
           String key = OUTPUT_PREFIX + "/dateint=" + dateint + "/hour=" + hour +
               "/" + UUID.randomUUID().toString() + ".parquet";
           SinglePendingCommit commit = new SinglePendingCommit();
-          commit.bucket = BUCKET;
-          commit.destinationKey = key;
-          commit.uri = "s3a://" + BUCKET + "/" + key;
-          commit.uploadId = UUID.randomUUID().toString();
-          commit.etags = new ArrayList<>();
+          commit.setBucket(BUCKET);
+          commit.setDestinationKey(key);
+          commit.setUri("s3a://" + BUCKET + "/" + key);
+          commit.setUploadId(UUID.randomUUID().toString());
+          commit.setEtags(new ArrayList<>());
           pending.add(commit);
         }
       }

@@ -239,6 +239,7 @@ public class StagingTestBase {
       }
     }
 
+    @SuppressWarnings("ThrowableNotThrown")
     @AfterClass
     public static void teardownFS() throws IOException {
       conf = null;
@@ -332,7 +333,7 @@ public class StagingTestBase {
     abstract C newJobCommitter() throws Exception;
   }
 
-  /** */
+  /** Abstract test of task commits. */
   public abstract static class TaskCommitterTest<C extends OutputCommitter>
       extends JobCommitterTest<C> {
     private static final TaskAttemptID AID = new TaskAttemptID(

@@ -313,10 +313,10 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
         .load(fs, pendingDataPath);
     persisted.validate();
     assertTrue("created timestamp wrong in " + persisted,
-        persisted.created > 0);
+        persisted.getCreated() > 0);
     assertTrue("saved timestamp wrong in " + persisted,
-        persisted.saved > 0);
-    List<String> etags = persisted.etags;
+        persisted.getSaved() > 0);
+    List<String> etags = persisted.getEtags();
     assertEquals("etag list " + persisted, 1, etags.size());
     List<PartETag> partList = CommitUtils.toPartEtags(etags);
     assertEquals("part list " + persisted, 1, partList.size());

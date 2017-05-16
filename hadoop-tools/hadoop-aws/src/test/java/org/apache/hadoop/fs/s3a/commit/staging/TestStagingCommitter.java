@@ -231,11 +231,11 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     MultiplePendingCommits pending = MultiplePendingCommits.load(dfs,
         stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
-    SinglePendingCommit commit = pending.commits.get(0);
+    SinglePendingCommit commit = pending.getCommits().get(0);
     assertEquals("Should write to the correct bucket:" + results,
-        BUCKET, commit.bucket);
+        BUCKET, commit.getBucket());
     assertEquals("Should write to the correct key: " + results,
-        OUTPUT_PREFIX + "/" + file.getName(), commit.destinationKey);
+        OUTPUT_PREFIX + "/" + file.getName(), commit.getDestinationKey());
 
     assertValidUpload(results.getTagsByUpload(), commit);
   }
@@ -293,16 +293,16 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
     List<SinglePendingCommit> pending =
-        MultiplePendingCommits.load(dfs, stats[0].getPath()).commits;
+        MultiplePendingCommits.load(dfs, stats[0].getPath()).getCommits();
     assertEquals("Should have correct number of pending commits",
         files.size(), pending.size());
 
     Set<String> keys = Sets.newHashSet();
     for (SinglePendingCommit commit : pending) {
       assertEquals("Should write to the correct bucket: " + commit,
-          BUCKET, commit.bucket);
+          BUCKET, commit.getBucket());
       assertValidUpload(results.getTagsByUpload(), commit);
-      keys.add(commit.destinationKey);
+      keys.add(commit.getDestinationKey());
     }
 
     assertEquals("Should write to the correct key",
@@ -678,9 +678,9 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private static void assertValidUpload(Map<String, List<String>> parts,
                                         SinglePendingCommit commit) {
     assertTrue("Should commit a valid uploadId",
-        parts.containsKey(commit.uploadId));
+        parts.containsKey(commit.getUploadId()));
 
-    List<String> tags = parts.get(commit.uploadId);
+    List<String> tags = parts.get(commit.getUploadId());
     assertEquals("Should commit the correct number of file parts",
         tags.size(), commit.size());
 

@@ -99,12 +99,12 @@ public class DelayedCommitTracker extends DefaultPutTracker {
         "No uploaded parts to save");
     SinglePendingCommit commitData = new SinglePendingCommit();
     commitData.touch(System.currentTimeMillis());
-    commitData.destinationKey = getDestKey();
-    commitData.bucket = bucket;
-    commitData.uri = path.toUri().toString();
-    commitData.uploadId = uploadId;
-    commitData.text = "";
-    commitData.size = bytesWritten;
+    commitData.setDestinationKey(getDestKey());
+    commitData.setBucket(bucket);
+    commitData.setUri(path.toUri().toString());
+    commitData.setUploadId(uploadId);
+    commitData.setText("");
+    commitData.setSize(bytesWritten);
     commitData.bindCommitData(parts);
     byte[] bytes = commitData.toBytes();
     PutObjectRequest put = writer.newPutRequest(

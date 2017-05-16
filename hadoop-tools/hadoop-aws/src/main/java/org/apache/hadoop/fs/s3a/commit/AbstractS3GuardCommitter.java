@@ -341,7 +341,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       List<SinglePendingCommit> pending) throws IOException {
     List<String> filenames = new ArrayList<>(pending.size());
     for (SinglePendingCommit commit : pending) {
-      filenames.add(commit.destinationKey);
+      filenames.add(commit.getDestinationKey());
     }
     maybeCreateSuccessMarker(context, filenames);
   }
@@ -364,13 +364,13 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER)) {
       // create a success data structure and then save it
       SuccessData successData = new SuccessData();
-      successData.committer = getName();
-      successData.description = getRole();
-      successData.hostname = NetUtils.getLocalHostname();
+      successData.setCommitter(getName());
+      successData.setDescription(getRole());
+      successData.setHostname(NetUtils.getLocalHostname());
       Date now = new Date();
-      successData.timestamp = now.getTime();
-      successData.date = now.toString();
-      successData.filenames = filenames;
+      successData.setTimestamp(now.getTime());
+      successData.setDate(now.toString());
+      successData.setFilenames(filenames);
       commitActions.createSuccessMarker(getOutputPath(), successData);
     }
   }
@@ -468,7 +468,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
           public void run(FileStatus pendingCommitFile) throws IOException {
             MultiplePendingCommits commits = MultiplePendingCommits.load(
                 fs, pendingCommitFile.getPath());
-            pending.addAll(commits.commits);
+            pending.addAll(commits.getCommits());
           }
         });
     return pending;

@@ -286,7 +286,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       // At least one file failed to load
       // revert all which did; report failure with first exception
       LOG.error("At least one commit file could not be read: failing");
-      abortPendingUploads(context, loaded._1().commits,
+      abortPendingUploads(context, loaded._1().getCommits(),
           true);
       throw failures.get(0)._2();
     }
@@ -294,9 +294,9 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     // patch in IDs
     String jobId = String.valueOf(context.getJobID());
     String taskId = String.valueOf(context.getTaskAttemptID());
-    for (SinglePendingCommit commit : commits.commits) {
-      commit.jobId = jobId;
-      commit.taskId = taskId;
+    for (SinglePendingCommit commit : commits.getCommits()) {
+      commit.setJobId(jobId);
+      commit.setTaskId(taskId);
     }
 
     Path jobAttemptPath = getJobAttemptPath(context);

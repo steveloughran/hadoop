@@ -227,8 +227,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     LOG.info("Committer from " + committerFactoryClassname() + "\n{}",
         commitDetails);
     assertEquals("Wrong committer in " + commitDetails,
-        committerName(), successData.committer);
-    List<String> successFiles = successData.filenames;
+        committerName(), successData.getCommitter());
+    List<String> successFiles = successData.getFilenames();
     assertTrue("No filenames in " + commitDetails,
         !successFiles.isEmpty());
     Set<String> summaryKeys = Sets.newHashSet();

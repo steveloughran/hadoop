@@ -30,12 +30,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.PartETag;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -69,58 +65,55 @@ public class SinglePendingCommit extends PersistentCommitData
    */
   private static final long serialVersionUID = 0x10000 + VERSION;
 
-  // This type is serialized/deserilized by Jackson: make all the fields visible
-  // to show what is going on.
-
   /** Version marker. */
-  public int version = VERSION;
+  private int version = VERSION;
 
   /**
    * This is the filename of the pending file itself.
    * Used during processing; it's persistent value, if any, is ignored.
    */
-  public String filename;
+  private String filename;
 
   /** Path URI of the destination. */
-  public String uri = "";
+  private String uri = "";
 
   /** ID of the upload. */
-  public String uploadId;
+  private String uploadId;
 
   /** Destination bucket. */
-  public String bucket;
+  private String bucket;
 
   /** Destination key in the bucket. */
-  public String destinationKey;
+  private String destinationKey;
 
   /** When was the upload created? */
-  public long created;
+  private long created;
 
   /** When was the upload saved? */
-  public long saved;
+  private long saved;
 
   /** timestamp as date; no expectation of parseability. */
-  public String date;
+  private String date;
 
   /** Job ID, if known. */
-  public String jobId = "";
+  private String jobId = "";
 
   /** Task ID, if known. */
-  public String taskId = "";
+  private String taskId = "";
 
   /** Arbitrary notes. */
-  public String text = "";
+  private String text = "";
 
   /** Ordered list of etags. */
-  public List<String> etags;
+  private List<String> etags;
 
   /**
    * Any custom extra data committer subclasses may choose to add.
    */
-  public Map<String, String> extraData = new HashMap<>(0);
+  private Map<String, String> extraData = new HashMap<>(0);
 
   /** Destination file size. */
-  public long size;
+  private long size;
 
   public SinglePendingCommit() {
   }
@@ -249,32 +242,6 @@ public class SinglePendingCommit extends PersistentCommitData
   }
 
   /**
-   * Create a completion request from the operation.
-   * TODO: this is an intermediate operation
-   * @return the request
-   * @throws ValidationFailure if the data is invalid and the request cannot
-   * be created.
-   */
-  public CompleteMultipartUploadRequest newCompleteRequest()
-      throws ValidationFailure {
-    validate();
-    List<PartETag> parts = Lists.newArrayList();
-    for (int i = 0; i < etags.size(); i++) {
-      parts.add(new PartETag(i + 1, etags.get(i)));
-    }
-    return new CompleteMultipartUploadRequest(
-        bucket, destinationKey, uploadId, parts);
-  }
-
-  public DeleteObjectRequest newDeleteRequest() {
-    return new DeleteObjectRequest(bucket, destinationKey);
-  }
-
-  public AbortMultipartUploadRequest newAbortRequest() {
-    return new AbortMultipartUploadRequest(bucket, destinationKey, uploadId);
-  }
-
-  /**
    * Build the destination path of the object.
    * @return the path
    * @throws IllegalStateException if the URI is invalid
@@ -305,4 +272,143 @@ public class SinglePendingCommit extends PersistentCommitData
     return etags.iterator();
   }
 
+  /** Version marker. */
+  public int getVersion() {
+    return version;
+  }
+
+  public void setVersion(int version) {
+    this.version = version;
+  }
+
+  /**
+   * This is the filename of the pending file itself.
+   * Used during processing; it's persistent value, if any, is ignored.
+   */
+  public String getFilename() {
+    return filename;
+  }
+
+  public void setFilename(String filename) {
+    this.filename = filename;
+  }
+
+  /** Path URI of the destination. */
+  public String getUri() {
+    return uri;
+  }
+
+  public void setUri(String uri) {
+    this.uri = uri;
+  }
+
+  /** ID of the upload. */
+  public String getUploadId() {
+    return uploadId;
+  }
+
+  public void setUploadId(String uploadId) {
+    this.uploadId = uploadId;
+  }
+
+  /** Destination bucket. */
+  public String getBucket() {
+    return bucket;
+  }
+
+  public void setBucket(String bucket) {
+    this.bucket = bucket;
+  }
+
+  /** Destination key in the bucket. */
+  public String getDestinationKey() {
+    return destinationKey;
+  }
+
+  public void setDestinationKey(String destinationKey) {
+    this.destinationKey = destinationKey;
+  }
+
+  /** When was the upload created? */
+  public long getCreated() {
+    return created;
+  }
+
+  public void setCreated(long created) {
+    this.created = created;
+  }
+
+  /** When was the upload saved? */
+  public long getSaved() {
+    return saved;
+  }
+
+  public void setSaved(long saved) {
+    this.saved = saved;
+  }
+
+  /** timestamp as date; no expectation of parseability. */
+  public String getDate() {
+    return date;
+  }
+
+  public void setDate(String date) {
+    this.date = date;
+  }
+
+  /** Job ID, if known. */
+  public String getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(String jobId) {
+    this.jobId = jobId;
+  }
+
+  /** Task ID, if known. */
+  public String getTaskId() {
+    return taskId;
+  }
+
+  public void setTaskId(String taskId) {
+    this.taskId = taskId;
+  }
+
+  /** Arbitrary notes. */
+  public String getText() {
+    return text;
+  }
+
+  public void setText(String text) {
+    this.text = text;
+  }
+
+  /** Ordered list of etags. */
+  public List<String> getEtags() {
+    return etags;
+  }
+
+  public void setEtags(List<String> etags) {
+    this.etags = etags;
+  }
+
+  /**
+   * Any custom extra data committer subclasses may choose to add.
+   */
+  public Map<String, String> getExtraData() {
+    return extraData;
+  }
+
+  public void setExtraData(Map<String, String> extraData) {
+    this.extraData = extraData;
+  }
+
+  /** Destination file size. */
+  public long getSize() {
+    return size;
+  }
+
+  public void setSize(long size) {
+    this.size = size;
+  }
 }

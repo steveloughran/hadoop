@@ -102,7 +102,7 @@ public class FileCommitActions {
    * @throws IOException on a failure
    */
   public void commitOrFail(SinglePendingCommit commit) throws IOException {
-    commit(commit, commit.filename).maybeRethrow();
+    commit(commit, commit.getFilename()).maybeRethrow();
   }
 
   /**
@@ -118,12 +118,12 @@ public class FileCommitActions {
     String destKey = "unknown destination";
     try {
       commit.validate();
-      destKey = commit.destinationKey;
+      destKey = commit.getDestinationKey();
       // finalize the commit
       writer(destKey).completeMultipartCommit(destKey,
-          commit.uploadId,
-          CommitUtils.toPartEtags(commit.etags),
-          commit.size);
+          commit.getUploadId(),
+          CommitUtils.toPartEtags(commit.getEtags()),
+          commit.getSize());
       LOG.debug("Successful commit");
       outcome = commitSuccess(origin, destKey);
     } catch (IOException e) {
@@ -163,7 +163,7 @@ public class FileCommitActions {
       throws FileNotFoundException, ValidationFailure, IOException {
     commit.validate();
     // this will force an existence check
-    Path path = fs.keyToQualifiedPath(commit.destinationKey);
+    Path path = fs.keyToQualifiedPath(commit.getDestinationKey());
     FileStatus status = fs.getFileStatus(
         path);
     LOG.debug("Destination entry: {}", status);
@@ -186,9 +186,9 @@ public class FileCommitActions {
         results
         = loadSinglePendingCommits(pendingDir, recursive);
     final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
-    for (SinglePendingCommit singlePendingCommit : results._1().commits) {
+    for (SinglePendingCommit singlePendingCommit : results._1().getCommits()) {
       CommitFileOutcome commit = commit(singlePendingCommit,
-          singlePendingCommit.filename);
+          singlePendingCommit.getFilename());
       outcome.add(commit);
     }
     LOG.info("Committed operations: {}", outcome);
@@ -289,8 +289,8 @@ public class FileCommitActions {
    */
   public CommitFileOutcome abort(SinglePendingCommit commit) {
     CommitFileOutcome outcome;
-    String destKey = commit.destinationKey;
-    String origin = commit.filename;
+    String destKey = commit.getDestinationKey();
+    String origin = commit.getFilename();
     try {
       abortSingleCommit(commit);
       outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
@@ -317,11 +317,11 @@ public class FileCommitActions {
    */
   public void abortSingleCommit(SinglePendingCommit commit)
       throws IOException {
-    String destKey = commit.destinationKey;
-    String origin = commit.filename !=null ?
-        (" defined in " + commit.filename)
+    String destKey = commit.getDestinationKey();
+    String origin = commit.getFilename() !=null ?
+        (" defined in " + commit.getFilename())
         : "";
-    String uploadId = commit.uploadId;
+    String uploadId = commit.getUploadId();
     LOG.info("Aborting commit to object {}{}",
         destKey, origin);
     abortMultipartCommit(destKey, uploadId);
@@ -414,7 +414,7 @@ public class FileCommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.warn("Revert {}", commit);
-    writer(commit.destinationKey).revertCommit(commit.destinationKey);
+    writer(commit.getDestinationKey()).revertCommit(commit.getDestinationKey());
   }
 
   /**
@@ -455,13 +455,13 @@ public class FileCommitActions {
       long length = localFile.length();
 
       SinglePendingCommit commitData = new SinglePendingCommit();
-      commitData.destinationKey = key;
-      commitData.bucket = bucket;
+      commitData.setDestinationKey(key);
+      commitData.setBucket(bucket);
       commitData.touch(System.currentTimeMillis());
-      commitData.uploadId = uploadId;
-      commitData.uri = destURI;
-      commitData.text = partition != null ? "partition: " + partition : "";
-      commitData.size = length;
+      commitData.setUploadId(uploadId);
+      commitData.setUri(destURI);
+      commitData.setText(partition != null ? "partition: " + partition : "");
+      commitData.setSize(length);
 
       long offset = 0;
       long numParts = (length / uploadPartSize +
