@@ -51,7 +51,7 @@ public class LoggingTextOutputFormat<K, V> extends TextOutputFormat<K, V> {
       throws IOException, InterruptedException {
     Configuration conf = job.getConfiguration();
     boolean isCompressed = getCompressOutput(job);
-    String keyValueSeparator = conf.get(SEPERATOR, "\t");
+    String keyValueSeparator = conf.get(SEPARATOR, "\t");
     CompressionCodec codec = null;
     String extension = "";
     if (isCompressed) {

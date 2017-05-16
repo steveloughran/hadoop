@@ -43,14 +43,35 @@ public final class Tasks {
   private Tasks() {
   }
 
-  public interface FailureTask<I, E extends Exception> {
-    void run(I item, Exception exception) throws E;
-  }
-
+  /**
+   * Callback invoked to process an item.
+   * @param <I> item type being processed
+   * @param <E> exception class which may be raised
+   */
   public interface Task<I, E extends Exception> {
     void run(I item) throws E;
   }
 
+  /**
+   * Callback invoked on a failure.
+   * @param <I> item type being processed
+   * @param <E> exception class which may be raised
+   */
+  public interface FailureTask<I, E extends Exception> {
+
+    /**
+     * process a failure.
+     * @param item item the task is processing
+     * @param exception the exception which was raised.
+     * @throws E Exception of type E
+     */
+    void run(I item, Exception exception) throws E;
+  }
+
+  /**
+   * Builder for task execution.
+   * @param <I> item type
+   */
   public static class Builder<I> {
     private final Iterable<I> items;
     private ExecutorService service = null;
@@ -62,10 +83,20 @@ public final class Tasks {
     private Task<I, ?> abortTask = null;
     private boolean stopAbortsOnFailure = false;
 
+    /**
+     * Create the builder.
+     * @param items items to process
+     */
     Builder(Iterable<I> items) {
       this.items = items;
     }
 
+    /**
+     * Declare executor service: if null, the tasks are executed in a single
+     * thread.
+     * @param executorService service to schedule tasks with.
+     * @return this builder.
+     */
     public Builder<I> executeWith(ExecutorService executorService) {
       this.service = executorService;
       return this;

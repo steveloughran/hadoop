@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.List;
 
-import com.amazonaws.services.s3.AmazonS3;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

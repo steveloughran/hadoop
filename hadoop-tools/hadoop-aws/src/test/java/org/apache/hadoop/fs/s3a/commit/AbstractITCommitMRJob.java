@@ -18,12 +18,26 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
 import com.google.common.collect.Sets;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.StorageStatisticsTracker;
@@ -40,20 +54,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.hadoop.service.ServiceOperations;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
@@ -242,15 +242,22 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
   /**
    * Override point to let implementations tune the MR Job conf.
-   * @param conf configuration
+   * @param c configuration
    */
-  protected void applyCustomConfigOptions(Configuration conf) {
+  protected void applyCustomConfigOptions(Configuration c) {
 
   }
 
+  /**
+   * Override point for any committer specific validation operations,
+   * called after the base assertions have all passed
+   * @param destPath destination of work
+   * @param successData loaded success data
+   * @throws Exception
+   */
   protected void customPostExecutionValidation(Path destPath,
       SuccessData successData)
-      throws IOException {
+      throws Exception {
 
   }
 

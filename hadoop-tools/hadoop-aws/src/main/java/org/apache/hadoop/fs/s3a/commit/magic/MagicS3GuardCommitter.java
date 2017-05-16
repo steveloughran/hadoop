@@ -305,7 +305,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
         taskAttemptID.getTaskID().toString() +
         CommitConstants.PENDINGSET_SUFFIX);
     LOG.info("Saving work of {} to {}", taskAttemptID, taskOutcomePath);
-    commits.save(getDestFS(),taskOutcomePath, false);
+    commits.save(getDestFS(), taskOutcomePath, false);
     return commits;
   }
 

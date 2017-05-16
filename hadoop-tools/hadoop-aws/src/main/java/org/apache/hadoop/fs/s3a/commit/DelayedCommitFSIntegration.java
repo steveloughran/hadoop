@@ -34,7 +34,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  * This class can be instantiated even when delayed commit is disabled;
  * in this case:
  * <ol>
- *   <li>{@link #isDelayedCompletePath(Path)} will always return false<./li>
+ *   <li>{@link #isDelayedCompletePath(Path)} will always return false.</li>
  *   <li>{@link #getTracker(Path, String)} will always return an instance
  *   of {@link DefaultPutTracker}.</li>
  * </ol>

@@ -522,9 +522,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Verify that recovery doesn't work for these committers.
-   * @throws Exception
    */
   @Test
+  @SuppressWarnings("deprecation")
   public void testRecoveryAndCleanup() throws Exception {
     describe("Test (unsupported) task recovery.");
     JobData jobData = startJob(true);
@@ -570,7 +570,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * file existence and contents, as well as optionally, the success marker.
    * @param dir directory to scan.
    * @param expectSuccessMarker check the success marker?
-   * @throws IOException
+   * @throws IOException failure.
    */
   private void validateContent(Path dir, boolean expectSuccessMarker)
       throws IOException {
@@ -1029,7 +1029,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     MapFile.Reader[] parts = new MapFile.Reader[names.length];
     for (int i = 0; i < names.length; i++) {
-      parts[i] = new MapFile.Reader(fs, names[i].toString(), conf);
+      parts[i] = new MapFile.Reader(names[i], conf);
     }
     return parts;
   }

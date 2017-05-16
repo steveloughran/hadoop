@@ -47,7 +47,7 @@ class AwsCall {
   }
 
   /**
-   * Execute an operation with no result
+   * Execute an operation with no result.
    * @param action action to execute (used in error messages)
    * @param path path of work (used in error messages)
    * @param operation operation to execute
@@ -63,7 +63,7 @@ class AwsCall {
   }
 
   /**
-   * Arbitrary operation throwing an IOException
+   * Arbitrary operation throwing an IOException.
    * @param <T> return type
    */
   interface Operation<T> {
@@ -71,7 +71,7 @@ class AwsCall {
   }
 
   /**
-   * Void operation which may raise an IOException
+   * Void operation which may raise an IOException.
    */
   interface VoidOperation {
     void execute() throws IOException;

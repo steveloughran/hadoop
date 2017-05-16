@@ -133,7 +133,12 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         role, jobName(context), jobIdString(context));
   }
 
-  /** TESTING ONLY; allows mock FS to cheat. */
+  /**
+   * Init the output filesystem and path.
+   * TESTING ONLY; allows mock FS to cheat.
+   * @param out output path
+   * @throws IOException failure to create the FS.
+   */
   protected void initOutput(Path out) throws IOException {
     FileSystem fs = getDestination(out, getConf());
     setDestFS(fs);
@@ -157,7 +162,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * Set the output path
+   * Set the output path.
    * @param outputPath new value
    */
   protected void setOutputPath(Path outputPath) {
@@ -193,11 +198,10 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * Get the destination FS, on demand if it is not already set.
+   * Get the destination FS, creating it on demand if needed.
    * @return the filesystem; requires the output path to be set up
    * @throws IOException if the FS cannot be instantiated.
    */
-
   public FileSystem getDestFS() throws IOException {
     if (destFS == null) {
       FileSystem fs = getDestination(outputPath, getConf());
@@ -274,7 +278,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   public abstract Path getTempTaskAttemptPath(TaskAttemptContext context);
 
   /**
-   * Get the name of this committer
+   * Get the name of this committer.
    * @return the committer name.
    */
   public abstract String getName();
@@ -559,6 +563,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public void cleanupJob(JobContext context) throws IOException {
     String r = getRole();
     String id = jobIdString(context);
@@ -621,7 +626,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   }
 
   /**
-   * Delete the task attempt path without raising any errors
+   * Delete the task attempt path without raising any errors.
    * @param context task context
    */
   protected void deleteTaskAttemptPathQuietly(TaskAttemptContext context) {

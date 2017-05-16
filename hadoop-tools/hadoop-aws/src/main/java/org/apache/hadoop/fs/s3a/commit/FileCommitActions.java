@@ -79,6 +79,7 @@ public class FileCommitActions {
    * Commit a pending file, then delete the data.
    * @param pendingFile path to the pending data
    * @return the outcome
+   * @throws IOException on a failure
    */
   public CommitFileOutcome commitPendingFile(Path pendingFile)
       throws IOException {
@@ -96,7 +97,7 @@ public class FileCommitActions {
   }
 
   /**
-   * Commit the operation, throwing an exception on any failure
+   * Commit the operation, throwing an exception on any failure.
    * @param commit commit to execute
    * @throws IOException on a failure
    */
@@ -527,6 +528,7 @@ public class FileCommitActions {
     /**
      * Add a failure.
      * @param pending pending path
+     * @param destination destination path
      * @param exception the exception causing the failure
      */
     public void failure(Path pending, String destination,
@@ -535,7 +537,7 @@ public class FileCommitActions {
     }
 
     /**
-     * Select all outcomes of a specific type
+     * Select all outcomes of a specific type.
      * @param expected expected outcome
      * @return an iterator over all values matching the expected type.
      */
@@ -545,7 +547,7 @@ public class FileCommitActions {
     }
 
     /**
-     * Predicate: does the outcome list include an entry of the given type
+     * Predicate: does the outcome list include an entry of the given type?
      * @param expected expected value
      * @return true if such an outcome exists
      */

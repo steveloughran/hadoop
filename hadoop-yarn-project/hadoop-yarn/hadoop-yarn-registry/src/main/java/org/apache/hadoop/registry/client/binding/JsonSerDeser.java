@@ -24,6 +24,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.registry.client.exceptions.InvalidRecordException;
 import org.apache.hadoop.registry.client.exceptions.NoRecordException;
+import org.apache.hadoop.util.JsonSerialization;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.io.IOException;
 /**
  * Support for marshalling objects to and from JSON.
  *  <p>
- * This extends {@link org.apache.hadoop.util.JsonSerDeser} with the notion
+ * This extends {@link JsonSerialization} with the notion
  * of a marker field in the JSON file, with
  * <ol>
  *   <li>a fail-fast check for it before even trying to parse.</li>
@@ -44,7 +45,7 @@ import java.io.IOException;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class JsonSerDeser<T> extends org.apache.hadoop.util.JsonSerDeser<T> {
+public class JsonSerDeser<T> extends JsonSerialization<T> {
 
   private static final String UTF_8 = "UTF-8";
   public static final String E_NO_DATA = "No data at path";

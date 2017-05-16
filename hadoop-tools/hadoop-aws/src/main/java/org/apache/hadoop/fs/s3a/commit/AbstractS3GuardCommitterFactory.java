@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
@@ -34,8 +33,8 @@ import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 /**
  * Dynamically create the output committer based on the filesystem type.
- * For S3A output, uses the {@link MagicS3GuardCommitter}; for other filesystems
- * use the classic committer.
+ * For S3A output, uses the committer provided in the implementation class.
+ * For other filesystems, returns the classic committer.
  */
 public abstract class AbstractS3GuardCommitterFactory
     extends PathOutputCommitterFactory {
@@ -59,9 +58,8 @@ public abstract class AbstractS3GuardCommitterFactory
     return outputCommitter;
   }
 
-
   /**
-   * Get the destination filesystem, returning null if there is one.
+   * Get the destination filesystem, returning null if there is none.
    * Code using this must explicitly or implicitly look for a null value
    * in the response.
    * @param outputPath output path
@@ -98,7 +96,7 @@ public abstract class AbstractS3GuardCommitterFactory
   }
 
   /**
-   * Override point: create a job committer for a specific filesystem
+   * Implementation point: create a job committer for a specific filesystem.
    * @param fileSystem destination FS.
    * @param outputPath final output path for work
    * @param context job context
@@ -112,7 +110,7 @@ public abstract class AbstractS3GuardCommitterFactory
       JobContext context) throws IOException;
 
   /**
-   * Override point: create a task committer for a specific filesystem
+   * Implementation point: create a task committer for a specific filesystem.
    * @param fileSystem destination FS.
    * @param outputPath final output path for work
    * @param context task context

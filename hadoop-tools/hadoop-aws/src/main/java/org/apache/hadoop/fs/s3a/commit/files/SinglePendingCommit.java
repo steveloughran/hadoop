@@ -43,7 +43,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
-import org.apache.hadoop.util.JsonSerDeser;
+import org.apache.hadoop.util.JsonSerialization;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
 import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
@@ -129,8 +129,8 @@ public class SinglePendingCommit extends PersistentCommitData
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  public static JsonSerDeser<SinglePendingCommit> serializer() {
-    return new JsonSerDeser<>(SinglePendingCommit.class, false, true);
+  public static JsonSerialization<SinglePendingCommit> serializer() {
+    return new JsonSerialization<>(SinglePendingCommit.class, false, true);
   }
 
   /**
@@ -177,6 +177,7 @@ public class SinglePendingCommit extends PersistentCommitData
   /**
    * Set the commit data.
    * @param parts ordered list of etags.
+   * @throws ValidationFailure if the data is invalid
    */
   public void bindCommitData(List<PartETag> parts) throws ValidationFailure {
     etags = new ArrayList<>(parts.size());

@@ -58,8 +58,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
       LoggerFactory.getLogger(MockS3AFileSystem.class);
 
   private final S3AFileSystem mock;
-  private final Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors>
-      outcome;
+  private final Pair<StagingTestBase.ClientResults,
+      StagingTestBase.ClientErrors> outcome;
   public static final int LOG_NONE = 0;
   public static final int LOG_NAME = 1;
   public static final int LOG_STACK = 2;
@@ -74,7 +74,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   public Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors>
-    getOutcome() {
+  getOutcome() {
     return outcome;
   }
 
@@ -253,6 +253,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public long getDefaultBlockSize() {
     return mock.getDefaultBlockSize();
   }

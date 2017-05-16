@@ -173,7 +173,15 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     // forces evaluation and caching of the resolution mode.
     ConflictResolution mode = getConflictResolutionMode(getJobContext());
     LOG.debug("Conflict resolution mode: {}", mode);
-    initPathFields(getJobContext());
+    JobContext context = getJobContext();
+    finalOutputPath = getFinalOutputPath(constructorOutputPath, context);
+    Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
+    S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
+        context.getConfiguration(), false);
+    bucket = fs.getBucket();
+    s3KeyPrefix = fs.pathToKey(finalOutputPath);
+    LOG.debug("{}: final output path is {}", getRole(), finalOutputPath);
+    setOutputPath(finalOutputPath);
   }
 
   @Override
@@ -272,6 +280,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     }
   }
 
+  /**
+   * The staging committers do not require "magic" commit support.
+   * @return false
+   */
   @Override
   protected boolean isDelayedCommitRequired() {
     return false;
@@ -290,6 +302,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context the context of the job.  This is used to get the
    * application attempt ID.
    * @return the FS to store job attempt data.
+   * @throws IOException failure to create the FS.
    */
   public FileSystem getJobAttemptFileSystem(JobContext context)
       throws IOException {
@@ -448,6 +461,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param relative the path of a file relative to the task attempt path
    * @param context the JobContext or TaskAttemptContext for this job
    * @return the S3 key where the file will be uploaded
+   * @throws IOException on a failure
    */
   protected String getFinalKey(String relative, JobContext context)
       throws IOException {
@@ -466,6 +480,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param relative the path of a file relative to the task attempt path
    * @param context the JobContext or TaskAttemptContext for this job
    * @return the S3 Path where the file will be uploaded
+   * @throws IOException on a failure
    */
   protected final Path getFinalPath(String relative, JobContext context)
       throws IOException {
@@ -549,7 +564,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context job context
    * @return a list of pending uploads. If an exception was swallowed,
    * then this may not match the actual set of pending operations
-   * @throws IOException shouldn't be raised, but retained for compiler
+   * @throws IOException shouldn't be raised, but retained for the compiler
    */
   protected List<SinglePendingCommit> getPendingUploadsToAbort(
       JobContext context) throws IOException {
@@ -648,6 +663,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @throws IOException IO failure.
    */
   @Override
+  @SuppressWarnings("deprecation")
   protected void cleanup(JobContext context, boolean suppressExceptions)
       throws IOException {
     try {
@@ -741,6 +757,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * writing a pending entry for them.
    * @param context task context
    * @param taskOutput list of files from the output
+   * @return number of uploads committed.
    * @throws IOException IO Failures.
    */
   protected int commitTaskInternal(final TaskAttemptContext context,
@@ -902,7 +919,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       }
     } catch (IOException e) {
       // the attempt to build the working path failed
-      LOG.debug("{}: Failed to delete working path" , getRole(), e);
+      LOG.debug("{}: Failed to delete working path", getRole(), e);
     }
   }
 
@@ -919,42 +936,19 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   /**
    * Get the output path.
-   * This will dynamically set {@code finalOutputPath} if it is unset.
    * @param context job context
    * @return the output path
    */
-  protected final Path getOutputPath(JobContext context)
-      throws IOException {
-    if (finalOutputPath == null) {
-      initPathFields(context);
-    }
+  protected final Path getOutputPath(JobContext context) throws IOException {
     return finalOutputPath;
   }
 
   /**
-   * The final output path
+   * The final output path.
    * @return the path where output will finally go.
    */
   private Path getFinalOutputPath() {
     return finalOutputPath;
-  }
-
-  /**
-   * Initialize path fields
-   * @param context job context
-   * @throws IOException failure to load the filesystem
-   */
-  private synchronized void initPathFields(JobContext context)
-      throws IOException {
-    this.finalOutputPath = getFinalOutputPath(constructorOutputPath, context);
-    Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
-
-    S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
-        context.getConfiguration(), false);
-    this.bucket = fs.getBucket();
-    this.s3KeyPrefix = fs.pathToKey(finalOutputPath);
-    LOG.debug("{}: final output path is {}", getRole(), finalOutputPath);
-    setOutputPath(finalOutputPath);
   }
 
   /**
@@ -964,24 +958,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @throws IOException failure to load the filesystem
    */
   private String getBucket(JobContext context) throws IOException {
-    if (bucket == null) {
-      // getting the output path sets the bucket from the path
-      initPathFields(context);
-    }
     return bucket;
   }
 
   /**
-   * Get the key of the destination "directory" of the job/task
+   * Get the key of the destination "directory" of the job/task,
    * @param context job context
    * @return key to write to
    * @throws IOException failure to load the filesystem
    */
   private String getS3KeyPrefix(JobContext context) throws IOException {
-    if (s3KeyPrefix == null) {
-      // getting the output path sets the s3 key prefix from the path
-      initPathFields(context);
-    }
     return s3KeyPrefix;
   }
 

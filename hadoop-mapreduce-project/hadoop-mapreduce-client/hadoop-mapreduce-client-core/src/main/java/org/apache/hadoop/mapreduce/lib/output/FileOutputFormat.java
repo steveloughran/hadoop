@@ -294,7 +294,7 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
    * Get the default path and filename for the output format.
    * @param context the task context
    * @param extension an extension to add to the filename
-   * @return a full path such as {@code $output/_temporary/$taskid/part-[mr]-$id}
+   * @return a full path $output/_temporary/$taskid/part-[mr]-$id
    * @throws IOException
    */
   public Path getDefaultWorkFile(TaskAttemptContext context,

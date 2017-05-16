@@ -50,9 +50,9 @@ public final class Paths {
    *
    * Examples:
    * <pre>
-   *   /example/part-0000  ==> /example/part-0000-0ab34
-   *   /example/part-0001.gz.csv  ==> /example/part-0001-0ab34.gz.csv
-   *   /example/part-0002-0abc3.gz.csv  ==> /example/part-0002-0abc3.gz.csv
+   *   /example/part-0000  ==&gt; /example/part-0000-0ab34
+   *   /example/part-0001.gz.csv  ==&gt; /example/part-0001-0ab34.gz.csv
+   *   /example/part-0002-0abc3.gz.csv  ==&gt; /example/part-0002-0abc3.gz.csv
    * </pre>
    *
    * @param pathStr path as a string
@@ -100,7 +100,8 @@ public final class Paths {
    */
   public static Pair<String, String> splitFilename(String pathStr) {
     int lastSlash = pathStr.lastIndexOf('/');
-    return Pair.of(pathStr.substring(0, lastSlash), pathStr.substring(lastSlash + 1));
+    return Pair.of(pathStr.substring(0, lastSlash),
+        pathStr.substring(lastSlash + 1));
   }
 
   /**
@@ -126,7 +127,7 @@ public final class Paths {
    * @return the relative path
    */
   public static String getRelativePath(Path basePath,
-                                       Path fullPath) {
+      Path fullPath) {
     //
     // Use URI.create(Path#toString) to avoid URI character escape bugs
     URI relative = URI.create(basePath.toString())
@@ -141,7 +142,7 @@ public final class Paths {
    * @param child child entries. "" elements are skipped.
    * @return the full child path.
    */
-  public static Path path(Path parent, String ...child) {
+  public static Path path(Path parent, String... child) {
     Path p = parent;
     for (String c : child) {
       if (!c.isEmpty()) {
@@ -152,7 +153,7 @@ public final class Paths {
   }
 
   /**
-   * Get the local task attempt temporary directory
+   * Get the task attempt temporary directory in the local filesystem.
    * @param conf configuration
    * @param uuid some UUID, such as a job UUID
    * @param attempt attempt ID
@@ -172,9 +173,11 @@ public final class Paths {
   /**
    * Try to come up with a good temp directory for different filesystems.
    * @param fs filesystem
+   * @param conf configuration
    * @return a path under which temporary work can go.
    */
-  public static Path tempDirForFileSystem(Configuration conf, FileSystem fs) {
+  public static Path tempDirForFileSystem(FileSystem fs,
+      Configuration conf) {
     Path temp;
     switch (fs.getScheme()) {
     case "file":
@@ -215,7 +218,7 @@ public final class Paths {
    */
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
       String uuid) throws IOException {
-    Path userTmp = new Path(tempDirForFileSystem(conf, FileSystem.get(conf)),
+    Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf), conf),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
     return new Path(work, StagingCommitterConstants.STAGING_UPLOADS);
@@ -237,14 +240,14 @@ public final class Paths {
    */
   static final class HiddenPathFilter implements PathFilter {
     private static final HiddenPathFilter INSTANCE = new HiddenPathFilter();
-  
+
     public static HiddenPathFilter get() {
       return INSTANCE;
     }
-  
+
     private HiddenPathFilter() {
     }
-  
+
     @Override
     public boolean accept(Path path) {
       return !path.getName().startsWith(".")

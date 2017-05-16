@@ -18,15 +18,14 @@
 
 package org.apache.hadoop.fs.s3a;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.StorageStatistics;
-
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import com.google.common.base.Joiner;
+
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.StorageStatistics;
 
 /**
  * Class to track storage statistics of a filesystem, generate diffs.

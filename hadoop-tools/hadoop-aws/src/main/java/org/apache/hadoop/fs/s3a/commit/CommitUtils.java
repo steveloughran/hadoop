@@ -315,9 +315,10 @@ public final class CommitUtils {
    * @param path path to examine
    * @param conf config
    * @param magicCommitRequired is delayed complete requires of the FS
+   * @return the filesystem
    * @throws PathCommitException output path isn't to an S3A FS instance, or
    * if {@code magicCommitRequired} is set, if doesn't support these commits.
-   * @throws IOException failure to instantiate the FS.
+   * @throws IOException failure to instantiate the FS
    */
   public static S3AFileSystem getS3AFileSystem(Path path,
       Configuration conf,
@@ -373,11 +374,12 @@ public final class CommitUtils {
   /**
    * Compute the path where the output of pending task attempts are stored.
    * @param context the context of the job with pending tasks.
+   * @param dest destination of work
    * @return the path where the output of pending task attempts are stored.
    */
-  public static Path getMagicTaskAttemptsPath(JobContext context, Path out) {
+  public static Path getMagicTaskAttemptsPath(JobContext context, Path dest) {
     return new Path(getMagicJobAttemptPath(
-        getAppAttemptId(context), out), "tasks");
+        getAppAttemptId(context), dest), "tasks");
   }
 
   /**
@@ -391,8 +393,7 @@ public final class CommitUtils {
    */
   public static Path getMagicTaskAttemptPath(TaskAttemptContext context,
       Path dest) {
-    return new Path(getBaseMagicTaskAttemptPath(context, dest),
-        BASE_PATH);
+    return new Path(getBaseMagicTaskAttemptPath(context, dest), BASE_PATH);
   }
 
   /**

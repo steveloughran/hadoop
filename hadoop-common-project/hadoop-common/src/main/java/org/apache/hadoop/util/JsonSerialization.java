@@ -51,14 +51,14 @@ import java.io.InputStream;
  * which use the mapper.
  *
  * This method was copied from
- * {@code org.apache.hadoop.registry.client.binding.JsonSerDeser}.
+ * {@code org.apache.hadoop.registry.client.binding.JsonSerialization}.
  * @param <T> Type to marshal.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class JsonSerDeser<T> {
+public class JsonSerialization<T> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonSerDeser.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JsonSerialization.class);
   private static final String UTF_8 = "UTF-8";
 
   private final Class<T> classType;
@@ -70,7 +70,7 @@ public class JsonSerDeser<T> {
    * @param failOnUnknownProperties fail if an unknown property is encountered.
    * @param pretty generate pretty (indented) output?
    */
-  public JsonSerDeser(Class<T> classType,
+  public JsonSerialization(Class<T> classType,
       boolean failOnUnknownProperties, boolean pretty) {
     Preconditions.checkArgument(classType != null, "null classType");
     this.classType = classType;

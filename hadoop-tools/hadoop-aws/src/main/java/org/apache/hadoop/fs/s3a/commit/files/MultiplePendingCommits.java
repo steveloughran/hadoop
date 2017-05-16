@@ -35,7 +35,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
-import org.apache.hadoop.util.JsonSerDeser;
+import org.apache.hadoop.util.JsonSerialization;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.validateCollectionClass;
 import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
@@ -90,8 +90,8 @@ public class MultiplePendingCommits extends PersistentCommitData {
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  public static JsonSerDeser<MultiplePendingCommits> serializer() {
-    return new JsonSerDeser<>(MultiplePendingCommits.class, false, true);
+  public static JsonSerialization<MultiplePendingCommits> serializer() {
+    return new JsonSerialization<>(MultiplePendingCommits.class, false, true);
   }
 
   /**

@@ -108,6 +108,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void cleanupJob(JobContext context) throws IOException {
       injection.cleanupJob(context);
       super.cleanupJob(context);

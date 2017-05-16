@@ -21,14 +21,14 @@ package org.apache.hadoop.fs.s3a.commit;
 import java.io.IOException;
 
 /**
- * Exception raised on validation failures; kept as an IOE for consistency
- * with other failures.
+ * Exception raised on validation failures; kept as an IOException
+ * for consistency with other failures.
  */
 public class ValidationFailure extends IOException {
 
   /**
    * Create an instance with string formatting applied to the message
-   * and arguments
+   * and arguments.
    * @param message error message
    * @param args optional list of arguments
    */

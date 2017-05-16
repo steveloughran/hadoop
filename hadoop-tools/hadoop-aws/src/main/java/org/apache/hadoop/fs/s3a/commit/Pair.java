@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.s3a.commit;
 
 /**
  * A typed tuple.
+ * Accessor names are consistent with those of Scala, which explains why
+ * they aren't that intuitive.
  * @param <L> left element type
  * @param <R> right element type
  */

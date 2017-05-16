@@ -44,13 +44,13 @@ public class ITMagicCommitMRJob extends AbstractITCommitMRJob {
   }
 
   @Override
-  protected void applyCustomConfigOptions(Configuration conf) {
-    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
+  protected void applyCustomConfigOptions(Configuration c) {
+    c.setBoolean(MAGIC_COMMITTER_ENABLED, true);
   }
 
   @Override
   protected void customPostExecutionValidation(Path destPath,
-      SuccessData successData) throws IOException {
+      SuccessData successData) throws Exception {
     assertPathDoesNotExist("No cleanup", new Path(destPath, MAGIC_DIR_NAME));
   }
 }

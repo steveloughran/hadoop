@@ -71,9 +71,15 @@ import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
 import org.apache.hadoop.service.ServiceOperations;
 
-import static org.apache.hadoop.test.LambdaTestUtils.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
+import static org.apache.hadoop.test.LambdaTestUtils.VoidCallable;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Test base for mock tests of staging committers:
@@ -407,7 +413,9 @@ public class StagingTestBase {
       return deletes;
     }
 
-    public void resetDeletes() { deletes.clear(); }
+    public void resetDeletes() {
+      deletes.clear();
+    }
 
     public void resetUploads() {
       uploads.clear();
@@ -724,10 +732,13 @@ public class StagingTestBase {
    * A convenience method to avoid a large number of @Test(expected=...) tests.
    * @param message A String message to describe this assertion
    * @param expected An Exception class that the Runnable should throw
+   * @param expectedMsg optional message expected in the exception text
    * @param runnable A Runnable that is expected to throw the exception
    */
   public static void assertThrows(
-      String message, Class<? extends Exception> expected, String expectedMsg,
+      String message,
+      Class<? extends Exception> expected,
+      String expectedMsg,
       Runnable runnable) throws Exception {
     intercept(expected, expectedMsg, message,
         new VoidCallable() {

@@ -33,7 +33,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.ValidationFailure;
-import org.apache.hadoop.util.JsonSerDeser;
+import org.apache.hadoop.util.JsonSerialization;
 
 /**
  * Summary data saved into a {@code _SUCCESS} marker file.
@@ -86,7 +86,7 @@ public class SuccessData extends PersistentCommitData {
   public Map<String, Long> metrics = new HashMap<>();
 
   /**
-   * Filenames in the commit
+   * Filenames in the commit.
    */
   public List<String> filenames = new ArrayList<>(0);
 
@@ -142,8 +142,8 @@ public class SuccessData extends PersistentCommitData {
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  private static JsonSerDeser<SuccessData> serializer() {
-    return new JsonSerDeser<>(SuccessData.class, false, true);
+  private static JsonSerialization<SuccessData> serializer() {
+    return new JsonSerialization<>(SuccessData.class, false, true);
   }
 
 }

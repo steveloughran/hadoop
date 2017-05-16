@@ -428,8 +428,9 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Set the URI field; exported for testing
-   * @param uri
+   * Set the URI field through {@link S3xLoginHelper}.
+   * Exported for testing.
+   * @param uri filesystem URI.
    */
   @VisibleForTesting
   protected void setUri(URI uri) {
@@ -1176,9 +1177,12 @@ public class S3AFileSystem extends FileSystem {
    * Increments the {@code OBJECT_DELETE_REQUESTS} and write
    * operation statistics.
    * @param key key to blob to delete.
+   * @throws AmazonClientException problems working with S3
+   * @throws IOException IO failure
    */
   @VisibleForTesting
-  protected void deleteObject(String key) throws InvalidRequestException {
+  protected void deleteObject(String key)
+      throws AmazonClientException, IOException {
     blockRootDelete(key);
     incrementWriteOperations();
     incrementStatistic(OBJECT_DELETE_REQUESTS);
@@ -2874,6 +2878,7 @@ public class S3AFileSystem extends FileSystem {
    * Listing all multipart uploads; limited to the first few hundred.
    * @return a listing of multipart uploads.
    * @param prefix prefix to scan for, "" for none
+   * @throws IOException IO failure, including any AmazonClientException
    */
   @InterfaceAudience.Private
   public List<MultipartUpload> listMultipartUploads(String prefix)

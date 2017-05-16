@@ -41,8 +41,7 @@ without worrying about the job failing for any queries using `hdfs://` paths as
 the final destination of work.
 
 The Dynamic committer factory is different in that it allows any of the other committer
-factories to be used to create a committer, based on the specific value of the 
-option `fs.s3a.committer.name`:
+factories to be used to create a committer, based on the specific value of theoption `fs.s3a.committer.name`:
 
 | value of `fs.s3a.committer.name` |  meaning |
 |--------|---------|
@@ -76,17 +75,17 @@ The initial option set:
 | `fs.s3a.buffer.dir` | Directory in local filesystem under which data is saved before being uploaded |
 
 Generated files are initially written to a local directory underneath one of the temporary
-directories listed in `fs.s3a.buffer.dir`.  
+directories listed in `fs.s3a.buffer.dir`.
 
 Temporary files are saved in HDFS (or other cluster filesystem )under the path
 `${fs.s3a.committer.tmp.path}/${user}` where `user` is the name of the user running the job.
-The default value of `fs.s3a.committer.tmp.path` is `/tmp`, so the temporary directory 
+The default value of `fs.s3a.committer.tmp.path` is `/tmp`, so the temporary directory
 for any application attempt will be a path `/tmp/${user}.
 In the special case in which the local `file:` filesystem is the cluster filesystem, the
 location of the temporary directory is that of the JVM system property
 `java.io.tmpdir`.
 
-The application attempt ID is used to create a unique path under this directory, 
+The application attempt ID is used to create a unique path under this directory,
 resulting in a path `/tmp/${user}/${application-attempt-id}/` under which
 summary data of each task's pending commits are managed using the standard
 `FileOutputFormat` committer.
@@ -171,7 +170,7 @@ isolate a task from the Job Driver, while the task retains access to S3.
 ## The execution workflow
 
 
-**setup**: 
+**setup**:
 
 * A job is created, assigned a Job ID (YARN?).
 * For each attempt, and attempt ID is created, to build the job attempt ID.
@@ -425,7 +424,7 @@ a multipart request with the final destination of `/results/latest/latest.orc.lz
 individual multipart PUT opreations
 
 1. On `close()`, summary data would be written to the file
-`/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`. 
+`/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`.
 This would contain the upload ID and all the parts and etags of uploaded data.
 
 1. The task commit operation would do nothing.
@@ -919,7 +918,7 @@ it chooses the actual committer by way of the new factory mechanism.
 Ultimately, a new Spark committer is going to be the best solution, as it
 can also address temporary files.  Given the difficulties encountered trying
 to get any cloud integration into Spark, this will be done outside the
-spark codebase, with a goal of adding it to Apache Bahir. (Short term: 
+spark codebase, with a goal of adding it to Apache Bahir. (Short term:
 Steve's [spark/cloud test suite](https://github.com/steveloughran/spark-cloud-examples).
 
 
@@ -987,7 +986,7 @@ be resilient to the various failure modes which may arise.
 These S3 committers work by writing task outputs to a temporary directory on the local FS.
 Task outputs are directed to the local FS by `getTaskAttemptPath` and `getWorkPath`.
 On task commit, the committers look for files in the task attempt directory (ignoring hidden files).
-Each file is uploaded to S3 using the [multi-part upload API](http://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html), 
+Each file is uploaded to S3 using the [multi-part upload API](http://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html),
 
 It works by writing all data to the local filesystem, uploading as multipart
 PUT requests at the end of each task, finalizing the PUT in the job commit.
@@ -1009,7 +1008,7 @@ in HDFS, and completes those put requests.
 
 By using `FileOutputCommmitter` to manage the propagation of the lists of files
 to commit, the existing commit algorithm implicitly becomes that defining which
-files will be committed at the end of the job. 
+files will be committed at the end of the job.
 
 
 The Netflix contribution has Hadoop `OutputCommitter` implementations for S3.
@@ -1030,7 +1029,7 @@ Task outputs are directed to the local FS by `getTaskAttemptPath` and `getWorkPa
 ### Conflict resolution
 
 The single-directory and partitioned committers handle conflict resolution by
-checking whether target paths exist in S3 before uploading any data. 
+checking whether target paths exist in S3 before uploading any data.
 There are 3 conflict resolution modes, controlled by setting `fs.s3a.committer.staging.conflict-mode`:
 
 * `fail`: Fail a task if an output directory or partition already exists. (Default)
@@ -1102,11 +1101,11 @@ that the local (pending) data is purged. TODO: test this
 #### Failure during task commit
 
 
-A process failure during the upload process will result in the 
+A process failure during the upload process will result in the
 list of pending multipart PUTs to *not* be persisted to the cluster filesystem.
 This window is smaller than the entire task execution, but still potentially
 significant, at least for large uploads.
- 
+
 Per-file persistence, or incremental overwrites of the upload list may
 reduce the problems here, but there would still be a small risk of
 an outstanding multipart upload not being recorded
@@ -1118,7 +1117,7 @@ Task will delete all local data; no uploads will be initiated.
 #### Failure to communicate with S3 during data upload
 
 If an upload fails, tasks will
- 
+
 * attempt to abort PUT requests already uploaded to S3
 * remove temporary files on the local FS.
 
@@ -1132,7 +1131,7 @@ of all completed tasks can be loaded, the PUT requests aborted.
 #### Executor failure before Job Commit
 
 Consider entire job lost; rerun required. All pending requests for the job
-will need to be identified and cancelled; 
+will need to be identified and cancelled;
 
 #### Executor failure during Job Commit
 
@@ -1144,7 +1143,7 @@ load these and abort them.
 #### Job failure prior to commit
 
 
-* Consider the entire job lost. 
+* Consider the entire job lost.
 * Executing tasks will not complete, and in aborting, delete local data.
 * Tasks which have completed will have pending commits. These will need
 to be identified and cancelled.
@@ -1184,10 +1183,10 @@ operations which will run up bills until cancelled. (as indeed, so does the Magi
 For cleaning up PUT commits, as well as scheduled GC of uncommitted writes, we
 may want to consider having job setup list and cancel all pending commits
 to the destination directory, on the assumption that these are from a previous
-incomplete operation. 
+incomplete operation.
 
 We should adds command to the s3guard CLI to probe for, list and abort pending requests under
-a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <path>`. 
+a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <path>`.
 
 
 
@@ -1197,7 +1196,7 @@ a path, e.g. `--has-pending <path>`, `--list-pending <path>`, `--abort-pending <
 The initial import will retain access to the Amazon S3 client which can be
 obtained from an instance of `S3AFileSystem`, so will share authentication
 and other configuration options.
- 
+
 Full integration must use an instance of `S3AFileSystem.WriteOperationHelper`,
 which supports the operations needed for multipart uploads. This is critical
 to keep ensure S3Guard is included in the operation path, alongside our logging

@@ -62,7 +62,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *   <li>Callbacks to let the FS know of events in the output stream
  *   upload process.</li>
  *   <li>Failure handling, including converting exceptions to IOEs.</li>
- *   <li>Integration with instrumentation and S3Guard<./li>
+ *   <li>Integration with instrumentation and S3Guard.</li>
  * </ul>
  *
  * This API is for internal use only.
@@ -208,6 +208,7 @@ public class WriteOperationHelper {
    * @param destination destination of the commit
    * @param uploadId multipart operation Id
    * @param partETags list of partial uploads
+   * @param length length of the upload
    * @return the result of the operation.
    * @throws IOException on problems.
    */
@@ -223,8 +224,10 @@ public class WriteOperationHelper {
    * Finalize a multipart PUT operation.
    * This completes the upload, and, if that works, calls
    * {@link S3AFileSystem#finishedWrite(String, long)} to update the filesystem.
+   * @param destination destination of the commit
    * @param uploadId multipart operation Id
    * @param partETags list of partial uploads
+   * @param length length of the upload
    * @return the result of the operation.
    * @throws IOException on problems.
    */
@@ -278,15 +281,16 @@ public class WriteOperationHelper {
 
   /**
    * Abort a multipart upload operation.
+   * @param destKey destination key of the upload
    * @param uploadId multipart operation Id
    * @throws AmazonClientException on problems.
    */
-  public void abortMultipartUpload(String uploadKey, String uploadId)
+  public void abortMultipartUpload(String destKey, String uploadId)
       throws AmazonClientException {
-    LOG.debug("Aborting multipart upload {} to {}", uploadId, uploadKey);
+    LOG.debug("Aborting multipart upload {} to {}", uploadId, destKey);
     owner.getAmazonS3Client().abortMultipartUpload(
         new AbortMultipartUploadRequest(owner.getBucket(),
-            uploadKey,
+            destKey,
             uploadId));
   }
 
@@ -396,10 +400,13 @@ public class WriteOperationHelper {
   /**
    * Revert a commit by deleting the file.
    * TODO: Policy regarding creating a mock empty parent directory.
+   * TODO: Delete entirely?
    * @param destKey destination key
    * @throws IOException due to inability to delete a directory or file.
+   * @return was the operation successful (i.e. did it complete without
+   * any error?)
    */
-  public boolean revertCommit(String destKey) throws IOException {
+  public boolean revertCommit(String destKey) {
     try {
       calls.execute("revert commit", destKey,
           () ->
