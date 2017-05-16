@@ -16,15 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging.integration;
-
-import java.io.IOException;
+package org.apache.hadoop.fs.s3a.commit.magic;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitMRJob;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
-import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
@@ -43,11 +40,19 @@ public class ITMagicCommitMRJob extends AbstractITCommitMRJob {
     return MagicS3GuardCommitter.NAME;
   }
 
+  /**
+   * Turn on the magic commit support for the FS, else nothing will work.
+   * @param c configuration
+   */
   @Override
   protected void applyCustomConfigOptions(Configuration c) {
     c.setBoolean(MAGIC_COMMITTER_ENABLED, true);
   }
 
+  /**
+   * Check that the magic dir was cleaned up.
+   * {@inheritDoc}
+   */
   @Override
   protected void customPostExecutionValidation(Path destPath,
       SuccessData successData) throws Exception {

@@ -456,6 +456,7 @@ public class S3AFileSystem extends FileSystem {
    */
   protected void setAmazonS3Client(AmazonS3 client) {
     Preconditions.checkNotNull(client != null, "client");
+    LOG.debug("Setting S3 client to {}", client);
     s3 = client;
   }
 
@@ -1178,11 +1179,12 @@ public class S3AFileSystem extends FileSystem {
    * operation statistics.
    * @param key key to blob to delete.
    * @throws AmazonClientException problems working with S3
-   * @throws IOException IO failure
+   * @throws InvalidRequestException if the request was rejected due to
+   * a mistaken attempt to delete the root directory.
    */
   @VisibleForTesting
   protected void deleteObject(String key)
-      throws AmazonClientException, IOException {
+      throws AmazonClientException, InvalidRequestException {
     blockRootDelete(key);
     incrementWriteOperations();
     incrementStatistic(OBJECT_DELETE_REQUESTS);
@@ -1366,7 +1368,6 @@ public class S3AFileSystem extends FileSystem {
     try {
       PutObjectResult result = s3.putObject(putObjectRequest);
       long putLen = result.getMetadata().getContentLength();
-      putLen = len;
       incrementPutCompletedStatistics(true, putLen);
       // update metadata
       finishedWrite(putObjectRequest.getKey(), putLen);
@@ -2878,7 +2879,7 @@ public class S3AFileSystem extends FileSystem {
    * Listing all multipart uploads; limited to the first few hundred.
    * @return a listing of multipart uploads.
    * @param prefix prefix to scan for, "" for none
-   * @throws IOException IO failure, including any AmazonClientException
+   * @throws IOException IO failure, including any uprated AmazonClientException
    */
   @InterfaceAudience.Private
   public List<MultipartUpload> listMultipartUploads(String prefix)

@@ -37,8 +37,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * A subclass of TextOutputFormat which logs what is happening.
- * Used for testing; we could maybe pull the logging up into the base class for
- * all to enjoy.
+ * Used for testing.
  * @param <K> text key
  * @param <V> text value
  */

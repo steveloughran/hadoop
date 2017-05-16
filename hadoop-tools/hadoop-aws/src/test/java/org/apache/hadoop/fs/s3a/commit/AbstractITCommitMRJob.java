@@ -61,7 +61,7 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 /** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
-  private static final int TEST_FILE_COUNT = 1;
+  private static final int TEST_FILE_COUNT = 8;
   private static MiniDFSTestCluster hdfs;
   private static MiniMRYarnCluster yarn = null;
   private static JobConf conf = null;
@@ -80,7 +80,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     hdfs.init(c);
     hdfs.start();
     conf = c;
-    yarn = new MiniMRYarnCluster("TestMRJob", 2);
+    yarn = new MiniMRYarnCluster("ITCommitMRJob", 2);
     yarn.init(c);
     yarn.start();
   }
@@ -201,6 +201,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     }
 
     applyCustomConfigOptions(jobConf);
+    // fail fast if anything goes wrong
     mrJob.setMaxMapAttempts(1);
 
     mrJob.submit();
@@ -253,7 +254,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
    * called after the base assertions have all passed
    * @param destPath destination of work
    * @param successData loaded success data
-   * @throws Exception
+   * @throws Exception failure
    */
   protected void customPostExecutionValidation(Path destPath,
       SuccessData successData)

@@ -148,7 +148,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     Path jobAttemptPath = getJobAttemptPath(context);
     FileSystem fs = getDestFS();
     FileStatus[] commitFiles = fs.listStatus(jobAttemptPath,
-        PENDING_MANY_FILTER);
+        PENDINGSET_FILTER);
     return loadMultiplePendingCommitFiles(
         context, false, fs,
         commitFiles);
@@ -161,7 +161,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     Path jobAttemptPath = getJobAttemptPath(context);
     FileSystem fs = getDestFS();
     FileStatus[] commitFiles = fs.listStatus(jobAttemptPath,
-        PENDING_MANY_FILTER);
+        PENDINGSET_FILTER);
     fs.listFiles(jobAttemptPath, true);
     List<SinglePendingCommit> commits = loadMultiplePendingCommitFiles(
         context, true, fs, commitFiles);
@@ -365,7 +365,10 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     return CommitUtils.getTempTaskAttemptPath(context, getOutputPath());
   }
 
-  private static final PathFilter PENDING_MANY_FILTER = new PathFilter() {
+  /**
+   * Filter to find all pendingset files only
+   */
+  private static final PathFilter PENDINGSET_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path path) {
       return path.toString().endsWith(CommitConstants.PENDINGSET_SUFFIX);

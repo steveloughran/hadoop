@@ -45,7 +45,12 @@ import org.apache.hadoop.util.Progressable;
 
 /**
  * Relays FS calls to the mocked FS, allows for some extra logging with
- * stack traces to be included. Why? Useful for tracking
+ * stack traces to be included.
+ *
+ * Operations which manipulate instrumentation values are all stubbed out
+ * to avoid raising exceptions.
+ *
+ * The logging is useful for tracking
  * down why there are extra calls to a method than a test would expect:
  * changes in implementation details often trigger such false-positive
  * test failures.
@@ -117,7 +122,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
    * @param client client.
    */
   @Override
-  protected void setAmazonS3Client(AmazonS3 client) {
+  public void setAmazonS3Client(AmazonS3 client) {
     LOG.debug("Setting S3 client to {}", client);
     super.setAmazonS3Client(client);
   }
