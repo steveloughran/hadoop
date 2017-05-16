@@ -309,28 +309,25 @@ public class CommitActions {
    * Upload all the data in the local file, returning the information
    * needed to commit the work.
    * @param localFile local file (be  a file)
+   * @param destPath destination path
    * @param partition partition/subdir. Not used
-   * @param bucket dest bucket
-   * @param key dest key
-   * @param destURI destination
    * @param uploadPartSize size of upload  @return a pending upload entry
    * @return the commit data
    * @throws IOException failure
    */
   public SinglePendingCommit uploadFileToPendingCommit(File localFile,
-      String partition,
-      String bucket,
-      String key,
-      String destURI,
+      Path destPath, String partition,
       long uploadPartSize)
       throws IOException {
 
-    LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
-            " partition={} partSize={}",
-        localFile, bucket, key, partition, uploadPartSize);
+    LOG.debug("Initiating multipart upload from {} to {}",
+        localFile, destPath);
+    Preconditions.checkArgument(destPath != null);
     if (!localFile.isFile()) {
       throw new FileNotFoundException("Not a file: " + localFile);
     }
+    String destURI = destPath.toString();
+    String key = fs.pathToKey(destPath);
     WriteOperationHelper writer = createWriter(key);
     String uploadId = null;
 
@@ -341,7 +338,7 @@ public class CommitActions {
 
       SinglePendingCommit commitData = new SinglePendingCommit();
       commitData.setDestinationKey(key);
-      commitData.setBucket(bucket);
+      commitData.setBucket(fs.getBucket());
       commitData.touch(System.currentTimeMillis());
       commitData.setUploadId(uploadId);
       commitData.setUri(destURI);
@@ -351,6 +348,10 @@ public class CommitActions {
       long offset = 0;
       long numParts = (length / uploadPartSize +
                            ((length % uploadPartSize) > 0 ? 1 : 0));
+      // always write one part, even if it is just an empty one
+      if (numParts == 0) {
+        numParts = 1;
+      }
 
       List<PartETag> parts = new ArrayList<>((int) numParts);
 
@@ -390,7 +391,6 @@ public class CommitActions {
    * A holder for a possible IOException; the call {@link #maybeRethrow()}
    * will throw any exception passed into the constructor, and be a no-op
    * if none was.
-   * Really this should be a Java 8 optional.
    */
   public static class MaybeIOE {
     private final IOException exception;

@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.MAGIC_COMMITTER_ENABLED;
 
 /**
  * Test case for committer operations; sets up the config for delayed commit
@@ -37,6 +38,8 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
+    conf.setBoolean("fs.s3a.impl.disable.cache", true);
+    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.setLong(MIN_MULTIPART_THRESHOLD, MULTIPART_MIN_SIZE);
     conf.setInt(MULTIPART_SIZE, MULTIPART_MIN_SIZE);
     conf.setBoolean(FAST_UPLOAD, true);

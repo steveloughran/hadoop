@@ -21,7 +21,6 @@ package org.apache.hadoop.fs.s3a.commit.staging;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -69,8 +68,8 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *   <li>
  *     Task Commit: list all files under the task working dir, upload
  *     each of them but do not commit the final operation.
- *     Persist the information for each pending commit into a directory
- *     (ISSUE: which FS?) for enumeration by the job committer.
+ *     Persist the information for each pending commit into the cluster
+ *     for enumeration and commit by the job committer.
  *   </li>
  *   <li>Task Abort: recursive delete of task working dir.</li>
  *   <li>Job Commit: list all pending PUTs to commit; commit them.</li>
@@ -80,13 +79,6 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *   </li>
  * </ol>
  * <p>
- * Configuration options:
- * <pre>
- *   : temporary local FS directory
- *   : intermediate directory on a cluster-wide FS (can be HDFS or a consistent
- *   s3 endpoint).
- *
- * </pre>
  */
 
 public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
@@ -100,12 +92,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   private final boolean uniqueFilenames;
   private final FileOutputCommitter wrappedCommitter;
 
-  // lazy variables
   private ConflictResolution conflictResolution = null;
   private Path finalOutputPath = null;
-  private String bucket = null;
   private String s3KeyPrefix = null;
-  private Path bucketRoot = null;
 
   /** The directory in the cluster FS for commits to go to. */
   private Path commitsDirectory;
@@ -178,7 +167,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     Preconditions.checkNotNull(finalOutputPath, "Output path cannot be null");
     S3AFileSystem fs = getS3AFileSystem(finalOutputPath,
         context.getConfiguration(), false);
-    bucket = fs.getBucket();
     s3KeyPrefix = fs.pathToKey(finalOutputPath);
     LOG.debug("{}: final output path is {}", getRole(), finalOutputPath);
     setOutputPath(finalOutputPath);
@@ -484,7 +472,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    */
   protected final Path getFinalPath(String relative, JobContext context)
       throws IOException {
-    return new Path(getBucketRoot(context), getFinalKey(relative, context));
+    return getDestS3AFS().keyToQualifiedPath(getFinalKey(relative, context));
   }
 
   // TODO
@@ -798,7 +786,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
     MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
         commitCount);
-    final String commitBucket = getBucket(context);
     try {
       Tasks.foreach(taskOutput)
           .stopOnFailure()
@@ -808,20 +795,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
             @Override
             public void run(FileStatus stat) throws IOException {
               Path path = stat.getPath();
-              File localFile = new File(
-                  URI.create(path.toString()).getPath());
-              String relative = Paths.getRelativePath(attemptPath,
-                  path);
+              File localFile = new File(path.toUri().getPath());
+              String relative = Paths.getRelativePath(attemptPath, path);
+              // TODO: Why isn't this being used?
               String partition = getPartition(relative);
               String key = getFinalKey(relative, context);
-              String destURI = String.format("s3a://%s/%s", commitBucket, key);
+              Path destPath = getDestS3AFS().keyToQualifiedPath(key);
               SinglePendingCommit commit = getCommitActions()
                   .uploadFileToPendingCommit(
                       localFile,
-                      partition,
-                      commitBucket,
-                      key,
-                      destURI,
+                      destPath, partition,
                       uploadPartSize);
               LOG.debug("{}: adding pending commit {}", getRole(), commit);
               commits.add(commit);
@@ -952,16 +935,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Get the bucket of the final FS of the job.
-   * @param context job context
-   * @return bucket name
-   * @throws IOException failure to load the filesystem
-   */
-  private String getBucket(JobContext context) throws IOException {
-    return bucket;
-  }
-
-  /**
    * Get the key of the destination "directory" of the job/task,
    * @param context job context
    * @return key to write to
@@ -971,21 +944,13 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return s3KeyPrefix;
   }
 
+  /**
+   * A UUID for this upload, as calculated with
+   * {@link #getUploadUUID(Configuration, String)}
+   * @return the UUID for files
+   */
   protected String getUUID() {
     return uuid;
-  }
-
-  /**
-   * Returns the bucket root of the output path.
-   *
-   * @param context the JobContext for this commit
-   * @return a Path that is the root of the output bucket
-   */
-  protected final Path getBucketRoot(JobContext context) throws IOException {
-    if (bucketRoot == null) {
-      this.bucketRoot = Paths.getRoot(getOutputPath(context));
-    }
-    return bucketRoot;
   }
 
   /**

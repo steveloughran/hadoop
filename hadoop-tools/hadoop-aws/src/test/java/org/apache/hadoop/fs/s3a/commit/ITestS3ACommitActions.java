@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -44,22 +46,21 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
+import static org.apache.hadoop.fs.s3a.Constants.*;
 
 /**
  * Test the low-level binding of the S3A FS to the magic commit mechanism,
  * and handling of the commit operations.
  */
-public class ITestS3ACommitOperations extends AbstractCommitITest {
+public class ITestS3ACommitActions extends AbstractCommitITest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ITestS3ACommitOperations.class);
+      LoggerFactory.getLogger(ITestS3ACommitActions.class);
   private static final byte[] DATASET = dataset(1000, 'a', 32);
 
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    conf.setBoolean("fs.s3a.impl.disable.cache", true);
-    conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.CLASSNAME);
     return conf;
@@ -144,7 +145,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     assertPathDoesNotExist("dest file was created", destFile);
   }
 
-  public CommitActions newActions() {
+  private CommitActions newActions() {
     return new CommitActions(getFileSystem());
   }
 
@@ -154,7 +155,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
    * @param destFile final destination file
    * @return pending path
    */
-  protected static Path makePending(Path destFile) {
+  private static Path makePending(Path destFile) {
     return makePendingChild(destFile, destFile.getName());
   }
 
@@ -213,7 +214,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     commit("child.txt", pendingChildPath, expectedDestPath);
   }
 
-  protected void createCommitAndVerify(String filename, byte[] data)
+  private void createCommitAndVerify(String filename, byte[] data)
       throws Exception {
     S3AFileSystem fs = getFileSystem();
     Path destFile = methodPath(filename);
@@ -253,7 +254,6 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     verifyCommitExists(commit);
   }
 
-
   /**
    * Verify that the path at the end of a commit exists.
    * This does not validate the size.
@@ -262,7 +262,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
    * @throws ValidationFailure commit arg is invalid
    * @throws IOException invalid commit, IO failure
    */
-  public void verifyCommitExists(SinglePendingCommit commit)
+  private void verifyCommitExists(SinglePendingCommit commit)
       throws FileNotFoundException, ValidationFailure, IOException {
     commit.validate();
     // this will force an existence check
@@ -282,7 +282,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
    * @return the path to the pending data
    * @throws IOException IO problems
    */
-  protected Path validatePendingCommitData(String filename,
+  private Path validatePendingCommitData(String filename,
       Path pendingFilePath) throws IOException {
     S3AFileSystem fs = getFileSystem();
     Path pendingDataPath = new Path(pendingFilePath.getParent(),
@@ -313,8 +313,52 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
    * @return new path
    * @throws IOException failure to create/parse the path.
    */
-  public Path methodPath(String filename) throws IOException {
+  private Path methodPath(String filename) throws IOException {
     return new Path(path(getMethodName()), filename);
   }
 
+  @Test
+  public void testUploadEmptyFile() throws Throwable {
+    File tempFile = File.createTempFile("commit", ".txt");
+    CommitActions actions = newActions();
+    Path dest = methodPath("testUploadEmptyFile");
+    S3AFileSystem fs = getFileSystem();
+    SinglePendingCommit pendingCommit =
+        actions.uploadFileToPendingCommit(tempFile,
+            dest, null,
+            DEFAULT_MULTIPART_SIZE);
+    assertPathDoesNotExist("pending commit", dest);
+    actions.commitOrFail(pendingCommit);
+    FileStatus status = verifyPathExists(fs,
+        "uploaded file commit", dest);
+    assertEquals("File length in " + status, 0, status.getLen());
+  }
+
+  @Test
+  public void testUploadSmallFile() throws Throwable {
+    File tempFile = File.createTempFile("commit", ".txt");
+    String text = "hello, world";
+    FileUtils.write(tempFile, text, "UTF-8");
+    CommitActions actions = newActions();
+    Path dest = methodPath("testUploadSmallFile");
+    S3AFileSystem fs = getFileSystem();
+    SinglePendingCommit pendingCommit =
+        actions.uploadFileToPendingCommit(tempFile,
+            dest, null,
+            DEFAULT_MULTIPART_SIZE);
+    assertPathDoesNotExist("pending commit", dest);
+    actions.commitOrFail(pendingCommit);
+    String s = readUTF8(fs, dest, -1);
+    assertEquals(text, s);
+  }
+
+  @Test(expected = FileNotFoundException.class)
+  public void testUploadMissingFile() throws Throwable {
+    File tempFile = File.createTempFile("commit", ".txt");
+    tempFile.delete();
+    CommitActions actions = newActions();
+    Path dest = methodPath("testUploadMissingile");
+    actions.uploadFileToPendingCommit(tempFile, dest, null,
+        DEFAULT_MULTIPART_SIZE);
+  }
 }
