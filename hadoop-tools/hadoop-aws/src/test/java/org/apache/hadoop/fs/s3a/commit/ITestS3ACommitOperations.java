@@ -58,6 +58,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
+    conf.setBoolean("fs.s3a.impl.disable.cache", true);
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.CLASSNAME);
@@ -134,26 +135,17 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
 
-    FileCommitActions actions = newActions();
+    CommitActions actions = newActions();
     // abort,; rethrow on failure
     LOG.info("First abort call");
-    actions.abortSinglePendingCommitFile(pendingDataPath).maybeRethrow();
+    actions.abortAllSinglePendingCommits(pendingDataPath.getParent(), true)
+        .maybeRethrow();
     assertPathDoesNotExist("pending file not deleted", pendingDataPath);
     assertPathDoesNotExist("dest file was created", destFile);
-
-    // and again. here uprating a missing file to a failure
-    LOG.info("Second abort call");
-    FileCommitActions.CommitFileOutcome outcome = actions.abortSinglePendingCommitFile(
-        pendingDataPath);
-    assertTrue("Expected 2nd abort to fail to ABORT_FAILED " + outcome,
-        outcome.hasOutcome(FileCommitActions.CommitOutcomes.ABORT_FAILED));
-    if (!(outcome.getException() instanceof FileNotFoundException)) {
-      outcome.maybeRethrow();
-    }
   }
 
-  public FileCommitActions newActions() {
-    return new FileCommitActions(getFileSystem());
+  public CommitActions newActions() {
+    return new CommitActions(getFileSystem());
   }
 
   /**
@@ -183,40 +175,13 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     createCommitAndVerify("small-commit.txt", DATASET);
   }
 
-  @Test(expected = FileNotFoundException.class)
-  public void testCommitNonexistentDir() throws Throwable {
-    describe("Attempt to commit a pending directory that does not exist");
-    Path destFile = methodPath("testCommitNonexistentDir");
-    newActions().commitSinglePendingCommitFiles(destFile, true);
-  }
-
-  @Test(expected = PathCommitException.class)
-  public void testCommitPendingFilesinSimpleFile() throws Throwable {
-    describe("Attempt to commit a pending directory that is actually a file");
-    Path destFile = methodPath("testCommitPendingFilesinSimpleFile");
-    touch(getFileSystem(), destFile);
-    newActions().commitSinglePendingCommitFiles(destFile, true);
-  }
-
   @Test
   public void testAbortNonexistentDir() throws Throwable {
     describe("Attempt to abort a directory that does not exist");
     Path destFile = methodPath("testAbortNonexistentPath");
-    FileCommitActions.CommitAllFilesOutcome outcome = newActions()
-        .abortAllSinglePendingCommits(destFile, true);
-    outcome.maybeRethrow();
-    assertFalse("outcome includes successes",
-        outcome.hasOutcome(FileCommitActions.CommitOutcomes.SUCCEEDED));
-  }
-
-  @Test
-  public void testAbortNonexistentFile() throws Throwable {
-    describe("Attempt to abort a file that does not exist");
-    Path destFile = methodPath("testAbortNonexistentFile");
-    FileCommitActions.CommitFileOutcome outcome =
-        newActions().abortSinglePendingCommitFile(destFile);
-    assertTrue("not aborted: " + outcome, outcome.hasOutcome(
-        FileCommitActions.CommitOutcomes.ABORT_FAILED));
+    newActions()
+        .abortAllSinglePendingCommits(destFile, true)
+        .maybeRethrow();
   }
 
   @Test
@@ -270,8 +235,8 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   }
 
   /**
-   * Commit to a write to {@code pendingFilePath} which is expected to saved
-   * to {@code destFile}.
+   * Commit to a write to {@code pendingFilePath} which is expected to
+   * be saved to {@code destFile}.
    * @param pendingFilePath path to write to
    * @param destFile destination to verify
    */
@@ -281,13 +246,32 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     assertPathDoesNotExist("dest file was created", destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
-    FileCommitActions.CommitFileOutcome outcome =
-        newActions().commitPendingFile(pendingDataPath);
-    outcome.maybeRethrow();
-    assertPathDoesNotExist("pending file not deleted after " + outcome,
+    SinglePendingCommit commit = SinglePendingCommit.load(getFileSystem(),
         pendingDataPath);
-    assertPathExists("dest file " + destFile + " not committed " + outcome,
-        destFile);
+    CommitActions actions = newActions();
+    actions.commitOrFail(commit);
+    verifyCommitExists(commit);
+  }
+
+
+  /**
+   * Verify that the path at the end of a commit exists.
+   * This does not validate the size.
+   * @param commit commit to verify
+   * @throws FileNotFoundException dest doesn't exist
+   * @throws ValidationFailure commit arg is invalid
+   * @throws IOException invalid commit, IO failure
+   */
+  public void verifyCommitExists(SinglePendingCommit commit)
+      throws FileNotFoundException, ValidationFailure, IOException {
+    commit.validate();
+    // this will force an existence check
+    Path path = getFileSystem().keyToQualifiedPath(commit.getDestinationKey());
+    FileStatus status = getFileSystem().getFileStatus(path);
+    LOG.debug("Destination entry: {}", status);
+    if (!status.isFile()) {
+      throw new PathCommitException(path, "Not a file: " + status);
+    }
   }
 
   /**

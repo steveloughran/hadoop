@@ -36,7 +36,7 @@ import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
+import org.apache.hadoop.fs.s3a.commit.CommitActions;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
@@ -96,11 +96,11 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Require delayed commit supported in the FS.
+   * Require magic paths in the FS client.
    * @return true, always.
    */
   @Override
-  protected boolean isDelayedCommitRequired() {
+  protected boolean isMagicFileSystemRequired() {
     return true;
   }
 
@@ -184,7 +184,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   @Override
   protected void cleanup(JobContext context, boolean suppressExceptions)
       throws IOException {
-    FileCommitActions.CommitAllFilesOutcome outcome = null;
+    CommitActions.MaybeIOE outcome = new CommitActions.MaybeIOE();
     try (DurationInfo d =
              new DurationInfo("Aborting outstanding uploads for Job %s",
                  jobIdString(context))) {
@@ -203,7 +203,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
               getMagicJobAttemptsPath(getOutputPath())), true);
       cleanupStagingDirs();
     }
-    if (!suppressExceptions && outcome != null) {
+    if (!suppressExceptions) {
       outcome.maybeRethrow();
     }
 
@@ -277,7 +277,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       TaskAttemptContext context) throws IOException {
     Path taskAttemptPath = getTaskAttemptPath(context);
     // load in all pending commits.
-    FileCommitActions actions = getCommitActions();
+    CommitActions actions = getCommitActions();
     Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
         loaded = actions.loadSinglePendingCommits(
             taskAttemptPath, true);
@@ -321,14 +321,11 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     Path attemptPath = getTaskAttemptPath(context);
     try (DurationInfo d =
              new DurationInfo("Abort task %s", context.getTaskAttemptID())) {
-      FileCommitActions.CommitAllFilesOutcome outcome
-          = getCommitActions().abortAllSinglePendingCommits(
-          attemptPath, true);
+      getCommitActions().abortAllSinglePendingCommits(attemptPath, true);
     } finally {
       deleteQuietly(getDestFS(), attemptPath, true);
     }
   }
-
 
   /**
    * Compute the path where the output of a given job attempt will be placed.

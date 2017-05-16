@@ -19,15 +19,20 @@
 package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
+import java.util.List;
 
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
@@ -104,11 +109,14 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
 
     assertPathExists("No pending file", pendingDataFile);
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
-    FileCommitActions.CommitAllFilesOutcome outcome =
-        new FileCommitActions(fs)
-            .commitSinglePendingCommitFiles(jobDir, false);
+    CommitActions actions = new CommitActions(fs);
+    Preconditions.checkArgument(jobDir != null, "null pendingDir");
+    Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
+        results = actions.loadSinglePendingCommits(jobDir, false);
+    for (SinglePendingCommit singlePendingCommit : results._1().getCommits()) {
+      actions.commitOrFail(singlePendingCommit);
+    }
     timer.end("time to commit %s", pendingDataFile);
-    outcome.maybeRethrow();
     super.test_030_postCreationAssertions();
   }
 

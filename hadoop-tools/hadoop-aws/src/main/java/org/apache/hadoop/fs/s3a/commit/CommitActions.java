@@ -22,14 +22,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,9 +49,9 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
  * This doesn't implement the protocol/binding to a specific execution engine,
  * just the operations needed to to build one.
  */
-public class FileCommitActions {
+public class CommitActions {
   private static final Logger LOG = LoggerFactory.getLogger(
-      FileCommitActions.class);
+      CommitActions.class);
 
   private final S3AFileSystem fs;
 
@@ -61,7 +59,7 @@ public class FileCommitActions {
    * Instantiate.
    * @param fs FS to bind to
    */
-  public FileCommitActions(S3AFileSystem fs) {
+  public CommitActions(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
   }
@@ -69,31 +67,20 @@ public class FileCommitActions {
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
-        "FileCommitActions{");
+        "CommitActions{");
     sb.append("fs=").append(fs.getUri());
     sb.append('}');
     return sb.toString();
   }
 
+
   /**
-   * Commit a pending file, then delete the data.
-   * @param pendingFile path to the pending data
-   * @return the outcome
-   * @throws IOException on a failure
+   * Create a new {@link WriteOperationHelper} for working with the destination.
+   * @param destKey destination key
+   * @return a new instance
    */
-  public CommitFileOutcome commitPendingFile(Path pendingFile)
-      throws IOException {
-    Preconditions.checkArgument(pendingFile != null, "null pendingFile");
-    // really read it in and parse
-    try {
-      SinglePendingCommit commit = SinglePendingCommit.load(fs, pendingFile);
-      CommitFileOutcome outcome = commit(commit, pendingFile.toString());
-      LOG.debug("Commit outcome: {}", outcome);
-      return outcome;
-    } finally {
-      LOG.debug("Deleting file {}", pendingFile);
-      deleteQuietly(fs, pendingFile, false);
-    }
+  private WriteOperationHelper createWriter(String destKey) {
+    return fs.createWriteOperationHelper(destKey);
   }
 
   /**
@@ -112,86 +99,32 @@ public class FileCommitActions {
    * @param origin origin path/string for outcome text
    * @return the outcome
    */
-  public CommitFileOutcome commit(SinglePendingCommit commit, String origin) {
+  public MaybeIOE commit(SinglePendingCommit commit, String origin) {
     LOG.debug("Committing single commit {}", commit);
-    CommitFileOutcome outcome;
+    MaybeIOE outcome = new MaybeIOE();
     String destKey = "unknown destination";
     try {
       commit.validate();
       destKey = commit.getDestinationKey();
       // finalize the commit
-      writer(destKey).completeMultipartCommit(destKey,
+      createWriter(destKey).completeMultipartCommit(destKey,
           commit.getUploadId(),
           CommitUtils.toPartEtags(commit.getEtags()),
           commit.getSize());
       LOG.debug("Successful commit");
-      outcome = commitSuccess(origin, destKey);
+      outcome = new MaybeIOE();
     } catch (IOException e) {
       String msg = String.format("Failed to commit upload against %s: %s",
           destKey, e);
       LOG.warn(msg, e);
-      outcome = commitFailure(origin, destKey, e);
+      outcome = new MaybeIOE(e);
     } catch (Exception e) {
       String msg = String.format("Failed to commit upload against %s," +
           " described in %s: %s", destKey, origin, e);
       LOG.warn(msg, e);
-      outcome = commitFailure(origin, destKey,
-          new PathCommitException(origin, msg, e));
+      outcome = new MaybeIOE(new PathCommitException(origin, msg, e));
     }
     LOG.debug("Commit outcome: {}", outcome);
-    return outcome;
-  }
-
-  /**
-   * Create a new {@link WriteOperationHelper} for working with the destination.
-   * @param destKey destination key
-   * @return a new instance
-   */
-  private WriteOperationHelper writer(String destKey) {
-    return fs.createWriteOperationHelper(destKey);
-  }
-
-  /**
-   * Verify that the path at the end of a commit exists. This does
-   * not validate the size.
-   * @param commit commit to verify
-   * @throws FileNotFoundException dest doesn't exist
-   * @throws ValidationFailure commit arg is invalid
-   * @throws IOException invalid commit, IO failure
-   */
-  public void verifyCommitExists(SinglePendingCommit commit)
-      throws FileNotFoundException, ValidationFailure, IOException {
-    commit.validate();
-    // this will force an existence check
-    Path path = fs.keyToQualifiedPath(commit.getDestinationKey());
-    FileStatus status = fs.getFileStatus(
-        path);
-    LOG.debug("Destination entry: {}", status);
-    if (!status.isFile()) {
-      throw new PathCommitException(path, "Not a file: " + status);
-    }
-  }
-
-  /**
-   * Commit all single pending files in a directory tree.
-   * @param pendingDir directory of pending operations
-   * @param recursive recurse?
-   * @return the outcome of all the operations
-   * @throws IOException if there is a problem listing the path.
-   */
-  public CommitAllFilesOutcome commitSinglePendingCommitFiles(Path pendingDir,
-      boolean recursive) throws IOException {
-    Preconditions.checkArgument(pendingDir != null, "null pendingDir");
-    Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
-        results
-        = loadSinglePendingCommits(pendingDir, recursive);
-    final CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
-    for (SinglePendingCommit singlePendingCommit : results._1().getCommits()) {
-      CommitFileOutcome commit = commit(singlePendingCommit,
-          singlePendingCommit.getFilename());
-      outcome.add(commit);
-    }
-    LOG.info("Committed operations: {}", outcome);
     return outcome;
   }
 
@@ -257,56 +190,15 @@ public class FileCommitActions {
   }
 
   /**
-   * Abort an pending file commit.
-   * This operation is designed to always
-   * succeed; failures are caught and logged.
-   * @param pendingFile path
-   * @return the outcome
+   * Convert any exception to an IOE, if needed.
+   * @param key key to use in a path exception
+   * @param ex exception
+   * @return an IOE, either the passed in value or a new one wrapping the other
+   * exception.
    */
-  public CommitFileOutcome abortSinglePendingCommitFile(Path pendingFile) {
-    CommitFileOutcome outcome;
-    try {
-      // read it in and abort
-      outcome = abort(SinglePendingCommit.load(fs, pendingFile));
-    } catch (IOException e) {
-      // abort failed to load/validate
-      String origin = pendingFile.toString();
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
-          origin, null, e);
-    } finally {
-      deleteQuietly(fs, pendingFile, false);
-    }
-    return outcome;
-  }
-
-  /**
-   * Abort a pending commit, returning an outcome of type
-   * {@link CommitOutcomes#ABORTED} describing the operation.
-   * Failures are caught and result in an outcome of the type
-   * {@link CommitOutcomes#ABORT_FAILED}
-   * @param commit commit data
-   * @return the outcome
-   */
-  public CommitFileOutcome abort(SinglePendingCommit commit) {
-    CommitFileOutcome outcome;
-    String destKey = commit.getDestinationKey();
-    String origin = commit.getFilename();
-    try {
-      abortSingleCommit(commit);
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORTED,
-          origin, destKey, null);
-    } catch (IOException | IllegalArgumentException e) {
-      // download to an abort + exception
-      LOG.warn("Failed to abort upload against {}," +
-          " described in {}",
-          destKey, origin, e);
-      outcome = new CommitFileOutcome(CommitOutcomes.ABORT_FAILED,
-          origin,
-          destKey,
-          e instanceof IOException ? (IOException) e
-              : new PathCommitException(destKey, e.toString(), e));
-    }
-    return outcome;
+  public IOException makeIOE(String key, Exception ex) {
+    return ex instanceof IOException ? (IOException) ex
+        : new PathCommitException(key, ex.toString(), ex);
   }
 
   /**
@@ -335,17 +227,7 @@ public class FileCommitActions {
    */
   public void abortMultipartCommit(String destKey, String uploadId)
       throws IOException {
-    writer(destKey).abortMultipartCommit(destKey, uploadId);
-  }
-
-  private static CommitFileOutcome commitSuccess(String origin,
-      String destKey) {
-    return new CommitFileOutcome(origin, destKey);
-  }
-
-  private static CommitFileOutcome commitFailure(String origin,
-      String destKey, IOException e) {
-    return new CommitFileOutcome(origin, destKey, e);
+    createWriter(destKey).abortMultipartCommit(destKey, uploadId);
   }
 
   /**
@@ -355,30 +237,36 @@ public class FileCommitActions {
    * @return the outcome of all the abort operations
    * @throws IOException if there is a problem listing the path.
    */
-  public CommitAllFilesOutcome abortAllSinglePendingCommits(Path pendingDir,
+  public MaybeIOE abortAllSinglePendingCommits(Path pendingDir,
       boolean recursive)
       throws IOException {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
-    CommitAllFilesOutcome outcome = new CommitAllFilesOutcome();
     RemoteIterator<LocatedFileStatus> pendingFiles;
     try {
       pendingFiles = fs.listFiles(pendingDir, recursive);
     } catch (FileNotFoundException e) {
       LOG.info("No directory to abort {}", pendingDir);
-      return outcome;
+      return new MaybeIOE();
     }
+    MaybeIOE outcome = null;
     if (!pendingFiles.hasNext()) {
       LOG.debug("No files to abort under {}", pendingDir);
     }
     while (pendingFiles.hasNext()) {
-      LocatedFileStatus next = pendingFiles.next();
-      Path pending = next.getPath();
-      if (pending.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
-        outcome.add(abortSinglePendingCommitFile(pending));
+      Path pendingFile = pendingFiles.next().getPath();
+      if (pendingFile.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
+        try {
+          abortSingleCommit(SinglePendingCommit.load(fs, pendingFile));
+        } catch (IOException | IllegalArgumentException e){
+          if (outcome == null) {
+            outcome = new MaybeIOE(makeIOE(pendingFile.toString(), e));
+          }
+        } finally{
+          deleteQuietly(fs, pendingFile, false);
+        }
       }
     }
-    LOG.info("aborted operations: {}", outcome);
-    return outcome;
+    return outcome == null ? new MaybeIOE(): outcome;
   }
 
   /**
@@ -389,7 +277,7 @@ public class FileCommitActions {
    */
   public int abortPendingUploadsUnderPath(Path dest) throws IOException {
     String destKey = fs.pathToKey(dest);
-    return writer(destKey).abortMultipartUploadsUnderPath(destKey);
+    return createWriter(destKey).abortMultipartUploadsUnderPath(destKey);
   }
 
   /**
@@ -414,7 +302,7 @@ public class FileCommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.warn("Revert {}", commit);
-    writer(commit.getDestinationKey()).revertCommit(commit.getDestinationKey());
+    createWriter(commit.getDestinationKey()).revertCommit(commit.getDestinationKey());
   }
 
   /**
@@ -440,13 +328,10 @@ public class FileCommitActions {
     LOG.debug("Initiating multipart upload from {} to s3a://{}/{}" +
             " partition={} partSize={}",
         localFile, bucket, key, partition, uploadPartSize);
-    if (!localFile.exists()) {
-      throw new FileNotFoundException(localFile.toString());
-    }
     if (!localFile.isFile()) {
-      throw new IOException("Not a file: " + localFile);
+      throw new FileNotFoundException("Not a file: " + localFile);
     }
-    WriteOperationHelper writer = writer(key);
+    WriteOperationHelper writer = createWriter(key);
     String uploadId = null;
 
     boolean threw = true;
@@ -502,214 +387,39 @@ public class FileCommitActions {
   }
 
   /**
-   * Outcome of a commit or abort operation, lists all successes and failures.
+   * A holder for a possible IOException; the call {@link #maybeRethrow()}
+   * will throw any exception passed into the constructor, and be a no-op
+   * if none was.
+   * Really this should be a Java 8 optional.
    */
-  public static class CommitAllFilesOutcome {
-    private final List<CommitFileOutcome> outcomes = new ArrayList<>();
-    private final List<CommitFileOutcome> succeeded = new ArrayList<>();
-
-    /**
-     * Get the list of succeeded operations.
-     * @return a possibly empty list.
-     */
-    public List<CommitFileOutcome> getSucceeded() {
-      return succeeded;
-    }
-
-    /**
-     * Add a success.
-     * @param pending pending path
-     * @param destination destination path
-     */
-    public void success(Path pending, String destination) {
-      outcomes.add(commitSuccess(pending.toString(), destination));
-    }
-
-    /**
-     * Add a failure.
-     * @param pending pending path
-     * @param destination destination path
-     * @param exception the exception causing the failure
-     */
-    public void failure(Path pending, String destination,
-        IOException exception) {
-      outcomes.add(commitFailure(pending.toString(), destination, exception));
-    }
-
-    /**
-     * Select all outcomes of a specific type.
-     * @param expected expected outcome
-     * @return an iterator over all values matching the expected type.
-     */
-    public Iterable<CommitFileOutcome> select(final CommitOutcomes expected) {
-      return Iterables.filter(outcomes,
-          input -> input.outcome == expected);
-    }
-
-    /**
-     * Predicate: does the outcome list include an entry of the given type?
-     * @param expected expected value
-     * @return true if such an outcome exists
-     */
-    public boolean hasOutcome(final CommitOutcomes expected) {
-      Iterator<CommitFileOutcome> iterator = select(expected).iterator();
-      return iterator.hasNext();
-    }
-
-    /**
-     * Get the total size of the outcome list.
-     * @return the size of the list
-     */
-    public int size() {
-      return outcomes.size();
-    }
-
-    /**
-     * Add an outcome, choose the destination list from its success flag.
-     * @param outcome outcome to add.
-     */
-    public void add(CommitFileOutcome outcome) {
-      outcomes.add(outcome);
-    }
-
-    public CommitFileOutcome firstOutcome(final CommitOutcomes expected) {
-      Iterator<CommitFileOutcome> iterator = select(expected).iterator();
-      if (iterator.hasNext()) {
-        return iterator.next();
-      } else {
-        return null;
-      }
-    }
-
-    /**
-     * Rethrow the exception in the first failure entry.
-     * @throws IOException the first exception caught.
-     */
-    public void maybeRethrow() throws IOException {
-      CommitFileOutcome failure = firstOutcome(CommitOutcomes.FAILED);
-      if (failure != null) {
-        throw failure.getException();
-      }
-    }
-
-    @Override
-    public String toString() {
-      final StringBuilder sb = new StringBuilder(
-          "CommitAllFilesOutcome{");
-      sb.append("outcome count=").append(outcomes.size());
-      sb.append('}');
-      return sb.toString();
-    }
-  }
-
-
-  /**
-   * Possible outcomes of a commit operation.
-   */
-  enum CommitOutcomes {
-    SUCCEEDED,
-    FAILED,
-    ABORTED,
-    ABORT_FAILED,
-    REVERTED
-  }
-
-  /**
-   * Outcome of a commit to a single file.
-   */
-  public static class CommitFileOutcome {
-    private final CommitOutcomes outcome;
-    private final String origin;
-    private final String destination;
+  public static class MaybeIOE {
     private final IOException exception;
 
     /**
-     * Success outcome.
-     * @param origin pending file
-     * @param destination destination of commit
+     * Construct without an exception
      */
-    public CommitFileOutcome(String origin, String destination) {
-      this(CommitOutcomes.SUCCEEDED, origin, destination, null);
+    public MaybeIOE() {
+      this.exception = null;
     }
 
     /**
-     * Failure outcome.
-     * @param origin pending file
-     * @param destination destination of commit
-     * @param exception failure cause
+     * Construct with an exception
+     * @param exception exception
      */
-    public CommitFileOutcome(String origin,
-        String destination,
-        IOException exception) {
-      this(exception == null ?
-              CommitOutcomes.SUCCEEDED : CommitOutcomes.FAILED,
-          origin, destination,
-          exception);
-    }
-
-    public CommitFileOutcome(CommitOutcomes outcome,
-        String origin,
-        String destination,
-        IOException exception) {
-      if (outcome.equals(CommitOutcomes.FAILED)) {
-        Preconditions.checkArgument(exception != null,
-            "no exception for failure");
-      }
-      this.outcome = outcome;
-      this.origin = origin;
-      this.destination = destination;
+    public MaybeIOE(IOException exception) {
       this.exception = exception;
     }
 
-    public CommitOutcomes getOutcome() {
-      return outcome;
-    }
-
-    public String getDestination() {
-      return destination;
-    }
-
     /**
-     * Predicate: is this a successful commit operation?
-     * @return true if the outcome was SUCCEEDED.
+     * Get any exception.
+     * @return the exception.
      */
-    public boolean isSucceeded() {
-      return hasOutcome(CommitOutcomes.SUCCEEDED);
-    }
-
-    /**
-     * Probe for the outcome being the desired one.
-     * @param desired desired outcome.
-     * @return true if the outcome is the desired one
-     */
-    public boolean hasOutcome(CommitOutcomes desired) {
-      return outcome == desired;
-    }
-
-    public String getOrigin() {
-      return origin;
-    }
-
     public IOException getException() {
       return exception;
     }
 
-    @Override
-    public String toString() {
-      final StringBuilder sb = new StringBuilder(
-          "CommitFileOutcome{");
-      sb.append(outcome);
-      sb.append(", destination=").append(destination);
-      sb.append(", pendingFile=").append(origin);
-      if (exception != null) {
-        sb.append(", exception=").append(exception);
-      }
-      sb.append('}');
-      return sb.toString();
-    }
-
     /**
-     * Rethrow any exception which was in the outcome.
+     * Rethrow any exception.
      * @throws IOException the exception field, if non-null.
      */
     public void maybeRethrow() throws IOException {

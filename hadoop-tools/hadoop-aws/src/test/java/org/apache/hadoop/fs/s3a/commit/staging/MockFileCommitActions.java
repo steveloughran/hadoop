@@ -19,12 +19,12 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.FileCommitActions;
+import org.apache.hadoop.fs.s3a.commit.CommitActions;
 
 /**
- * Extension of {@link FileCommitActions} for mocking S3A in tests.
+ * Extension of {@link CommitActions} for mocking S3A in tests.
  */
-public class MockFileCommitActions extends FileCommitActions {
+public class MockFileCommitActions extends CommitActions {
 
   /**
    * Creator.

@@ -285,7 +285,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return false
    */
   @Override
-  protected boolean isDelayedCommitRequired() {
+  protected boolean isMagicFileSystemRequired() {
     return false;
   }
 

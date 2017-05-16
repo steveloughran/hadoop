@@ -65,8 +65,18 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractS3GuardCommitter.class);
-  protected ExecutorService threadPool = null;
-  private FileCommitActions commitActions;
+
+  /**
+   * Thread pool for task execution.
+   */
+  protected ExecutorService threadPool;
+
+  /** Underlying commit operations */
+  private CommitActions commitActions;
+
+  /**
+   * Final destination of work.
+   */
   private Path outputPath;
 
   /**
@@ -77,10 +87,17 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * This is the directory for all intermediate work: where the output format
    * will write data.
+   * <i>This may not be on the final file system</i>
    */
   private Path workPath;
+
+  /** Configuration of the job. */
   private Configuration conf;
+
+  /** Filesystem of {@link #outputPath}. */
   private FileSystem destFS;
+
+  /** The job context. For a task, this can be cast to a TaskContext. */
   private final JobContext jobContext;
 
   /**
@@ -101,7 +118,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     initOutput(outputPath);
     LOG.debug("{} instantiated for job \"{}\" ID {} with destination {}",
         role, jobName(context), jobIdString(context), outputPath);
-    commitActions = new FileCommitActions(getDestS3AFS());
+    commitActions = new CommitActions(getDestS3AFS());
   }
 
  /**
@@ -304,15 +321,15 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    */
   protected FileSystem getDestination(Path out, Configuration config)
       throws IOException {
-    return getS3AFileSystem(out, config, isDelayedCommitRequired());
+    return getS3AFileSystem(out, config, isMagicFileSystemRequired());
   }
 
   /**
    * Flag to indicate whether or not the destination filesystem needs
-   * to be configured to support the delayed commit mechanism.
-   * @return what the requirements of the committer are of the S3 endpoint
+   * to be configured to support the magic path.
+   * @return what the requirements of the committer are of the filesystem.
    */
-  protected abstract boolean isDelayedCommitRequired();
+  protected abstract boolean isMagicFileSystemRequired();
 
   /**
    * Task recovery considered unsupported: Warn and fail.
@@ -578,7 +595,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * Subclasses may provide a mock version of this.
    * @return the commit actions instance to use for operations.
    */
-  protected FileCommitActions getCommitActions() {
+  protected CommitActions getCommitActions() {
     return commitActions;
   }
 
@@ -586,7 +603,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * For testing: set a new commit action.
    * @param commitActions commit actions instance
    */
-  protected void setCommitActions(FileCommitActions commitActions) {
+  protected void setCommitActions(CommitActions commitActions) {
     this.commitActions = commitActions;
   }
 
