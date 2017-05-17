@@ -37,6 +37,7 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
+import com.amazonaws.services.s3.transfer.model.UploadResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -201,23 +202,6 @@ public class WriteOperationHelper {
   public void abortMultipartCommit(MultipartUpload upload)
       throws IOException {
     abortMultipartCommit(upload.getKey(), upload.getUploadId());
-  }
-
-  /**
-   * Complete the multipart commit operation.
-   * @param destination destination of the commit
-   * @param uploadId multipart operation Id
-   * @param partETags list of partial uploads
-   * @param length length of the upload
-   * @return the result of the operation.
-   * @throws IOException on problems.
-   */
-  public CompleteMultipartUploadResult completeMultipartCommit(
-      String destination,
-      String uploadId,
-      List<PartETag> partETags,
-      long length) throws IOException {
-    return finalizeMultipartUpload(destination, uploadId, partETags, length);
   }
 
   /**
@@ -397,23 +381,30 @@ public class WriteOperationHelper {
   }
 
   /**
+   * PUT an object via the transfer manager.
+   * @param putObjectRequest the request
+   * @return the result of the operation
+   * @throws IOException on problems
+   */
+  public UploadResult uploadObject(PutObjectRequest putObjectRequest)
+      throws IOException {
+    return calls.execute("put",
+        putObjectRequest.getKey(),
+        () -> owner.executePut(putObjectRequest, null));
+  }
+
+  /**
    * Revert a commit by deleting the file.
    * TODO: Policy regarding creating a mock empty parent directory.
    * TODO: Delete entirely?
+   * @throws IOException on problems
    * @param destKey destination key
-   * @return was the operation successful (i.e. did it complete without
-   * any error?)
    */
-  public boolean revertCommit(String destKey) {
-    try {
-      calls.execute("revert commit", destKey,
-          () ->
-              owner.deleteObjectAtPath(owner.keyToPath(destKey),
-                  destKey, true));
-      return true;
-    } catch (IOException e) {
-      return false;
-    }
+  public void revertCommit(String destKey) throws IOException {
+    calls.execute("revert commit", destKey,
+        () ->
+            owner.deleteObjectAtPath(owner.keyToPath(destKey),
+                destKey, true));
   }
 
   /**

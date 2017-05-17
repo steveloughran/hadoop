@@ -79,7 +79,6 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *   </li>
  * </ol>
  */
-
 public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -730,7 +729,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       try {
         List<FileStatus> filesToCommit = getTaskOutput(context);
         int count = commitTaskInternal(context, filesToCommit);
-        LOG.info("{}: upl´oad file count: {}", getRole(), count);
+        LOG.info("{}: upload file count: {}", getRole(), count);
       } catch (IOException e) {
         LOG.error("{}: commit of task {} failed",
             getRole(), context.getTaskAttemptID(), e);
@@ -776,66 +775,66 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       // there is nothing to write. needsTaskCommit() should have caught
       // this, so warn that there is some kind of problem in the protocol.
       LOG.warn("{}: No files to commit", getRole());
-      return 0;
-    }
+    } else {
+      boolean threw = true;
+      // before the uploads, report some progress
+      context.progress();
 
-    boolean threw = true;
-    // before the uploads, report some progress
-    context.progress();
-
-    MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
-        commitCount);
-    try {
-      Tasks.foreach(taskOutput)
-          .stopOnFailure()
-          .throwFailureWhenFinished()
-          .executeWith(getThreadPool())
-          .run(new Tasks.Task<FileStatus, IOException>() {
-            @Override
-            public void run(FileStatus stat) throws IOException {
-              Path path = stat.getPath();
-              File localFile = new File(path.toUri().getPath());
-              String relative = Paths.getRelativePath(attemptPath, path);
-              // TODO: Why isn't this being used?
-              String partition = getPartition(relative);
-              String key = getFinalKey(relative, context);
-              Path destPath = getDestS3AFS().keyToQualifiedPath(key);
-              SinglePendingCommit commit = getCommitActions()
-                  .uploadFileToPendingCommit(
-                      localFile,
-                      destPath, partition,
-                      uploadPartSize);
-              LOG.debug("{}: adding pending commit {}", getRole(), commit);
-              commits.add(commit);
-            }
-          });
-
-      for (SinglePendingCommit commit : commits) {
-        pendingCommits.add(commit);
-      }
-
-      // save the data
-      // although overwrite=false, there's still a risk of > 1 entry being
-      // committed if the FS doesn't have create-no-overwrite consistency.
-
-      LOG.debug("Saving {} commits to file {}",
-          pendingCommits.size(), commitsAttemptPath);
-      pendingCommits.save(commitsFS, commitsAttemptPath, false);
-
-      threw = false;
-
-    } finally {
-      if (threw) {
-        LOG.error("{}: Exception during commit process, aborting {} commit(s)",
-            getRole(), commits.size());
-        Tasks.foreach(commits)
-            .run(new Tasks.Task<SinglePendingCommit, IOException>() {
+      MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
+          commitCount);
+      try {
+        Tasks.foreach(taskOutput)
+            .stopOnFailure()
+            .throwFailureWhenFinished()
+            .executeWith(buildThreadPool(context))
+            .run(new Tasks.Task<FileStatus, IOException>() {
               @Override
-              public void run(SinglePendingCommit commit) throws IOException {
-                getCommitActions().abortSingleCommit(commit);
+              public void run(FileStatus stat) throws IOException {
+                Path path = stat.getPath();
+                File localFile = new File(path.toUri().getPath());
+                String relative = Paths.getRelativePath(attemptPath, path);
+                // TODO: Why isn't this being used?
+                String partition = getPartition(relative);
+                String key = getFinalKey(relative, context);
+                Path destPath = getDestS3AFS().keyToQualifiedPath(key);
+                SinglePendingCommit commit = getCommitActions()
+                    .uploadFileToPendingCommit(
+                        localFile,
+                        destPath, partition,
+                        uploadPartSize);
+                LOG.debug("{}: adding pending commit {}", getRole(), commit);
+                commits.add(commit);
               }
             });
-        deleteTaskAttemptPathQuietly(context);
+
+        for (SinglePendingCommit commit : commits) {
+          pendingCommits.add(commit);
+        }
+
+        // save the data
+        // although overwrite=false, there's still a risk of > 1 entry being
+        // committed if the FS doesn't have create-no-overwrite consistency.
+
+        LOG.debug("Saving {} commits to file {}",
+            pendingCommits.size(), commitsAttemptPath);
+        pendingCommits.save(commitsFS, commitsAttemptPath, false);
+
+        threw = false;
+
+      } finally {
+        if (threw) {
+          LOG.error(
+              "{}: Exception during commit process, aborting {} commit(s)",
+              getRole(), commits.size());
+          Tasks.foreach(commits)
+              .run(new Tasks.Task<SinglePendingCommit, IOException>() {
+                @Override
+                public void run(SinglePendingCommit commit) throws IOException {
+                  getCommitActions().abortSingleCommit(commit);
+                }
+              });
+          deleteTaskAttemptPathQuietly(context);
+        }
       }
     }
 
@@ -843,7 +842,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     LOG.debug("Committing wrapped task");
     wrappedCommitter.commitTask(context);
 
-    LOG.debug("Cleaning up attempt dir");
+    LOG.debug("Cleaning up attempt dir {}", attemptPath);
     attemptFS.delete(attemptPath, true);
     return commits.size();
   }

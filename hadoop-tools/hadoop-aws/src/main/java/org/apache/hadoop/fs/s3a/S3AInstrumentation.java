@@ -122,6 +122,12 @@ public class S3AInstrumentation {
       STREAM_WRITE_BLOCK_UPLOADS_ABORTED,
       STREAM_WRITE_TOTAL_TIME,
       STREAM_WRITE_TOTAL_DATA,
+      S3GUARD_COMMITTER_COMMITS_CREATED,
+      S3GUARD_COMMITTER_COMMITS_COMPLETED,
+      S3GUARD_COMMITTER_BYTES_COMMITTED,
+      S3GUARD_COMMITTER_COMMITS_FAILED,
+      S3GUARD_COMMITTER_COMMITS_ABORTED,
+      S3GUARD_COMMITTER_COMMITS_REVERTED,
       S3GUARD_METADATASTORE_PUT_PATH_REQUEST,
       S3GUARD_METADATASTORE_INITIALIZATION
   };
@@ -503,6 +509,14 @@ public class S3AInstrumentation {
    */
   public S3GuardInstrumentation getS3GuardInstrumentation() {
     return s3GuardInstrumentation;
+  }
+
+  /**
+   * Create a new instance of the committer statistics.
+   * @return a new committer statistics instance
+   */
+  CommitterStatistics newCommitterStatistics() {
+    return new CommitterStatistics();
   }
 
   /**
@@ -919,4 +933,57 @@ public class S3AInstrumentation {
 
     }
   }
+
+  public void commitCreated() {
+    incrementCounter(S3GUARD_COMMITTER_COMMITS_CREATED, 1);
+  }
+
+  /** A commit has been created. */
+  public void commitCompleted(long size) {
+    incrementCounter(S3GUARD_COMMITTER_COMMITS_COMPLETED, 1);
+    incrementCounter(S3GUARD_COMMITTER_BYTES_COMMITTED, size);
+  }
+
+  public void commitAborted() {
+    incrementCounter(S3GUARD_COMMITTER_COMMITS_ABORTED, 1);
+  }
+
+  public void commitReverted() {
+    incrementCounter(S3GUARD_COMMITTER_COMMITS_REVERTED, 1);
+  }
+
+  public void commitFailed() {
+    incrementCounter(S3GUARD_COMMITTER_COMMITS_FAILED, 1);
+  }
+
+  /**
+   * Instrumentation exported to S3Guard Committer.
+   */
+  @InterfaceAudience.Private
+  @InterfaceStability.Unstable
+  public final class CommitterStatistics {
+    /** A commit has been created. */
+    public void commitCreated() {
+      S3AInstrumentation.this.commitCreated();
+    }
+
+    /** A commit has been created. */
+    public void commitCompleted(long size) {
+      S3AInstrumentation.this.commitCompleted(size);
+    }
+
+    public void commitAborted() {
+      S3AInstrumentation.this.commitAborted();
+    }
+
+    public void commitReverted() {
+      S3AInstrumentation.this.commitReverted();
+    }
+
+    public void commitFailed() {
+      S3AInstrumentation.this.commitFailed();
+    }
+
+  }
+
 }

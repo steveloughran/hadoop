@@ -109,7 +109,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
     byte[] bytes = commitData.toBytes();
     PutObjectRequest put = writer.newPutRequest(
         new ByteArrayInputStream(bytes), bytes.length);
-    writer.putObject(put);
+    writer.uploadObject(put);
     LOG.debug("{} — put delayed commit information to {}:\n{}",
         this, path, commitData);
     return false;

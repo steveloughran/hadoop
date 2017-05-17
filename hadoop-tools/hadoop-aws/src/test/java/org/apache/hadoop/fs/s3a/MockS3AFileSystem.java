@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit.staging;
+package org.apache.hadoop.fs.s3a;
 
 import java.io.IOException;
 import java.net.URI;
@@ -38,23 +38,21 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.Statistic;
 import org.apache.hadoop.fs.s3a.commit.Pair;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase;
 import org.apache.hadoop.util.Progressable;
 
 /**
  * Relays FS calls to the mocked FS, allows for some extra logging with
- * stack traces to be included.
- *
- * Operations which manipulate instrumentation values are all stubbed out
- * to avoid raising exceptions.
+ * stack traces to be included, stubbing out other methods
+ * where needed to avoid failures.
  *
  * The logging is useful for tracking
  * down why there are extra calls to a method than a test would expect:
  * changes in implementation details often trigger such false-positive
  * test failures.
  *
+ * This class is in the s3a package so that it has access to methods
  */
 public class MockS3AFileSystem extends S3AFileSystem {
   public static final String BUCKET = "bucket-name";
@@ -69,6 +67,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
   public static final int LOG_NAME = 1;
   public static final int LOG_STACK = 2;
   private int logEvents = LOG_NAME;
+  private final S3AInstrumentation instrumentation =
+      new S3AInstrumentation(FS_URI);
 
   public MockS3AFileSystem(S3AFileSystem mock,
       Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors> outcome) {
@@ -291,4 +291,8 @@ public class MockS3AFileSystem extends S3AFileSystem {
     return sb.toString();
   }
 
+  @Override
+  public S3AInstrumentation.CommitterStatistics newCommitterStatistics() {
+    return instrumentation.newCommitterStatistics();
+  }
 }

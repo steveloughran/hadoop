@@ -68,7 +68,7 @@ The initial option set:
 | `fs.s3a.committer.staging.unique-filenames` | Should the committer generate unique filenames by including a unique ID in the name of each created file? |
 | `fs.s3a.committer.staging.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
 | `fs.s3a.committer.staging.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
-| `fs.s3a.committer.staging.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
+| `fs.s3a.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
 | `fs.s3a.committer.tmp.path` | Directory in the cluster filesystem used for storing information on the uncommitted files. |
 | `mapreduce.fileoutputcommitter.marksuccessfuljobs` | flag to control creation of `_SUCCESS` marker file on job completion. Default: true |
 | `fs.s3a.multipart.size` | Size in bytes of each part of a multipart upload. Default: "100M" |

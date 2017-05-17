@@ -202,12 +202,12 @@ public final class CommitConstants {
    * Number of threads in staging committers for parallel operations
    * (upload, commit, abort): {@value}.
    */
-  public static final String FS_S3A_COMMITTER_STAGING_THREADS =
-      "fs.s3a.committer.staging.threads";
+  public static final String FS_S3A_COMMITTER_THREADS =
+      "fs.s3a.committer.threads";
   /**
-   * Default value for {@link #FS_S3A_COMMITTER_STAGING_THREADS}: {@value}.
+   * Default value for {@link #FS_S3A_COMMITTER_THREADS}: {@value}.
    */
-  public static final int DEFAULT_STAGING_COMMITTER_THREADS = 8;
+  public static final int DEFAULT_COMMITTER_THREADS = 8;
 
   /**
    * Path for pending data in the cluster FS: {@value}.

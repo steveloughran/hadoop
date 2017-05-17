@@ -554,8 +554,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // do commit. Here there will be pending data
     committer.commitTask(tContext);
-    Path attemptPath = committer.getTaskAttemptPath(tContext);
-    assertPathDoesNotExist("commit dir", attemptPath);
+    assertTaskAttemptPathDoesNotExist(committer, tContext);
 
     Configuration conf2 = jobData.job.getConfiguration();
     conf2.set(MRJobConfig.TASK_ATTEMPT_ID, attempt0);
@@ -582,6 +581,26 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer2.abortJob(jContext2, JobStatus.State.KILLED);
     // now, state of system may still have pending data
     assertNoMultipartUploadsPending(outDir);
+  }
+
+  protected void assertTaskAttemptPathDoesNotExist(
+      AbstractS3GuardCommitter committer, TaskAttemptContext context)
+      throws IOException {
+    Path attemptPath = committer.getTaskAttemptPath(context);
+    ContractTestUtils.assertPathDoesNotExist(
+        attemptPath.getFileSystem(context.getConfiguration()),
+        "task attempt dir",
+        attemptPath);
+  }
+
+  protected void assertJobAttemptPathDoesNotExist(
+      AbstractS3GuardCommitter committer, JobContext context)
+      throws IOException {
+    Path attemptPath = committer.getJobAttemptPath(context);
+    ContractTestUtils.assertPathDoesNotExist(
+        attemptPath.getFileSystem(context.getConfiguration()),
+        "job attempt dir",
+        attemptPath);
   }
 
   /**
@@ -620,7 +639,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @throws IOException failure.
    */
   protected Path getPart0000(Path dir) throws IOException {
-    FileStatus[] statuses = getFileSystem().listStatus(dir,
+    FileSystem fs = dir.getFileSystem(getConfiguration());
+    FileStatus[] statuses = fs.listStatus(dir,
         new PathFilter() {
           @Override
           public boolean accept(Path path) {
@@ -629,7 +649,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         });
     if (statuses.length != 1) {
       // fail, with a listing of the parent dir
-      assertPathExists("Output file", new Path(dir, PART_00000));
+      ContractTestUtils.assertPathExists(fs, "Output file",
+          new Path(dir, PART_00000));
     }
     return statuses[0].getPath();
   }
@@ -965,7 +986,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     // do commit
     committer.commitTask(tContext);
-    assertPathDoesNotExist("job path", committer.getTaskAttemptPath(tContext));
+    assertTaskAttemptPathDoesNotExist(committer, tContext);
   }
 
   protected static void expectSimulatedFailureOnJobCommit(JobContext jContext,
@@ -1181,7 +1202,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
     committer.abortJob(jContext, JobStatus.State.FAILED);
 
-    assertPathDoesNotExist("job temp dir", jtd);
+    assertTaskAttemptPathDoesNotExist(committer, tContext);
+    assertJobAttemptPathDoesNotExist(committer, jContext);
 
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
@@ -1211,14 +1233,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
             // write output
             writeTextOutput(tContext);
             committer.abortJob(jContext, JobStatus.State.RUNNING);
-            ContractTestUtils.assertPathDoesNotExist(
-                committer.getTaskAttemptFilesystem(tContext),
-                "Task attempt local working dir",
-                committer.getTaskAttemptPath(tContext));
-            assertPathDoesNotExist("job temp dir",
-                committer.getJobAttemptPath(jContext));
+            assertTaskAttemptPathDoesNotExist(
+                committer, tContext);
+            assertJobAttemptPathDoesNotExist(
+                committer, jContext);
             assertNoMultipartUploadsPending(outDir);
-
           }
         });
   }

@@ -68,6 +68,7 @@ import com.amazonaws.services.s3.transfer.Copy;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerConfiguration;
 import com.amazonaws.services.s3.transfer.Upload;
+import com.amazonaws.services.s3.transfer.model.UploadResult;
 import com.amazonaws.event.ProgressListener;
 import com.amazonaws.event.ProgressEvent;
 import com.google.common.annotations.VisibleForTesting;
@@ -295,7 +296,7 @@ public class S3AFileSystem extends FileSystem {
         LOG.debug("Using S3AOutputStream");
       }
 
-      metadataStore = S3Guard.getMetadataStore(this);
+      setMetadataStore(S3Guard.getMetadataStore(this));
       allowAuthoritative = conf.getBoolean(METADATASTORE_AUTHORITATIVE,
           DEFAULT_METADATASTORE_AUTHORITATIVE);
     } catch (AmazonClientException e) {
@@ -1066,6 +1067,7 @@ public class S3AFileSystem extends FileSystem {
   /** For testing only.  See ITestS3GuardEmptyDirs. */
   @VisibleForTesting
   void setMetadataStore(MetadataStore ms) {
+    Preconditions.checkNotNull(ms);
     metadataStore = ms;
   }
 
@@ -1332,21 +1334,14 @@ public class S3AFileSystem extends FileSystem {
    * @return the upload initiated
    */
   public UploadInfo putObject(PutObjectRequest putObjectRequest) {
-    long len;
-    if (putObjectRequest.getFile() != null) {
-      len = putObjectRequest.getFile().length();
-    } else {
-      len = putObjectRequest.getMetadata().getContentLength();
-    }
+    long len = getPutRequestLength(putObjectRequest);;
     LOG.debug("PUT {} bytes to {} via transfer manager ",
         len, putObjectRequest.getKey());
     incrementPutStartStatistics(len);
     try {
       Upload upload = transfers.upload(putObjectRequest);
-      incrementPutCompletedStatistics(true, len);
       return new UploadInfo(upload, len);
     } catch (AmazonClientException e) {
-      incrementPutCompletedStatistics(false, len);
       throw e;
     }
   }
@@ -2209,25 +2204,63 @@ public class S3AFileSystem extends FileSystem {
     }
     final String key = pathToKey(dst);
     final ObjectMetadata om = newObjectMetadata(srcfile.length());
+    Progressable progress = null;
     PutObjectRequest putObjectRequest = newPutObjectRequest(key, om, srcfile);
-    UploadInfo info = putObject(putObjectRequest);
-    Upload upload = info.getUpload();
-    ProgressableProgressListener listener = new ProgressableProgressListener(
-        this, key, upload, null);
-    upload.addProgressListener(listener);
-    try {
-      upload.waitForUploadResult();
-    } catch (InterruptedException e) {
-      throw new InterruptedIOException("Interrupted copying " + src
-          + " to "  + dst + ", cancelling");
-    }
-    listener.uploadCompleted();
-
-    // This will delete unnecessary fake parent directories
-    finishedWrite(key, info.getLength());
+    executePut(putObjectRequest, progress);
 
     if (delSrc) {
       local.delete(src, false);
+    }
+  }
+
+  /**
+   * Execute a PUT via the transfer manager, blocking for completion,
+   * updating the metastore afterwards.
+   * If the waiting for completion is interrupted, the upload will be
+   * aborted before an {@code InterruptedIOException} is thrown.
+   * @param putObjectRequest request
+   * @param progress optional progress callback
+   * @return the upload result
+   * @throws InterruptedIOException if the blocking was interrupted.
+   */
+  UploadResult executePut(PutObjectRequest putObjectRequest, Progressable progress)
+      throws InterruptedIOException {
+    String key = putObjectRequest.getKey();
+    UploadInfo info = putObject(putObjectRequest);
+    Upload upload = info.getUpload();
+    ProgressableProgressListener listener = new ProgressableProgressListener(
+        this, key, upload, progress);
+    upload.addProgressListener(listener);
+    UploadResult result = waitForUploadCompletion(key, info);
+    listener.uploadCompleted();
+    // post-write actions
+    finishedWrite(key, info.getLength());
+    return result;
+  }
+
+  /**
+   * Wait for an upload to complete.
+   * If the waiting for completion is interrupted, the upload will be
+   * aborted before an {@code InterruptedIOException} is thrown.
+   * @param upload upload to wait for
+   * @param key destination key
+   * @return the upload result
+   * @throws InterruptedIOException if the blocking was interrupted.
+   */
+  UploadResult waitForUploadCompletion(String key, UploadInfo uploadInfo)
+      throws InterruptedIOException {
+    Upload upload = uploadInfo.getUpload();
+    try {
+      UploadResult result = upload.waitForUploadResult();
+      incrementPutCompletedStatistics(true, uploadInfo.getLength());
+      return result;
+    } catch (InterruptedException e) {
+      LOG.info("Interrupted: aborting upload");
+      incrementPutCompletedStatistics(false, uploadInfo.getLength());
+      upload.abort();
+      throw (InterruptedIOException)
+          new InterruptedIOException("Interrupted in PUT to " + keyToPath(key))
+          .initCause(e);
     }
   }
 
@@ -2481,11 +2514,7 @@ public class S3AFileSystem extends FileSystem {
         newObjectMetadata(0L),
         im);
     UploadInfo info = putObject(putObjectRequest);
-    try {
-      info.getUpload().waitForUploadResult();
-    } catch (InterruptedException e) {
-      throw new InterruptedIOException("Interrupted creating " + objectName);
-    }
+    waitForUploadCompletion(objectName, info);
     incrementPutProgressStatistics(objectName, 0);
     instrumentation.directoryCreated();
   }
@@ -2897,5 +2926,12 @@ public class S3AFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * Create a new instance of the committer statistics.
+   * @return a new committer statistics instance
+   */
+  public S3AInstrumentation.CommitterStatistics newCommitterStatistics() {
+    return instrumentation.newCommitterStatistics();
+  }
 
 }

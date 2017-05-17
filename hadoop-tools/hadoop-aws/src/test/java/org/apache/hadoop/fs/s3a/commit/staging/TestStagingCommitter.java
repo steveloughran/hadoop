@@ -48,6 +48,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AWSClientIOException;
 import org.apache.hadoop.fs.s3a.Constants;
+import org.apache.hadoop.fs.s3a.MockS3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.Pair;
@@ -127,7 +128,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   @Before
   public void setupCommitter() throws Exception {
     JobConf jobConf = getConfiguration();
-    jobConf.setInt(FS_S3A_COMMITTER_STAGING_THREADS, numThreads);
+    jobConf.setInt(FS_S3A_COMMITTER_THREADS, numThreads);
     jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
         uniqueFilenames);
     jobConf.set(FS_S3A_COMMITTER_STAGING_UUID,

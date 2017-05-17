@@ -22,7 +22,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
@@ -35,7 +37,9 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.S3AInstrumentation;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
@@ -55,6 +59,9 @@ public class CommitActions {
 
   private final S3AFileSystem fs;
 
+  /** Statistics. */
+  private final S3AInstrumentation.CommitterStatistics statistics;
+
   /**
    * Instantiate.
    * @param fs FS to bind to
@@ -62,17 +69,13 @@ public class CommitActions {
   public CommitActions(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
+    statistics = fs.newCommitterStatistics();
   }
 
   @Override
   public String toString() {
-    final StringBuilder sb = new StringBuilder(
-        "CommitActions{");
-    sb.append("fs=").append(fs.getUri());
-    sb.append('}');
-    return sb.toString();
+    return "CommitActions{" + fs.getUri() + '}';
   }
-
 
   /**
    * Create a new {@link WriteOperationHelper} for working with the destination.
@@ -81,6 +84,12 @@ public class CommitActions {
    */
   private WriteOperationHelper createWriter(String destKey) {
     return fs.createWriteOperationHelper(destKey);
+  }
+
+
+  /** @return statistics. */
+  protected S3AInstrumentation.CommitterStatistics getStatistics() {
+    return statistics;
   }
 
   /**
@@ -101,13 +110,13 @@ public class CommitActions {
    */
   public MaybeIOE commit(SinglePendingCommit commit, String origin) {
     LOG.debug("Committing single commit {}", commit);
-    MaybeIOE outcome = new MaybeIOE();
+    MaybeIOE outcome;
     String destKey = "unknown destination";
     try {
       commit.validate();
       destKey = commit.getDestinationKey();
       // finalize the commit
-      createWriter(destKey).completeMultipartCommit(destKey,
+      createWriter(destKey).finalizeMultipartUpload(destKey,
           commit.getUploadId(),
           CommitUtils.toPartEtags(commit.getEtags()),
           commit.getSize());
@@ -124,6 +133,12 @@ public class CommitActions {
       LOG.warn(msg, e);
       outcome = new MaybeIOE(new PathCommitException(origin, msg, e));
     }
+    if (outcome.hasException()) {
+      statistics.commitFailed();
+    } else {
+      statistics.commitCompleted(commit.size());
+    }
+
     LOG.debug("Commit outcome: {}", outcome);
     return outcome;
   }
@@ -171,8 +186,9 @@ public class CommitActions {
    */
   public Pair<MultiplePendingCommits,
       List<Pair<LocatedFileStatus, IOException>>>
-      loadSinglePendingCommits(Path pendingDir,
-      boolean recursive) throws IOException {
+      loadSinglePendingCommits(
+          Path pendingDir,
+          boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     MultiplePendingCommits commits = new MultiplePendingCommits(
@@ -214,9 +230,12 @@ public class CommitActions {
         (" defined in " + commit.getFilename())
         : "";
     String uploadId = commit.getUploadId();
-    LOG.info("Aborting commit to object {}{}",
-        destKey, origin);
-    abortMultipartCommit(destKey, uploadId);
+    LOG.info("Aborting commit to object {}{}", destKey, origin);
+    try {
+      abortMultipartCommit(destKey, uploadId);
+    } finally {
+      statistics.commitAborted();
+    }
   }
 
   /**
@@ -227,7 +246,11 @@ public class CommitActions {
    */
   public void abortMultipartCommit(String destKey, String uploadId)
       throws IOException {
-    createWriter(destKey).abortMultipartCommit(destKey, uploadId);
+    try {
+      createWriter(destKey).abortMultipartCommit(destKey, uploadId);
+    } finally {
+      statistics.commitAborted();
+    }
   }
 
   /**
@@ -302,8 +325,12 @@ public class CommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.warn("Revert {}", commit);
-    createWriter(commit.getDestinationKey())
-        .revertCommit(commit.getDestinationKey());
+    try {
+      createWriter(commit.getDestinationKey())
+          .revertCommit(commit.getDestinationKey());
+    } finally {
+      statistics.commitAborted();
+    }
   }
 
   /**
@@ -389,6 +416,20 @@ public class CommitActions {
   }
 
   /**
+   * Add the filesystem statistics to the map; overwriting anything
+   * with the same name.
+   * @param dest destination map
+   */
+  public void addFileSystemStatistics(Map<String, Long> dest) {
+    Iterator<StorageStatistics.LongStatistic> iter
+        = fs.getStorageStatistics().getLongStatistics();
+    while (iter.hasNext()) {
+      StorageStatistics.LongStatistic stat = iter.next();
+      dest.put(stat.getName(), stat.getValue());
+    }
+  }
+
+  /**
    * A holder for a possible IOException; the call {@link #maybeRethrow()}
    * will throw any exception passed into the constructor, and be a no-op
    * if none was.
@@ -420,6 +461,14 @@ public class CommitActions {
     }
 
     /**
+     * Is there an exception in this class?
+     * @return true if there is an exception
+     */
+    public boolean hasException() {
+      return exception != null;
+    }
+
+    /**
      * Rethrow any exception.
      * @throws IOException the exception field, if non-null.
      */
@@ -427,6 +476,14 @@ public class CommitActions {
       if (exception != null) {
         throw exception;
       }
+    }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder("MaybeIOE{");
+      sb.append(hasException() ? exception : "");
+      sb.append('}');
+      return sb.toString();
     }
   }
 

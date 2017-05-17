@@ -47,7 +47,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    conf.setInt(CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS, 1);
+    conf.setInt(CommitConstants.FS_S3A_COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         DIRECTORY_COMMITTER_FACTORY);
     // disable unique filenames so that the protocol tests of FileOutputFormat

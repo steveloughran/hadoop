@@ -118,7 +118,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     initOutput(outputPath);
     LOG.debug("{} instantiated for job \"{}\" ID {} with destination {}",
         role, jobName(context), jobIdString(context), outputPath);
-    commitActions = new CommitActions(getDestS3AFS());
+    S3AFileSystem fs = getDestS3AFS();
+    commitActions = new CommitActions(fs);
   }
 
  /**
@@ -388,6 +389,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       successData.setTimestamp(now.getTime());
       successData.setDate(now.toString());
       successData.setFilenames(filenames);
+      commitActions.addFileSystemStatistics(successData.getMetrics());
       commitActions.createSuccessMarker(getOutputPath(), successData);
     }
   }
@@ -626,8 +628,8 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   protected final synchronized ExecutorService buildThreadPool(JobContext context) {
     if (threadPool == null) {
       int numThreads = context.getConfiguration().getInt(
-          FS_S3A_COMMITTER_STAGING_THREADS,
-          DEFAULT_STAGING_COMMITTER_THREADS);
+          FS_S3A_COMMITTER_THREADS,
+          DEFAULT_COMMITTER_THREADS);
       LOG.debug("{}: creating thread pool of size {}", getRole(), numThreads);
       if (numThreads > 0) {
         this.threadPool = Executors.newFixedThreadPool(numThreads,
@@ -639,15 +641,6 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         return null;
       }
     }
-    return threadPool;
-  }
-
-  /**
-   * Get the thread pool, if there is one. Null if the operations are single
-   * threaded, or {@@link #buildThreadPool} has not yet been used to build it.
-   * @return thread pool for task execution or null if there is none
-   */
-  protected synchronized ExecutorService getThreadPool() {
     return threadPool;
   }
 
@@ -710,6 +703,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
             @Override
             public void run(SinglePendingCommit commit,
                 Exception exception) throws IOException {
+              // TODO: why retry here?
               getCommitActions().abortSingleCommit(commit);
             }
           })

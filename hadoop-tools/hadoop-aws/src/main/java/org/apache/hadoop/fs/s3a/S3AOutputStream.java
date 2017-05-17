@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.util.Progressable;
 
+import com.amazonaws.services.s3.model.PutObjectRequest;
 import org.slf4j.Logger;
 
 import java.io.BufferedOutputStream;
@@ -100,23 +101,11 @@ public class S3AOutputStream extends OutputStream {
 
     try {
       final ObjectMetadata om = fs.newObjectMetadata(backupFile.length());
-      UploadInfo info = fs.putObject(
-          fs.newPutObjectRequest(
-              key,
-              om,
-              backupFile));
-      ProgressableProgressListener listener =
-          new ProgressableProgressListener(fs, key, info.getUpload(), progress);
-      info.getUpload().addProgressListener(listener);
-
-      info.getUpload().waitForUploadResult();
-      listener.uploadCompleted();
-      // This will delete unnecessary fake parent directories, update any
-      // MetadataStore
-      fs.finishedWrite(key, info.getLength());
-    } catch (InterruptedException e) {
-      throw (InterruptedIOException) new InterruptedIOException(e.toString())
-          .initCause(e);
+      PutObjectRequest request = fs.newPutObjectRequest(
+          key,
+          om,
+          backupFile);
+      fs.executePut(request, progress);
     } catch (AmazonClientException e) {
       throw translateException("saving output", key , e);
     } finally {

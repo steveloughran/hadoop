@@ -142,6 +142,26 @@ public enum Statistic {
   STREAM_WRITE_QUEUE_DURATION("stream_write_queue_duration",
       "Total queue duration of all block uploads"),
 
+  // S3guard committer stats
+  S3GUARD_COMMITTER_COMMITS_CREATED(
+      "s3guard_committer_commits_created",
+      "Number of commits created"),
+  S3GUARD_COMMITTER_COMMITS_COMPLETED(
+      "s3guard_committer_commits_completed",
+      "Number of commits completed"),
+  S3GUARD_COMMITTER_BYTES_COMMITTED(
+      "s3guard_committer_bytes_commited",
+      "Amount of data committed"),
+  S3GUARD_COMMITTER_COMMITS_FAILED(
+      "s3guard_committer_commits_failed",
+      "Number of commits failed"),
+  S3GUARD_COMMITTER_COMMITS_ABORTED(
+      "s3guard_committer_commits_aborted",
+      "Number of commits aborted"),
+  S3GUARD_COMMITTER_COMMITS_REVERTED(
+      "s3guard_committer_commits_reverted",
+      "Number of commits reverted"),
+
   // S3guard stats
   S3GUARD_METADATASTORE_PUT_PATH_REQUEST(
       "s3guard_metadatastore_put_path_request",
