@@ -1367,10 +1367,9 @@ public class S3AFileSystem extends FileSystem {
     incrementPutStartStatistics(len);
     try {
       PutObjectResult result = s3.putObject(putObjectRequest);
-      long putLen = result.getMetadata().getContentLength();
-      incrementPutCompletedStatistics(true, putLen);
+      incrementPutCompletedStatistics(true, len);
       // update metadata
-      finishedWrite(putObjectRequest.getKey(), putLen);
+      finishedWrite(putObjectRequest.getKey(), len);
       return result;
     } catch (AmazonClientException e) {
       incrementPutCompletedStatistics(false, len);

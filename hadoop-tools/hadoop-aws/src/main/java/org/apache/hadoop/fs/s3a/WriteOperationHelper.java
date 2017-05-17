@@ -396,7 +396,6 @@ public class WriteOperationHelper {
         () -> owner.putObjectDirect(putObjectRequest));
   }
 
-
   /**
    * Revert a commit by deleting the file.
    * TODO: Policy regarding creating a mock empty parent directory.
