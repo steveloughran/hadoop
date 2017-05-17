@@ -146,7 +146,7 @@ public class SuccessData extends PersistentCommitData {
     return new JsonSerialization<>(SuccessData.class, false, true);
   }
 
-  /** Timestamp of creation. */
+  /** @return timestamp of creation. */
   public long getTimestamp() {
     return timestamp;
   }
@@ -155,7 +155,7 @@ public class SuccessData extends PersistentCommitData {
     this.timestamp = timestamp;
   }
 
-  /** Timestamp as date; no expectation of parseability. */
+  /** @return timestamp as date; no expectation of parseability. */
   public String getDate() {
     return date;
   }
@@ -165,7 +165,7 @@ public class SuccessData extends PersistentCommitData {
   }
 
   /**
-   * Host which created the file (implicitly: committed the work).
+   * @return host which created the file (implicitly: committed the work).
    */
   public String getHostname() {
     return hostname;
@@ -176,7 +176,7 @@ public class SuccessData extends PersistentCommitData {
   }
 
   /**
-   * Committer name.
+   * @return committer name.
    */
   public String getCommitter() {
     return committer;
@@ -187,7 +187,7 @@ public class SuccessData extends PersistentCommitData {
   }
 
   /**
-   * Description text.
+   * @return any description text.
    */
   public String getDescription() {
     return description;
@@ -198,7 +198,7 @@ public class SuccessData extends PersistentCommitData {
   }
 
   /**
-   * Metrics.
+   * @return any metrics.
    */
   public Map<String, Long> getMetrics() {
     return metrics;
@@ -209,7 +209,7 @@ public class SuccessData extends PersistentCommitData {
   }
 
   /**
-   * Filenames in the commit.
+   * @return a list of filenames in the commit.
    */
   public List<String> getFilenames() {
     return filenames;

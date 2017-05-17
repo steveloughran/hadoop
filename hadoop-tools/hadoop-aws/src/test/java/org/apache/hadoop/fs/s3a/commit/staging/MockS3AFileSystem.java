@@ -79,7 +79,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   public Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors>
-  getOutcome() {
+    getOutcome() {
     return outcome;
   }
 

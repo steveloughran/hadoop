@@ -363,7 +363,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Filter to find all pendingset files only
+   * Filter to find all pendingset files.
    */
   private static final PathFilter PENDINGSET_FILTER = new PathFilter() {
     @Override

@@ -63,8 +63,9 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     // identify working dir for staging and delete
     Configuration conf = getConfiguration();
     String uuid = StagingS3GuardCommitter.getUploadUUID(conf,
-        taskAttempt0.getJobID());
-    Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid, taskAttempt0);
+        getTaskAttempt0().getJobID());
+    Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid,
+        getTaskAttempt0());
     rmdir(tempDir, conf);
   }
 

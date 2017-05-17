@@ -353,12 +353,13 @@ public final class CommitUtils {
   }
 
   /**
-   * Compute the path where the output of a given job attempt will be placed.
+   * Compute the "magic" path for a job attempt
    * @param appAttemptId the ID of the application attempt for this job.
+   * @param dest the final output directory
    * @return the path to store job attempt data.
    */
-  public static Path getMagicJobAttemptPath(int appAttemptId, Path out) {
-    return new Path(getMagicJobAttemptsPath(out),
+  public static Path getMagicJobAttemptPath(int appAttemptId, Path dest) {
+    return new Path(getMagicJobAttemptsPath(dest),
         formatAppAttemptDir(appAttemptId));
   }
 

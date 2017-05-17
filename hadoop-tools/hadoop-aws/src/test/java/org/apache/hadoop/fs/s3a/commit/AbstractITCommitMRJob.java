@@ -250,8 +250,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   }
 
   /**
-   * Override point for any committer specific validation operations,
-   * called after the base assertions have all passed
+   * Override point for any committer specific validation operations;
+   * called after the base assertions have all passed.
    * @param destPath destination of work
    * @param successData loaded success data
    * @throws Exception failure

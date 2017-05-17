@@ -69,9 +69,9 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   /**
    * Thread pool for task execution.
    */
-  protected ExecutorService threadPool;
+  private ExecutorService threadPool;
 
-  /** Underlying commit operations */
+  /** Underlying commit operations. */
   private CommitActions commitActions;
 
   /**
@@ -429,7 +429,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         getRole(), pending.size());
     Tasks.foreach(pending)
         .stopOnFailure().throwFailureWhenFinished()
-        .executeWith(getThreadPool(context))
+        .executeWith(buildThreadPool(context))
         .onFailure(
             new Tasks.FailureTask<SinglePendingCommit, IOException>() {
               @Override
@@ -479,7 +479,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         Lists.newArrayList());
     Tasks.foreach(pendingCommitFiles)
         .throwFailureWhenFinished(!suppressExceptions)
-        .executeWith(getThreadPool(context))
+        .executeWith(buildThreadPool(context))
         .run(new Tasks.Task<FileStatus, IOException>() {
           @Override
           public void run(FileStatus pendingCommitFile) throws IOException {
@@ -623,11 +623,11 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * @param context the JobContext for this commit
    * @return an {@link ExecutorService} or null for the number of threads
    */
-  protected final ExecutorService getThreadPool(JobContext context) {
+  protected final synchronized ExecutorService buildThreadPool(JobContext context) {
     if (threadPool == null) {
       int numThreads = context.getConfiguration().getInt(
-          CommitConstants.FS_S3A_COMMITTER_STAGING_THREADS,
-          CommitConstants.DEFAULT_STAGING_COMMITTER_THREADS);
+          FS_S3A_COMMITTER_STAGING_THREADS,
+          DEFAULT_STAGING_COMMITTER_THREADS);
       LOG.debug("{}: creating thread pool of size {}", getRole(), numThreads);
       if (numThreads > 0) {
         this.threadPool = Executors.newFixedThreadPool(numThreads,
@@ -639,6 +639,15 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         return null;
       }
     }
+    return threadPool;
+  }
+
+  /**
+   * Get the thread pool, if there is one. Null if the operations are single
+   * threaded, or {@@link #buildThreadPool} has not yet been used to build it.
+   * @return thread pool for task execution or null if there is none
+   */
+  protected synchronized ExecutorService getThreadPool() {
     return threadPool;
   }
 
@@ -696,7 +705,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     } else {
       Tasks.foreach(pending)
           .throwFailureWhenFinished(!suppressExceptions)
-          .executeWith(getThreadPool(context))
+          .executeWith(buildThreadPool(context))
           .onFailure(new Tasks.FailureTask<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit,

@@ -183,7 +183,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
   }
 
   /**
-   * Commit list.
+   * @return commit list.
    */
   public List<SinglePendingCommit> getCommits() {
     return commits;
@@ -194,7 +194,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
   }
 
   /**
-   * Any custom extra data committer subclasses may choose to add.
+   * @return any custom extra data committer subclasses may choose to add.
    */
   public Map<String, String> getExtraData() {
     return extraData;

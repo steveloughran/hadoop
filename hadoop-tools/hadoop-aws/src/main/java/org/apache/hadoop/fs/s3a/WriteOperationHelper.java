@@ -402,7 +402,6 @@ public class WriteOperationHelper {
    * TODO: Policy regarding creating a mock empty parent directory.
    * TODO: Delete entirely?
    * @param destKey destination key
-   * @throws IOException due to inability to delete a directory or file.
    * @return was the operation successful (i.e. did it complete without
    * any error?)
    */

@@ -302,7 +302,8 @@ public class CommitActions {
    */
   public void revertCommit(SinglePendingCommit commit) throws IOException {
     LOG.warn("Revert {}", commit);
-    createWriter(commit.getDestinationKey()).revertCommit(commit.getDestinationKey());
+    createWriter(commit.getDestinationKey())
+        .revertCommit(commit.getDestinationKey());
   }
 
   /**
@@ -396,14 +397,14 @@ public class CommitActions {
     private final IOException exception;
 
     /**
-     * Construct without an exception
+     * Construct without an exception.
      */
     public MaybeIOE() {
       this.exception = null;
     }
 
     /**
-     * Construct with an exception
+     * Construct with an exception.
      * @param exception exception
      */
     public MaybeIOE(IOException exception) {

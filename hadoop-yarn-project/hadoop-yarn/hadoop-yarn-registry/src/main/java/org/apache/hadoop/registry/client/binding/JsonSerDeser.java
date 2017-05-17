@@ -39,7 +39,7 @@ import java.io.IOException;
  *   <li>Specific IOException subclasses for a failure.</li>
  * </ol>
  * The rationale for this is not only to support different things in the,
- * registry, but the fact that all ZK nodes have a size > 0 when examined.
+ * registry, but the fact that all ZK nodes have a size &gt; 0 when examined.
  *
  * @param <T> Type to marshal.
  */

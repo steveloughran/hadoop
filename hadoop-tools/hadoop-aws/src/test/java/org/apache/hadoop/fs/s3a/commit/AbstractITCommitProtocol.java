@@ -91,14 +91,14 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * ID.
    */
 
-  protected String jobId;
+  private String jobId;
 
   // A random task attempt id for testing.
-  protected String attempt0;
-  protected TaskAttemptID taskAttempt0;
+  private String attempt0;
+  private TaskAttemptID taskAttempt0;
 
-  protected String attempt1;
-  protected TaskAttemptID taskAttempt1;
+  private String attempt1;
+  private TaskAttemptID taskAttempt1;
 
   private static final Text KEY_1 = new Text("key1");
   private static final Text KEY_2 = new Text("key2");
@@ -210,6 +210,26 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   protected Path getOutDir() {
     return outDir;
+  }
+
+  protected String getJobId() {
+    return jobId;
+  }
+
+  protected String getAttempt0() {
+    return attempt0;
+  }
+
+  protected TaskAttemptID getTaskAttempt0() {
+    return taskAttempt0;
+  }
+
+  protected String getAttempt1() {
+    return attempt1;
+  }
+
+  protected TaskAttemptID getTaskAttempt1() {
+    return taskAttempt1;
   }
 
   /**

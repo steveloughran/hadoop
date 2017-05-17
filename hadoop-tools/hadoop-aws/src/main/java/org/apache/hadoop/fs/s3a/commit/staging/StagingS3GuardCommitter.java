@@ -78,7 +78,6 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *     Delete all task attempt directories.
  *   </li>
  * </ol>
- * <p>
  */
 
 public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
@@ -790,7 +789,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       Tasks.foreach(taskOutput)
           .stopOnFailure()
           .throwFailureWhenFinished()
-          .executeWith(threadPool)
+          .executeWith(getThreadPool())
           .run(new Tasks.Task<FileStatus, IOException>() {
             @Override
             public void run(FileStatus stat) throws IOException {
@@ -922,7 +921,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context job context
    * @return the output path
    */
-  protected final Path getOutputPath(JobContext context) throws IOException {
+  protected final Path getOutputPath(JobContext context) {
     return finalOutputPath;
   }
 
@@ -935,7 +934,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Get the key of the destination "directory" of the job/task,
+   * Get the key of the destination "directory" of the job/task.
    * @param context job context
    * @return key to write to
    * @throws IOException failure to load the filesystem
@@ -945,7 +944,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * A UUID for this upload, as calculated with
+   * A UUID for this upload, as calculated with.
    * {@link #getUploadUUID(Configuration, String)}
    * @return the UUID for files
    */

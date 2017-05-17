@@ -272,7 +272,7 @@ public class SinglePendingCommit extends PersistentCommitData
     return etags.iterator();
   }
 
-  /** Version marker. */
+  /** @return version marker. */
   public int getVersion() {
     return version;
   }
@@ -284,6 +284,7 @@ public class SinglePendingCommit extends PersistentCommitData
   /**
    * This is the filename of the pending file itself.
    * Used during processing; it's persistent value, if any, is ignored.
+   * @return filename
    */
   public String getFilename() {
     return filename;
@@ -293,7 +294,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.filename = filename;
   }
 
-  /** Path URI of the destination. */
+  /** @return path URI of the destination. */
   public String getUri() {
     return uri;
   }
@@ -302,7 +303,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.uri = uri;
   }
 
-  /** ID of the upload. */
+  /** @return ID of the upload. */
   public String getUploadId() {
     return uploadId;
   }
@@ -311,7 +312,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.uploadId = uploadId;
   }
 
-  /** Destination bucket. */
+  /** @return destination bucket. */
   public String getBucket() {
     return bucket;
   }
@@ -320,7 +321,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.bucket = bucket;
   }
 
-  /** Destination key in the bucket. */
+  /** @return destination key in the bucket. */
   public String getDestinationKey() {
     return destinationKey;
   }
@@ -329,7 +330,10 @@ public class SinglePendingCommit extends PersistentCommitData
     this.destinationKey = destinationKey;
   }
 
-  /** When was the upload created? */
+  /**
+   * When was the upload created?
+   * @return timestamp
+   */
   public long getCreated() {
     return created;
   }
@@ -338,7 +342,10 @@ public class SinglePendingCommit extends PersistentCommitData
     this.created = created;
   }
 
-  /** When was the upload saved? */
+  /**
+   * When was the upload saved?
+   * @return timestamp
+   */
   public long getSaved() {
     return saved;
   }
@@ -347,7 +354,10 @@ public class SinglePendingCommit extends PersistentCommitData
     this.saved = saved;
   }
 
-  /** timestamp as date; no expectation of parseability. */
+  /**
+   * Timestamp as date; no expectation of parseability.
+   * @return date string
+   */
   public String getDate() {
     return date;
   }
@@ -356,7 +366,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.date = date;
   }
 
-  /** Job ID, if known. */
+  /** @return Job ID, if known. */
   public String getJobId() {
     return jobId;
   }
@@ -365,7 +375,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.jobId = jobId;
   }
 
-  /** Task ID, if known. */
+  /** @return Task ID, if known. */
   public String getTaskId() {
     return taskId;
   }
@@ -374,7 +384,10 @@ public class SinglePendingCommit extends PersistentCommitData
     this.taskId = taskId;
   }
 
-  /** Arbitrary notes. */
+  /**
+   * Arbitrary notes.
+   * @return any notes
+   */
   public String getText() {
     return text;
   }
@@ -383,7 +396,7 @@ public class SinglePendingCommit extends PersistentCommitData
     this.text = text;
   }
 
-  /** Ordered list of etags. */
+  /** @return ordered list of etags. */
   public List<String> getEtags() {
     return etags;
   }
@@ -394,6 +407,7 @@ public class SinglePendingCommit extends PersistentCommitData
 
   /**
    * Any custom extra data committer subclasses may choose to add.
+   * @return custom data
    */
   public Map<String, String> getExtraData() {
     return extraData;
@@ -403,7 +417,10 @@ public class SinglePendingCommit extends PersistentCommitData
     this.extraData = extraData;
   }
 
-  /** Destination file size. */
+  /**
+   * Destination file size.
+   * @return size of destination object
+   */
   public long getSize() {
     return size;
   }
