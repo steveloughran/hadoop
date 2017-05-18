@@ -230,6 +230,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     String commitDetails = successData.toString();
     LOG.info("Committer from " + committerFactoryClassname() + "\n{}",
         commitDetails);
+    LOG.info("Committer statistics: \n{}",
+        successData.dumpMetrics("  ", " = ", "\n"));
     assertEquals("Wrong committer in " + commitDetails,
         committerName(), successData.getCommitter());
     List<String> successFiles = successData.getFilenames();
@@ -241,14 +243,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
             + commitDetails, expectedKeys, summaryKeys);
     assertPathDoesNotExist("temporary dir",
         new Path(outputPath, CommitConstants.PENDING_DIR_NAME));
-    Map<String, Long> metrics = successData.getMetrics();
-    List<String> list = new ArrayList<>(metrics.keySet());
-    Collections.sort(list);
-    StringBuilder sb = new StringBuilder(list.size() * 32);
-    for (String k : list) {
-      sb.append(k).append(" = ").append(metrics.get(k)).append("\n");
-    }
-    LOG.info("Committer statistics: \n{}", sb);
     customPostExecutionValidation(outputPath, successData);
   }
 

@@ -24,7 +24,12 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem.Statistics;
+import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricStringBuilder;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -122,12 +127,16 @@ public class S3AInstrumentation {
       STREAM_WRITE_BLOCK_UPLOADS_ABORTED,
       STREAM_WRITE_TOTAL_TIME,
       STREAM_WRITE_TOTAL_DATA,
-      S3GUARD_COMMITTER_COMMITS_CREATED,
-      S3GUARD_COMMITTER_COMMITS_COMPLETED,
-      S3GUARD_COMMITTER_BYTES_COMMITTED,
-      S3GUARD_COMMITTER_COMMITS_FAILED,
-      S3GUARD_COMMITTER_COMMITS_ABORTED,
-      S3GUARD_COMMITTER_COMMITS_REVERTED,
+      COMMITTER_COMMITS_CREATED,
+      COMMITTER_COMMITS_COMPLETED,
+      COMMITTER_JOBS_SUCCEEDED,
+      COMMITTER_JOBS_FAILED,
+      COMMITTER_TASKS_SUCCEEDED,
+      COMMITTER_TASKS_FAILED,
+      COMMITTER_BYTES_COMMITTED,
+      COMMITTER_COMMITS_FAILED,
+      COMMITTER_COMMITS_ABORTED,
+      COMMITTER_COMMITS_REVERTED,
       S3GUARD_METADATASTORE_PUT_PATH_REQUEST,
       S3GUARD_METADATASTORE_INITIALIZATION
   };
@@ -935,25 +944,25 @@ public class S3AInstrumentation {
   }
 
   public void commitCreated() {
-    incrementCounter(S3GUARD_COMMITTER_COMMITS_CREATED, 1);
+    incrementCounter(COMMITTER_COMMITS_CREATED, 1);
   }
 
   /** A commit has been created. */
   public void commitCompleted(long size) {
-    incrementCounter(S3GUARD_COMMITTER_COMMITS_COMPLETED, 1);
-    incrementCounter(S3GUARD_COMMITTER_BYTES_COMMITTED, size);
+    incrementCounter(COMMITTER_COMMITS_COMPLETED, 1);
+    incrementCounter(COMMITTER_BYTES_COMMITTED, size);
   }
 
   public void commitAborted() {
-    incrementCounter(S3GUARD_COMMITTER_COMMITS_ABORTED, 1);
+    incrementCounter(COMMITTER_COMMITS_ABORTED, 1);
   }
 
   public void commitReverted() {
-    incrementCounter(S3GUARD_COMMITTER_COMMITS_REVERTED, 1);
+    incrementCounter(COMMITTER_COMMITS_REVERTED, 1);
   }
 
   public void commitFailed() {
-    incrementCounter(S3GUARD_COMMITTER_COMMITS_FAILED, 1);
+    incrementCounter(COMMITTER_COMMITS_FAILED, 1);
   }
 
   /**
@@ -984,6 +993,121 @@ public class S3AInstrumentation {
       S3AInstrumentation.this.commitFailed();
     }
 
+    public void taskCompleted(boolean success) {
+      incrementCounter(
+          success ? COMMITTER_TASKS_SUCCEEDED
+              : COMMITTER_TASKS_FAILED,
+          1);
+    }
+
+    public void jobCompleted(boolean success) {
+      incrementCounter(
+          success ? COMMITTER_JOBS_SUCCEEDED
+              : COMMITTER_JOBS_FAILED,
+          1);
+    }
   }
 
+  /**
+   * Dump all the metrics to a string.
+   * @param prefix prefix before every entry
+   * @param separator separator between name and value
+   * @param suffix suffix
+   * @param all get all the metrics even if the values are not changed.
+   * @return a string dump of the metrics
+   */
+  public Map<String, Long> toMap() {
+    MetricsToMap metricBuilder = new MetricsToMap(null);
+    registry.snapshot(metricBuilder, true);
+    for (Map.Entry<String, MutableCounterLong> entry :
+        streamMetrics.entrySet()) {
+      metricBuilder.tuple(entry.getKey(), entry.getValue().value());
+    }
+    return metricBuilder.getMap();
+  }
+
+  /**
+   * Convert all metrics to a map.
+   */
+  private static class MetricsToMap extends MetricsRecordBuilder {
+    private final MetricsCollector parent;
+    private final Map<String, Long> map =
+        new HashMap<>(COUNTERS_TO_CREATE.length * 2);
+
+    public MetricsToMap(MetricsCollector parent) {
+      this.parent = parent;
+    }
+
+    @Override
+    public MetricsRecordBuilder tag(MetricsInfo info, String value) {
+      return this;
+    }
+
+    @Override
+    public MetricsRecordBuilder add(MetricsTag tag) {
+      return this;
+    }
+
+    @Override
+    public MetricsRecordBuilder add(AbstractMetric metric) {
+      return this;
+    }
+
+    @Override
+    public MetricsRecordBuilder setContext(String value) {
+      return this;
+    }
+
+    @Override
+    public MetricsRecordBuilder addCounter(MetricsInfo info, int value) {
+      return tuple(info, value);
+    }
+
+    @Override
+    public MetricsRecordBuilder addCounter(MetricsInfo info, long value) {
+      return tuple(info, value);
+    }
+
+    @Override
+    public MetricsRecordBuilder addGauge(MetricsInfo info, int value) {
+      return tuple(info, value);
+    }
+
+    @Override
+    public MetricsRecordBuilder addGauge(MetricsInfo info, long value) {
+      return tuple(info, value);
+    }
+
+    public MetricsToMap tuple(MetricsInfo info, long value) {
+      return tuple(info.name(), value);
+    }
+
+    public MetricsToMap tuple(String name, long value) {
+      map.put(name, value);
+      return this;
+    }
+
+    @Override
+    public MetricsRecordBuilder addGauge(MetricsInfo info, float value) {
+      return tuple(info, (long) value);
+    }
+
+    @Override
+    public MetricsRecordBuilder addGauge(MetricsInfo info, double value) {
+      return tuple(info, (long) value);
+    }
+
+    @Override
+    public MetricsCollector parent() {
+      return parent;
+    }
+
+    /**
+     * Get the map.
+     * @return the map of metrics
+     */
+    public Map<String, Long> getMap() {
+      return map;
+    }
+  }
 }

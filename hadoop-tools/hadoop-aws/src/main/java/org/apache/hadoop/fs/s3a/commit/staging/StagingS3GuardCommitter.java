@@ -612,12 +612,17 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       LOG.warn("Precommit failure for job {}", jobIdString(context), e);
       abortJobInternal(context, pending, true);
+      getCommitActions().jobCompleted(false);
       throw e;
     }
     try (DurationInfo d = new DurationInfo("%s: committing Job %s",
         getRole(), jobIdString(context))) {
       commitJobInternal(context, pending);
+    } catch (IOException e) {
+      getCommitActions().jobCompleted(false);
+      throw e;
     }
+    getCommitActions().jobCompleted(true);
     maybeCreateSuccessMarkerFromCommits(context, pending);
   }
 
@@ -726,16 +731,16 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void commitTask(TaskAttemptContext context) throws IOException {
     try (DurationInfo d = new DurationInfo("%s: commit task %s",
         getRole(), context.getTaskAttemptID())) {
-      try {
-        List<FileStatus> filesToCommit = getTaskOutput(context);
-        int count = commitTaskInternal(context, filesToCommit);
-        LOG.info("{}: upload file count: {}", getRole(), count);
-      } catch (IOException e) {
-        LOG.error("{}: commit of task {} failed",
-            getRole(), context.getTaskAttemptID(), e);
-        throw e;
-      }
+      List<FileStatus> filesToCommit = getTaskOutput(context);
+      int count = commitTaskInternal(context, filesToCommit);
+      LOG.info("{}: upload file count: {}", getRole(), count);
+    } catch (IOException e) {
+      LOG.error("{}: commit of task {} failed",
+          getRole(), context.getTaskAttemptID(), e);
+      getCommitActions().taskCompleted(false);
+      throw e;
     }
+    getCommitActions().taskCompleted(true);
   }
 
   /**

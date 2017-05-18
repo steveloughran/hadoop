@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +36,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AInstrumentation;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
@@ -119,7 +117,7 @@ public class CommitActions {
       createWriter(destKey).finalizeMultipartUpload(destKey,
           commit.getUploadId(),
           CommitUtils.toPartEtags(commit.getEtags()),
-          commit.getSize());
+          commit.getLength());
       LOG.debug("Successful commit");
       outcome = new MaybeIOE();
     } catch (IOException e) {
@@ -136,7 +134,7 @@ public class CommitActions {
     if (outcome.hasException()) {
       statistics.commitFailed();
     } else {
-      statistics.commitCompleted(commit.size());
+      statistics.commitCompleted(commit.getLength());
     }
 
     LOG.debug("Commit outcome: {}", outcome);
@@ -307,12 +305,18 @@ public class CommitActions {
    * Save the success data to the {@code _SUCCESS} file.
    * @param outputPath output directory
    * @param successData success data to save.
+   * @param addMetrics
    * @throws IOException IO problem
    */
-  public void createSuccessMarker(Path outputPath, SuccessData successData)
+  public void createSuccessMarker(Path outputPath,
+      SuccessData successData,
+      boolean addMetrics)
       throws IOException {
     Preconditions.checkArgument(outputPath != null, "null outputPath");
 
+    if (addMetrics) {
+      addFileSystemStatistics(successData.getMetrics());
+    }
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     LOG.debug("Touching success marker for job {}", markerPath);
     successData.save(fs, markerPath, true);
@@ -329,7 +333,7 @@ public class CommitActions {
       createWriter(commit.getDestinationKey())
           .revertCommit(commit.getDestinationKey());
     } finally {
-      statistics.commitAborted();
+      statistics.commitReverted();
     }
   }
 
@@ -361,6 +365,7 @@ public class CommitActions {
 
     boolean threw = true;
     try {
+      statistics.commitCreated();
       uploadId = writer.initiateMultiPartUpload();
       long length = localFile.length();
 
@@ -371,7 +376,7 @@ public class CommitActions {
       commitData.setUploadId(uploadId);
       commitData.setUri(destURI);
       commitData.setText(partition != null ? "partition: " + partition : "");
-      commitData.setSize(length);
+      commitData.setLength(length);
 
       long offset = 0;
       long numParts = (length / uploadPartSize +
@@ -406,6 +411,7 @@ public class CommitActions {
       return commitData;
     } finally {
       if (threw && uploadId != null) {
+        statistics.commitAborted();
         try {
           abortMultipartCommit(key, uploadId);
         } catch (IOException e) {
@@ -421,12 +427,23 @@ public class CommitActions {
    * @param dest destination map
    */
   public void addFileSystemStatistics(Map<String, Long> dest) {
-    Iterator<StorageStatistics.LongStatistic> iter
-        = fs.getStorageStatistics().getLongStatistics();
-    while (iter.hasNext()) {
-      StorageStatistics.LongStatistic stat = iter.next();
-      dest.put(stat.getName(), stat.getValue());
-    }
+    dest.putAll(fs.getInstrumentation().toMap());
+  }
+
+  /**
+   * Note that a task has completed.
+   * @param success success flag
+   */
+  public void taskCompleted(boolean success) {
+    statistics.taskCompleted(success);
+  }
+
+  /**
+   * Note that a job has completed.
+   * @param success success flag
+   */
+  public void jobCompleted(boolean success) {
+    statistics.jobCompleted(success);
   }
 
   /**

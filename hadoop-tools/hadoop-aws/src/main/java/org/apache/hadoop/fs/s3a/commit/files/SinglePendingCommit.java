@@ -113,7 +113,7 @@ public class SinglePendingCommit extends PersistentCommitData
   private Map<String, String> extraData = new HashMap<>(0);
 
   /** Destination file size. */
-  private long size;
+  private long length;
 
   public SinglePendingCommit() {
   }
@@ -190,7 +190,7 @@ public class SinglePendingCommit extends PersistentCommitData
     verify(StringUtils.isNotEmpty(destinationKey),
         "Empty destination");
     verify(StringUtils.isNotEmpty(uploadId), "Empty uploadId");
-    verify(size >= 0, "Invalid size: " + size);
+    verify(length >= 0, "Invalid length: " + length);
     destinationPath();
     verify(etags != null, "No etag list");
     validateCollectionClass(etags, String.class);
@@ -213,7 +213,7 @@ public class SinglePendingCommit extends PersistentCommitData
     sb.append(", uploadId='").append(uploadId).append('\'');
     sb.append(", created=").append(created);
     sb.append(", saved=").append(saved);
-    sb.append(", size=").append(size);
+    sb.append(", size=").append(length);
     sb.append(", date='").append(date).append('\'');
     sb.append(", jobId='").append(jobId).append('\'');
     sb.append(", taskId='").append(taskId).append('\'');
@@ -259,7 +259,7 @@ public class SinglePendingCommit extends PersistentCommitData
    * Get the number of etags.
    * @return the size of the etag list.
    */
-  public int size() {
+  public int getPartCount() {
     return etags.size();
   }
 
@@ -421,11 +421,11 @@ public class SinglePendingCommit extends PersistentCommitData
    * Destination file size.
    * @return size of destination object
    */
-  public long getSize() {
-    return size;
+  public long getLength() {
+    return length;
   }
 
-  public void setSize(long size) {
-    this.size = size;
+  public void setLength(long length) {
+    this.length = length;
   }
 }

@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.util;
 
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -36,13 +43,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-
 /**
  * Support for marshalling objects to and from JSON.
  *  <p>
@@ -51,7 +51,7 @@ import java.io.InputStream;
  * which use the mapper.
  *
  * This method was copied from
- * {@code org.apache.hadoop.registry.client.binding.JsonSerialization}.
+ * {@code org.apache.hadoop.registry.client.binding.JsonSerDeser}.
  * @param <T> Type to marshal.
  */
 @InterfaceAudience.Private
@@ -221,7 +221,7 @@ public class JsonSerialization<T> {
   }
 
   /**
-   * Save to a hadoop filesystem.
+   * Save to a Hadoop filesystem.
    * @param fs filesystem
    * @param path path
    * @param overwrite should any existing file be overwritten
@@ -234,7 +234,7 @@ public class JsonSerialization<T> {
   }
 
   /**
-   * Write the json as bytes -then close the file.
+   * Write the JSON as bytes, then close the file.
    * @param dataOutputStream an output stream that will always be closed
    * @throws IOException on any failure
    */

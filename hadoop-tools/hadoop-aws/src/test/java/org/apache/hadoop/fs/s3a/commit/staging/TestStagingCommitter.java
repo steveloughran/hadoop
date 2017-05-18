@@ -683,7 +683,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     List<String> tags = parts.get(commit.getUploadId());
     assertEquals("Should commit the correct number of file parts",
-        tags.size(), commit.size());
+        tags.size(), commit.getPartCount());
 
 /*
     for (int i = 0; i < tags.size(); i += 1) {

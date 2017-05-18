@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit.files;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +122,30 @@ public class SuccessData extends PersistentCommitData {
     return sb.toString();
   }
 
+  /**
+   * Dump the metrics (if any) to a string.
+   * The metrics are sorted for ease of viewing.
+   * @param prefix prefix before every entry
+   * @param middle string between key and value
+   * @param suffix suffix to each entry
+   * @return the dumped string
+   */
+  public String dumpMetrics(String prefix, String middle, String suffix) {
+    if (metrics == null) {
+      return "";
+    }
+    List<String> list = new ArrayList<>(metrics.keySet());
+    Collections.sort(list);
+    StringBuilder sb = new StringBuilder(list.size() * 32);
+    for (String k : list) {
+      sb.append(prefix)
+          .append(k)
+          .append(middle)
+          .append(metrics.get(k))
+          .append(suffix);
+    }
+    return sb.toString();
+  }
 
   /**
    * Load an instance from a file, then validate it.

@@ -143,23 +143,35 @@ public enum Statistic {
       "Total queue duration of all block uploads"),
 
   // S3guard committer stats
-  S3GUARD_COMMITTER_COMMITS_CREATED(
-      "s3guard_committer_commits_created",
+  COMMITTER_COMMITS_CREATED(
+      "committer_commits_created",
       "Number of commits created"),
-  S3GUARD_COMMITTER_COMMITS_COMPLETED(
-      "s3guard_committer_commits_completed",
-      "Number of commits completed"),
-  S3GUARD_COMMITTER_BYTES_COMMITTED(
-      "s3guard_committer_bytes_commited",
+  COMMITTER_COMMITS_COMPLETED(
+      "committer_commits_completed",
+      "Number of file commits completed"),
+  COMMITTER_JOBS_SUCCEEDED(
+      "committer_jobs_completed",
+      "Number of successful jobs"),
+  COMMITTER_JOBS_FAILED(
+      "committer_jobs_failed",
+      "Number of failed jobs"),
+  COMMITTER_TASKS_SUCCEEDED(
+      "committer_tasks_completed",
+      "Number of successful tasks"),
+  COMMITTER_TASKS_FAILED(
+      "committer_tasks_failed",
+      "Number of failed tasks"),
+  COMMITTER_BYTES_COMMITTED(
+      "committer_bytes_committed",
       "Amount of data committed"),
-  S3GUARD_COMMITTER_COMMITS_FAILED(
-      "s3guard_committer_commits_failed",
+  COMMITTER_COMMITS_FAILED(
+      "committer_commits_failed",
       "Number of commits failed"),
-  S3GUARD_COMMITTER_COMMITS_ABORTED(
-      "s3guard_committer_commits_aborted",
+  COMMITTER_COMMITS_ABORTED(
+      "committer_commits_aborted",
       "Number of commits aborted"),
-  S3GUARD_COMMITTER_COMMITS_REVERTED(
-      "s3guard_committer_commits_reverted",
+  COMMITTER_COMMITS_REVERTED(
+      "committer_commits_reverted",
       "Number of commits reverted"),
 
   // S3guard stats

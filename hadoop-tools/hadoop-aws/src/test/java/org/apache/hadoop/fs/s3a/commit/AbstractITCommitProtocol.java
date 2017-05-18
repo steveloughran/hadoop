@@ -164,6 +164,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       abortMultipartUploadsUnderPath(outDir);
       cleanupDestDir();
     }
+    S3AFileSystem fileSystem = getFileSystem();
+    if (fileSystem != null) {
+      LOG.info("Statistics for {}:\n{}", fileSystem.getUri(),
+          fileSystem.getInstrumentation().dump("  ", " =  ", "\n", true));
+    }
+
     super.teardown();
   }
 
@@ -614,7 +620,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   private void validateContent(Path dir, boolean expectSuccessMarker)
       throws IOException {
     if (expectSuccessMarker) {
-      assertSuccessMarkerExists(dir);
+      verifySuccessMarker(dir);
     }
     Path expectedFile = getPart0000(dir);
     LOG.debug("Validating content in {}", expectedFile);
@@ -943,13 +949,21 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   /**
-   * Assert that the specified dir has the {@code _SUCCESS} marker.
-   * @param dir dir to scan
+   * Verify that the specified dir has the {@code _SUCCESS} marker
+   * and that it can be loaded.
+   * The contents will be logged and returned.
+   * @param dir directory to scan
+   * @return the loaded success data
    * @throws IOException IO Failure
    */
-  protected void assertSuccessMarkerExists(Path dir) throws IOException {
+  protected SuccessData verifySuccessMarker(Path dir) throws IOException {
     assertPathExists("Success marker",
         new Path(dir, SUCCESS_FILE_NAME));
+    SuccessData successData = loadSuccessMarker(dir);
+    LOG.info("Success data {}", successData.toString());
+    LOG.info("Metrics\n{}",
+        successData.dumpMetrics("  ", " = ", "\n"));
+    return successData;
   }
 
   /**
@@ -1018,9 +1032,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     describe("\nvalidating");
 
     // validate output
-    assertSuccessMarkerExists(outDir);
-    SuccessData successData = loadSuccessMarker(outDir);
-    LOG.info("Success data {}", successData);
+    verifySuccessMarker(outDir);
 
     describe("validate output of %s", outDir);
     validateMapFileOutputContent(fs, outDir);

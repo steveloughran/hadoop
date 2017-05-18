@@ -104,7 +104,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
     commitData.setUri(path.toUri().toString());
     commitData.setUploadId(uploadId);
     commitData.setText("");
-    commitData.setSize(bytesWritten);
+    commitData.setLength(bytesWritten);
     commitData.bindCommitData(parts);
     byte[] bytes = commitData.toBytes();
     PutObjectRequest put = writer.newPutRequest(

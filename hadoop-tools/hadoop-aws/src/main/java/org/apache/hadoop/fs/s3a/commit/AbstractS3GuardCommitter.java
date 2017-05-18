@@ -389,8 +389,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       successData.setTimestamp(now.getTime());
       successData.setDate(now.toString());
       successData.setFilenames(filenames);
-      commitActions.addFileSystemStatistics(successData.getMetrics());
-      commitActions.createSuccessMarker(getOutputPath(), successData);
+      commitActions.createSuccessMarker(getOutputPath(), successData, true);
     }
   }
 

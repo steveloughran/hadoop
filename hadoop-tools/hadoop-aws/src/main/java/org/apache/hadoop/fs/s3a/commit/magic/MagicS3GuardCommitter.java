@@ -33,10 +33,10 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitActions;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.CommitActions;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
@@ -128,11 +128,16 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       LOG.warn("Precommit failure for job {}", id, e);
       abortJobInternal(context, pending, true);
+      getCommitActions().jobCompleted(false);
       throw e;
     }
     try (DurationInfo d = new DurationInfo("%s: committing Job %s", r, id)) {
       commitJobInternal(context, pending);
+    } catch (IOException e) {
+      getCommitActions().jobCompleted(false);
+      throw e;
     }
+    getCommitActions().jobCompleted(true);
     maybeCreateSuccessMarkerFromCommits(context, pending);
   }
 
@@ -259,10 +264,14 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       MultiplePendingCommits commits = innerCommitTask(context);
       LOG.info("Task {} committed {} files", context.getTaskAttemptID(),
           commits.size());
+    } catch (IOException e) {
+      getCommitActions().taskCompleted(false);
+      throw e;
     } finally {
       // delete the task attempt so there's no possibility of a second attempt
       deleteTaskAttemptPathQuietly(context);
     }
+    getCommitActions().taskCompleted(true);
   }
 
   /**
