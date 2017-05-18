@@ -1334,7 +1334,7 @@ public class S3AFileSystem extends FileSystem {
    * @return the upload initiated
    */
   public UploadInfo putObject(PutObjectRequest putObjectRequest) {
-    long len = getPutRequestLength(putObjectRequest);;
+    long len = getPutRequestLength(putObjectRequest);
     LOG.debug("PUT {} bytes to {} via transfer manager ",
         len, putObjectRequest.getKey());
     incrementPutStartStatistics(len);
@@ -2223,7 +2223,8 @@ public class S3AFileSystem extends FileSystem {
    * @return the upload result
    * @throws InterruptedIOException if the blocking was interrupted.
    */
-  UploadResult executePut(PutObjectRequest putObjectRequest, Progressable progress)
+  UploadResult executePut(PutObjectRequest putObjectRequest,
+      Progressable progress)
       throws InterruptedIOException {
     String key = putObjectRequest.getKey();
     UploadInfo info = putObject(putObjectRequest);

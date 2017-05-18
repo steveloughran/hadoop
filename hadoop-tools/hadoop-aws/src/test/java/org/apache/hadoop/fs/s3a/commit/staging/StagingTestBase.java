@@ -94,7 +94,6 @@ public class StagingTestBase {
   public static final Path OUTPUT_PATH = new Path(
       "s3a://" + BUCKET + "/" + OUTPUT_PREFIX);
   public static final URI OUTPUT_PATH_URI = OUTPUT_PATH.toUri();
-  public static final URI FS_URI = URI.create("s3a://" + BUCKET + "/");
   private static final Logger LOG =
       LoggerFactory.getLogger(StagingTestBase.class);
 
@@ -376,16 +375,16 @@ public class StagingTestBase {
    */
   public static class ClientResults implements Serializable {
     // For inspection of what the committer did
-    public final Map<String, InitiateMultipartUploadRequest> requests =
+    private final Map<String, InitiateMultipartUploadRequest> requests =
         Maps.newHashMap();
-    public final List<String> uploads = Lists.newArrayList();
-    public final List<UploadPartRequest> parts = Lists.newArrayList();
-    public final Map<String, List<String>> tagsByUpload = Maps.newHashMap();
-    public final List<CompleteMultipartUploadRequest> commits =
+    private final List<String> uploads = Lists.newArrayList();
+    private final List<UploadPartRequest> parts = Lists.newArrayList();
+    private final Map<String, List<String>> tagsByUpload = Maps.newHashMap();
+    private final List<CompleteMultipartUploadRequest> commits =
         Lists.newArrayList();
-    public final List<AbortMultipartUploadRequest> aborts
+    private final List<AbortMultipartUploadRequest> aborts
         = Lists.newArrayList();
-    public final List<DeleteObjectRequest> deletes = Lists.newArrayList();
+    private final List<DeleteObjectRequest> deletes = Lists.newArrayList();
 
     public Map<String, InitiateMultipartUploadRequest> getRequests() {
       return requests;

@@ -173,7 +173,7 @@ public class MultiplePendingCommits extends PersistentCommitData {
     serializer().save(fs, path, this, overwrite);
   }
 
-  /** Version marker. */
+  /** @return the version marker. */
   public int getVersion() {
     return version;
   }

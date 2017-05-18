@@ -352,7 +352,7 @@ public final class CommitUtils {
   }
 
   /**
-   * Compute the "magic" path for a job attempt
+   * Compute the "magic" path for a job attempt.
    * @param appAttemptId the ID of the application attempt for this job.
    * @param dest the final output directory
    * @return the path to store job attempt data.

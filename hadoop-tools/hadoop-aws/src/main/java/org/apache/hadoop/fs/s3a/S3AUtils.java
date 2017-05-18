@@ -588,7 +588,7 @@ public final class S3AUtils {
   }
 
   /**
-   * Get a long option >= the minimum allowed value, supporting memory
+   * Get a long option &gt;= the minimum allowed value, supporting memory
    * prefixes K,M,G,T,P.
    * @param conf configuration
    * @param key key to look up
@@ -778,7 +778,6 @@ public final class S3AUtils {
     }
   }
 
-
   /**
    * Patch the security credential provider information in
    * {@link #CREDENTIAL_PROVIDER_PATH}
@@ -915,4 +914,5 @@ public final class S3AUtils {
       }
     }
   }
+
 }
