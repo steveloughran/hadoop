@@ -186,8 +186,11 @@ The standard commit algorithms (the `FileOutputCommitter` and its v1 and v2 algo
 rely on directory rename being an `O(1)` atomic operation: callers output their
 work to temporary directories in the destination filesystem, then
 rename these directories to the final destination as way of committing work.
-This is the perfect solution for commiting work against any filesystem,
-implementing the full semantics of the `FileSystem.rename()` command.
+This is the perfect solution for commiting work against any filesystem with
+consistent listing operations and where the `FileSystem.rename()` command
+is an atomic `O(1)` operation.
+
+
 Using rename allows individual tasks to work in temporary directories, with the
 rename as the atomic operation can be used to explicitly commit tasks and
 ultimately the entire job. Because the cost of the rename is low, it can be
@@ -203,6 +206,12 @@ To mimic renaming, the Hadoop S3A client has to copy the data to a new object
 with the destination filename, then delete the original entry. This copy
 can be executed server-side, but as it does not complete until the in-cluster
 copy has completed, it takes time proportional to the amount of data.
+
+The rename overhead is the most visible issue, but it is not the most dangerous.
+That is the fact that path listings have no consistency guarantees, and may
+lag the addition or deletion of files.
+If files are not listed, the commit operation will *not* copy them, and
+so they will not appear in the final output.
 
 ### Hadoop MR Commit algorithm "1"
 
@@ -359,7 +368,6 @@ being atomic.
 
 
 
-
 # Core feature: A new/modified output stream for delayed PUT commits
 
 
@@ -396,10 +404,9 @@ Recognising when a file is "special" is problematic; the normal `create(Path, Bo
 call must recognize when the file being created is to be a delayed-commit file,
 so returning the special new stream.
 
-For this we propose
+For this we have
 
-
-1. A "Special" temporary directory name, `__magic`, to indicate that all files
+A "Special" temporary directory name, `__magic`, to indicate that all files
 created under this path are that, "ending commits". Directories created under
 the path will still be created —this allows job and task specific directories to
 be created for individual job and task attempts.
@@ -410,75 +417,76 @@ and used to commit the final uploads.
 
 In the latter example, consider a job with the final directory `/results/latest`
 
-1. The intermediate directory for the task 01 attempt 01 of job `job_400_1` would be
+ The intermediate directory for the task 01 attempt 01 of job `job_400_1` would be
 
-        /results/latest/__magic/job_400_1/_task_01_01
+    /results/latest/__magic/job_400_1/_task_01_01
 
-    This would be returned as the temp directory.
+This would be returned as the temp directory.
 
-1. When a client attempted to create the file
+When a client attempted to create the file
 `/results/latest/__magic/job_400_1/task_01_01/latest.orc.lzo` , the S3A FS would initiate
 a multipart request with the final destination of `/results/latest/latest.orc.lzo`.
 
-1. As data was written to the output stream, it would be incrementally uploaded as
-individual multipart PUT opreations
+ As data was written to the output stream, it would be incrementally uploaded as
+individual multipart PUT operations
 
-1. On `close()`, summary data would be written to the file
+ On `close()`, summary data would be written to the file
 `/results/latest/__magic/job400_1/task_01_01/latest.orc.lzo.pending`.
 This would contain the upload ID and all the parts and etags of uploaded data.
 
-1. The task commit operation would do nothing.
 
-1. The job commit operation would identify all `__magic_` directories
-under the destination directory.
+#### Task commit
 
-1. Those directories of successful task attempts would have their contents
-read, and for each file with summary data, the multipart upload completed.
+The information needed to commit a task is moved from the task attempt
+to the job attempt.
 
-1. Those associated with failed/incomplete task attempts would have the
-summary data of their written parts used to manage the abort
-of the associated multipart puts and the pending data.
+1. The task commit operation lists all `.pending` files in its attempt directory.
+1. The contents are loaded into a list of single pending uploads.
+1. These are merged into to a single `Pendingset` structure.
+1. Which is saved to a `.pendingset` file in the job attempt directory.
+1. Finally, the task attempt directory is deleted. In the example, this
+would be to `/results/latest/__magic/job400_1/task_01_01.pendingset`; 
 
-It should also be possible to support a full directory tree of generated data.
-Paths would just be created under the temporary directory to match
-that of the final data; `/results/latest/__magic/job_400/task_01_01/2017/2017-01-01.orc.lzo.pending`
-would be mapped to a final path of `/results/latest/2017/2017-01-01.orc.lzo`.
 
-Why have a new suffix, `.pending` rather than just use the original filename?
+A failure to load any of the single pending upload files (i.e. the file
+could not load or was considered invalid, the task is considered to
+have failed. All successfully loaded pending commits will be aborted, then
+the failure reported.
 
-1. This avoids anything getting confused between the commit data and the actual data.
-1. It guarantees that any attempt to query or read the path written to will raise
-a `FileNotFoundException` immediately (assuming this is what we want).
-1. If any actual files somehow end up in the directory (e.g through a rename) then
-they can be identified. (maybe the task committer should check for that and signal a problem)
+Similarly, a failure to save the `.pendingset` file will trigger an
+abort of all its pending uploads.
+
+
+#### Job Commit
+
+The job committer will load all `.pendingset` files in its job
+attempt directory.
+
+A failure to load any of these files is considered a job failure; all
+pendingsets which could be loaded will be aborted.
+
+If all pendingsets were loaded, then every
+pending commit in the job will be committed. If any one of these commits
+failed, then all successful commits will be reverted by deleting the destination
+file.
+
+#### Supporting directory trees
+
+To allow tasks to generate data in subdirectories, a special filename `__base`
+will be used to provide an extra cue as to the final path. When mapping an output
+path  `/results/latest/__magic/job_400/task_01_01/__base/2017/2017-01-01.orc.lzo.pending`
+to a final destination path, the path will become `/results/latest/2017/2017-01-01.orc.lzo`.
+That is: all directories between `__magic` and `__base` inclusive will be ignored.
 
 
 **Issues**
 
-* What if there are some non-`.pending` files in the task directory?
-* What if the multipart commit fails?
+Q. What if there are some non-`.pending` files in the task attempt directory?
 
-### Aborting a task
+A. This can only happen if the magic committer is being used in an S3A client
+which does not have the "magic path" feature enabled. This will be checked for
+during job and task committer initialization.
 
-When a task is aborted, all of its pending commits must be cancelled.
-
-1. List all pending commit files for that task.
-1. Cancel them.
-1. Delete the commit files.
-1. Delete the directory (for completeness).
-
-**Issues**
-
-* What if there are some non-.pending files in the task directory?
-* What if the multipart abort fails?
-
-### Aborting a job
-
-Aborting a job is similar to aborting a task:
-
-1. Enumerate all task directories under a job directory.
-1. Abort all pending commits in them.
-1. delete the pending directory for that job.
 
 ### Cleaning up after complete job failure
 
@@ -511,7 +519,7 @@ data had yet been uploaded, the `close()` time would be that of the initiate
 multipart request and the final put. This could perhaps be simplified by always
 requesting a multipart ID on stream creation.
 
-The time to commit will be `O(files)`:
+The time to commit will be `files/threads`:
 
 * An `O(children/5000)` bulk listing of the destination directory will enumerate all
 children of all pending commit directories.
@@ -519,7 +527,7 @@ children of all pending commit directories.
 would be higher).
 
 * Every file to be committed will require a GET of the summary data, and a POST
-of the final commit. This could be parallelized.
+of the final commit. This is parallelized.
 
 * Similarly, every task being aborted will require a GET and abort request.
 
@@ -540,50 +548,53 @@ or some command tools which we would need to write.
 
 1. Files will not be visible after the `close()` call, as they will not exist.
 Any code which expected pending-commit files to be visible will fail.
-1. Failures of tasks and jobs will leave outstanding multipart PUT blocks. These
+
+1. Failures of tasks and jobs will leave outstanding multipart uploads. These
 will need to be garbage collected. S3 now supports automated cleanup; S3A has
 the option to do it on startup, and we plan for the `hadoop s3` command to
 allow callers to explicitly do it. If tasks were to explicitly write the upload
 ID of writes as a write commenced, cleanup by the job committer may be possible.
+
 1. The time to write very small files may be higher than that of PUT and COPY.
 We are ignoring this problem as not relevant in production; any attempt at optimizing
 small file operations will only complicate development, maintenance and testing.
+
 1. The files containing temporary information could be mistaken for actual
 data.
+
 1. It could potentially be harder to diagnose what is causing problems. Lots of
 logging can help, especially with debug-level listing of the directory structure
 of the temporary directories.
-1. The committer will need access to low-level S3 operations. It will need
-to be implemented inside the hadoop-aws library, with methods explicitly
-exposed for it.
-1. If a new Spark committer is also added, that will need access to the same
-private/unstable methods, and be very brittle against Hadoop versions.
+
 1. To reliably list all PUT requests outstanding, we need list consistency
 In the absence of a means to reliably identify when an S3 endpoint is consistent, people
 may still use eventually consistent stores, with the consequent loss of data.
+
 1. If there is more than one job simultaneously writing to the same destination
 directories, the output may get confused. This appears to hold today with the current
 commit algorithms.
-1. It would be possible to create >1 client writing to the same destination
-file within the same S3A client/task, either sequentially or in parallel.
+
+1. It is possible to create more than one client writing to the
+same destination file within the same S3A client/task, either sequentially or in parallel.
+
 1. Even with a consistent metadata store, if a job overwrites existing
 files, then old data may still be visible to clients reading the data, until
 the update has propagated to all replicas of the data.
+
 1. If the operation is attempting to completely overwrite the contents of
 a directory, then it is not going to work: the existing data will not be cleaned
 up. A cleanup operation would need to be included in the job commit, deleting
 all files in the destination directory which where not being overwritten.
+
 1. It requires a path element, such as `__magic` which cannot be used
 for any purpose other than for the storage of pending commit data.
+
 1. Unless extra code is added to every FS operation, it will still be possible
-to manipulate files under the `__magic` tree. That's not necessarily bad.
+to manipulate files under the `__magic` tree. That's not bad, it just potentially
+confusing.
+
 1. As written data is not materialized until the commit, it will not be possible
 for any process to read or manipulated a file which it has just created.
-1. As written data is not materialized until the commit, if a task
-fails before the `close()` operation, there will be nothing to recover.
-This is the exact outcome that surfaces when writing to S3A today, so it
-cannot be described as a regression.
-
 
 
 ## Implementation
@@ -632,77 +643,50 @@ is identified, determine final path and temp dir (some magic is going to
 be needed here); instantiate `S3ACommitterUploadTracker` with destination
 information.
 
-### New class:`FileCommitActions`
-
-This is created, bonded to an S3FS instance and is used to commit a single
-file. Having it standalone allows for isolated testing of functionality
-and failure resilience
-
-**`commitPendingFile(Path)`**
-
-1. Takes a working file path under `__magic`,
-1. verifies its referring to an MPU,
-1. lists and reads in all info on the MPU commit
-1. builds final commit, submits it,
-1. DELETE working data
-
-What to do if the upload ID is unknown? Fail the commit?
-
-**`abortPendingFile(Path)`**
-
-Cancels the MPU of a file. Reads in a path, gets the MPU ID, cancels
-maybe also: calculate final destination, enum the list of MPUs pending
-there and verify that the one about to be cancelled exists/is for it.
-
-Maybe/maybe not delete the file entry.
-
-It must not be an error if an abort fails because the upload ID is not
-known.
+#### Outstanding issues
 
 
-**`commitAllPendingFilesInPath(Path pendingDir, boolean recursive)`**
+**Name of pending directory**
 
-Enumerate all entries in a directory/directory tree: commits them.
+The design proposes the name `__magic` for the directory. HDFS and
+the various scanning routines always treat files and directories starting with `_`
+as temporary/excluded data.
 
-Because of the risk of multiple job/task attempts in the `__magic` tree,
-this should no be called directly against that tree, only against
-those tasks known to have complete
+There's another option, `_temporary`, which is used by `FileOutputFormat` for its
+output. If that was used, then the static methods in `FileOutputCommitter`
+to generate paths, for example `getJobAttemptPath(JobContext, Path)` would
+return paths in the pending directory, so automatically be treated as
+delayed-completion files.
 
-**`abortAllPendingFilesInPath(Path pendingDir, boolean recursive)`**
+**Subdirectories of a pending directory**
 
-Enumerate all entries in a directory/directory tree: abort the MPUs, then
-delete the entries in the path.
+It is legal to create subdirectories in a task work directory, which
+will then be moved into the destination directory, retaining that directory
+tree.
 
-### New class:`S3AJobCommitter`
+That is, a if the task working dir is `dest/__magic/app1/task1/`, all files
+under `dest/__magic/app1/task1/part-0000/` must end up under the path
+`dest/part-0000/`.
 
-Commit the output of all tasks which are known to have completed, aborts
-those which have not. It is the core of the commit process.
+This behavior is relied upon for the writing of intermediate map data in an MR
+job.
 
-If a job is committed, it must commit the output of all tasks which have completed.
+This means it is not simply enough to strip off all elements of under `__magic`,
+it is critical to determine the base path.
 
-Those tasks known to have failed will be aborted
+Proposed: use the special name `__base` as a marker of the base element for
+committing. Under task attempts a `__base` dir is created and turned into the
+working dir. All files created under this path will be committed to the destination
+with a path relative to the base dir.
 
-Presumably it will have to abort those tasks whose state is unknown: they
-must be considered failures.
+More formally: the last parent element of a path which is `__base` sets the
+base for relative paths created underneath it.
 
-### New class:`S3AJobAborter`
-
-Abort all tasks of a job, using `S3ATaskDirectoryAborter` in series or
-parallel.
-
-
-### class `S3AOutputCommitter extends PathOutputCommitter`
-
-This is the class which will use the S3A task and job commit/aborter classes
-to manage the task and job output commitment process. It is the integration
-point with the Hadoop MR framework.
-
-
-### Integration with Hadoop and Spark code.
+### Integration with MapReduce
 
 
 In order to support the ubiquitous `FileOutputFormat` and subclasses,
-the S3A Committer will need somehow be accepted as a valid committer by the class,
+S3A Committers will need somehow be accepted as a valid committer by the class,
 a class which explicity expects the output committer to be `FileOutputCommitter`
 
 ```java
@@ -765,22 +749,47 @@ uses, these changes will allow an S3A committer to replace the `FileOutputCommit
 with minimal changes to the codebase.
 
 
-
 ### Failure cases
-
-**Job Recovery**
 
 **Network Partitioning**
 
+The job/task commit protocol is expected to handle this with the task
+only committing work when the job driver tells it to. A network partition
+should trigger the task committer's cancellation of the work (this is a protcol
+above the committers).
+
 **Job Driver failure**
+
+The job will be restarted. When it completes it will delete all
+outstanding requests to the destination directory which it has not
+committed itself.
 
 **Task failure**
 
+The task will be restarted. Pending work of the task will not be committed;
+when the job driver cleans up it will cancel pending writes under the directory.
+
 **Multiple jobs targeting the same destination directory**
+
+This leaves things in an inderminate state.
+
 
 **Failure during task commit**
 
+Pending uploads will remain, but no changes will be visible. 
+
+If the `.pendingset` file has been saved to the job attempt directory, the
+task has effectively committed, it has just failed to report to the
+controller. This will cause complications during job commit, as there
+may be two task pendingset committing the same files, or committing
+files with 
+
+*Proposed*: track task ID in pendingsets, recognise duplicates on load
+and then respond by cancelling one set and committing the other. (or fail?)
+
 **Failure during job commit**
+
+The destination will be left in an unknown state.
 
 **Failure during task/job abort**
 
@@ -853,7 +862,7 @@ We plan to wait until the MRv2 implementation is working before starting this re
 process, to simplify the development.
 
 
-### Integrating with Spark
+## Integrating with Spark
 
 Spark defines a commit protocol `org.apache.spark.internal.io.FileCommitProtocol`,
 implementing it in `HadoopMapReduceCommitProtocol` a subclass `SQLHadoopMapReduceCommitProtocol`
@@ -899,6 +908,13 @@ this is then patched in to the value `spark.sql.sources.outputCommitterClass`
 where it is picked up by `SQLHadoopMapReduceCommitProtocol` and instantiated
 as the committer for the work.
 
+This is presumably done so the user has the option of requesting a metadata
+summary file by setting the option `"parquet.enable.summary-metadata"`.
+Creating the summary file requires scanning every single file in the destination
+directory on the job commit, so is *very* expensive, and not something which
+we recommend when working with S3.
+
+
 To use a s3guard committer, it must also be identified as the parquet committer.
 The fact that instances are dynamically instantiated somewhat complicates the process.
 
@@ -911,67 +927,18 @@ This is unfortunate as it complicates dynamically selecting a committer protocol
 based on the destination filesystem type or any per-bucket configuration. Some
 possible solutions are
 
-* Have a dynamic output committer which relays to another PathOutputCommitter;
+* Have a dynamic output committer which relays to another `PathOutputCommitter`;
 it chooses the actual committer by way of the new factory mechanism.
 * Add a new spark output committer.
-
-Ultimately, a new Spark committer is going to be the best solution, as it
-can also address temporary files.  Given the difficulties encountered trying
-to get any cloud integration into Spark, this will be done outside the
-spark codebase, with a goal of adding it to Apache Bahir. (Short term:
-Steve's [spark/cloud test suite](https://github.com/steveloughran/spark-cloud-examples).
 
 
 The short term solution of a dynamic wrapper committer could postpone the need for this.
 
 
 
-
-
-
-#### Outstanding issues
-
-
-**Name of pending directory**
-
-The design proposes the name `__magic` for the directory. HDFS and
-the various scanning routines always treat files and directories starting with `_`
-as temporary/excluded data.
-
-There's another option, `_temporary`, which is used by `FileOutputFormat` for its
-output. If that was used, then the static methods in `FileOutputCommitter`
-to generate paths, for example `getJobAttemptPath(JobContext, Path)` would
-return paths in the pending directory, so automatically be treated as
-delayed-completion files.
-
-**Subdirectories of a pending directory**
-
-It is legal to create subdirectories in a task work directory, which
-will then be moved into the destination directory, retaining that directory
-tree.
-
-That is, a if the task working dir is `dest/__magic/app1/task1/`, all files
-under `dest/__magic/app1/task1/part-0000/` must end up under the path
-`dest/part-0000/`.
-
-This behavior is relied upon for the writing of intermediate map data in an MR
-job.
-
-This means it is not simply enough to strip off all elements of under `__magic`,
-it is critical to determine the base path.
-
-Proposed: use the special name `__base` as a marker of the base element for
-committing. Under task attempts a `__base` dir is created and turned into the
-working dir. All files created under this path will be committed to the destination
-with a path relative to the base dir.
-
-More formally: the last parent element of a path which is `__base` sets the
-base for relative paths created underneath it.
-
-
 ## Alternate Design, the Netflix "Staging" Committer
 
-Ryan Blue, of Netflix, Submitted an alternate committer, one which has a
+Ryan Blue, of Netflix, has submitted an alternate committer, one which has a
 number of appealing features
 
 * Doesn't have any requirements of the destination object store, not even
@@ -1078,24 +1045,30 @@ output reaches the job commit.
 
 Similarly, if a task is aborted, temporary output on the local FS is removed.
 
-If a task dies while the committer is running, it is possible for data to be left on the local FS or as unfinished parts in S3. Unfinished upload parts in S3 are not visible to table readers and are cleaned up following the rules in the target bucket's life-cycle policy.
+If a task dies while the committer is running, it is possible for data to be 
+eft on the local FS or as unfinished parts in S3.
+Unfinished upload parts in S3 are not visible to table readers and are cleaned
+up following the rules in the target bucket's life-cycle policy.
 
-Failures during job commit are handled by deleting any files that have already been completed and aborting the remaining uploads. Because uploads are completed individually, the files that are deleted were visible to readers.
+Failures during job commit are handled by deleting any files that have already
+been completed and aborting the remaining uploads.
+Because uploads are completed individually, the files that are deleted were visible to readers.
 
 If the process dies while the job committer is running, there are two possible failures:
 
 1. Some directories that would be replaced have been deleted, but no new data is visible.
-2. Some new data is visible but is not complete, and all replaced directories have been removed. Only complete files are visible.
+2. Some new data is visible but is not complete, and all replaced directories have been removed.
+ Only complete files are visible.
 
-If the process dies during job commit, cleaning up is a manual process. File names include a UUID for each write so that files can be identified and removed.
+If the process dies during job commit, cleaning up is a manual process.
+File names include a UUID for each write so that files can be identified and removed.
 
 
 #### Failure during task execution
 
 All data is written to local temporary files; these need to be cleaned up.
 
-The job must ensure
-that the local (pending) data is purged. TODO: test this
+The job must ensure that the local (pending) data is purged. *TODO*: test this
 
 
 #### Failure during task commit

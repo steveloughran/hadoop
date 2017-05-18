@@ -47,9 +47,8 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class MultiplePendingCommits extends PersistentCommitData {
-  private static final Logger LOG = LoggerFactory.getLogger(
-      MultiplePendingCommits.class);
+public class Pendingset extends PersistentCommitData {
+  private static final Logger LOG = LoggerFactory.getLogger(Pendingset.class);
 
   /**
    * Supported version value: {@value}.
@@ -77,12 +76,12 @@ public class MultiplePendingCommits extends PersistentCommitData {
    */
   private Map<String, String> extraData = new HashMap<>(0);
 
-  public MultiplePendingCommits() {
+  public Pendingset() {
     this(0);
   }
 
 
-  public MultiplePendingCommits(int size) {
+  public Pendingset(int size) {
     commits = new ArrayList<>(size);
   }
 
@@ -90,8 +89,8 @@ public class MultiplePendingCommits extends PersistentCommitData {
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  public static JsonSerialization<MultiplePendingCommits> serializer() {
-    return new JsonSerialization<>(MultiplePendingCommits.class, false, true);
+  public static JsonSerialization<Pendingset> serializer() {
+    return new JsonSerialization<>(Pendingset.class, false, true);
   }
 
   /**
@@ -102,10 +101,10 @@ public class MultiplePendingCommits extends PersistentCommitData {
    * @throws IOException IO failure
    * @throws ValidationFailure if the data is invalid
    */
-  public static MultiplePendingCommits load(FileSystem fs, Path path)
+  public static Pendingset load(FileSystem fs, Path path)
       throws IOException {
     LOG.debug("Reading pending commits in file {}", path);
-    MultiplePendingCommits instance = serializer().load(fs, path);
+    Pendingset instance = serializer().load(fs, path);
     instance.validate();
     return instance;
   }
@@ -151,7 +150,6 @@ public class MultiplePendingCommits extends PersistentCommitData {
           c.getDestinationKey());
       destinations.add(c.getDestinationKey());
     }
-
   }
 
   @Override

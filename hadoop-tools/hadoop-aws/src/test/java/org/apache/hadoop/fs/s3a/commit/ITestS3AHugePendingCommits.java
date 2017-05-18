@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.scale.AbstractSTestS3AHugeFiles;
 
@@ -111,7 +111,7 @@ public class ITestS3AHugePendingCommits extends AbstractSTestS3AHugeFiles {
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
     CommitActions actions = new CommitActions(fs);
     Preconditions.checkArgument(jobDir != null, "null pendingDir");
-    Pair<MultiplePendingCommits, List<Pair<LocatedFileStatus, IOException>>>
+    Pair<Pendingset, List<Pair<LocatedFileStatus, IOException>>>
         results = actions.loadSinglePendingCommits(jobDir, false);
     for (SinglePendingCommit singlePendingCommit : results._1().getCommits()) {
       actions.commitOrFail(singlePendingCommit);

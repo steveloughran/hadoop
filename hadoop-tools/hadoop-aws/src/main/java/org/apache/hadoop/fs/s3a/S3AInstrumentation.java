@@ -943,54 +943,37 @@ public class S3AInstrumentation {
     }
   }
 
-  public void commitCreated() {
-    incrementCounter(COMMITTER_COMMITS_CREATED, 1);
-  }
-
-  /** A commit has been created. */
-  public void commitCompleted(long size) {
-    incrementCounter(COMMITTER_COMMITS_COMPLETED, 1);
-    incrementCounter(COMMITTER_BYTES_COMMITTED, size);
-  }
-
-  public void commitAborted() {
-    incrementCounter(COMMITTER_COMMITS_ABORTED, 1);
-  }
-
-  public void commitReverted() {
-    incrementCounter(COMMITTER_COMMITS_REVERTED, 1);
-  }
-
-  public void commitFailed() {
-    incrementCounter(COMMITTER_COMMITS_FAILED, 1);
-  }
-
   /**
-   * Instrumentation exported to S3Guard Committer.
+   * Instrumentation exported to S3Guard Committers.
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public final class CommitterStatistics {
     /** A commit has been created. */
     public void commitCreated() {
-      S3AInstrumentation.this.commitCreated();
+      incrementCounter(COMMITTER_COMMITS_CREATED, 1);
     }
 
     /** A commit has been created. */
     public void commitCompleted(long size) {
-      S3AInstrumentation.this.commitCompleted(size);
+      incrementCounter(COMMITTER_COMMITS_COMPLETED, 1);
+      incrementCounter(COMMITTER_BYTES_COMMITTED, size);
     }
 
+    /**
+     * A commit has been completed.
+     * @param size size in bytes
+     */
     public void commitAborted() {
-      S3AInstrumentation.this.commitAborted();
+      incrementCounter(COMMITTER_COMMITS_ABORTED, 1);
     }
 
     public void commitReverted() {
-      S3AInstrumentation.this.commitReverted();
+      incrementCounter(COMMITTER_COMMITS_REVERTED, 1);
     }
 
     public void commitFailed() {
-      S3AInstrumentation.this.commitFailed();
+      incrementCounter(COMMITTER_COMMITS_FAILED, 1);
     }
 
     public void taskCompleted(boolean success) {
@@ -1009,12 +992,8 @@ public class S3AInstrumentation {
   }
 
   /**
-   * Dump all the metrics to a string.
-   * @param prefix prefix before every entry
-   * @param separator separator between name and value
-   * @param suffix suffix
-   * @param all get all the metrics even if the values are not changed.
-   * @return a string dump of the metrics
+   * Copy all the metrics to a map of (name, long-value).
+   * @return a map of the metrics
    */
   public Map<String, Long> toMap() {
     MetricsToMap metricBuilder = new MetricsToMap(null);

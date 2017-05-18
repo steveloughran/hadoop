@@ -44,7 +44,7 @@ import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.fs.s3a.commit.Tasks;
-import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
@@ -784,7 +784,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
       // before the uploads, report some progress
       context.progress();
 
-      MultiplePendingCommits pendingCommits = new MultiplePendingCommits(
+      Pendingset pendingCommits = new Pendingset(
           commitCount);
       try {
         Tasks.foreach(taskOutput)

@@ -50,7 +50,7 @@ import org.apache.hadoop.fs.s3a.AWSClientIOException;
 import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.MockS3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapred.JobConf;
@@ -229,7 +229,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID: " + results,
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = MultiplePendingCommits.load(dfs,
+    Pendingset pending = Pendingset.load(dfs,
         stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
     SinglePendingCommit commit = pending.getCommits().get(0);
@@ -270,7 +270,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     assertEquals("Should name the commits file with the task ID",
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
-    MultiplePendingCommits pending = MultiplePendingCommits.load(dfs,
+    Pendingset pending = Pendingset.load(dfs,
         stats[0].getPath());
     assertEquals("Should have one pending commit", 1, pending.size());
   }
@@ -294,7 +294,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
         "task_job_0001_r_000002", stats[0].getPath().getName());
 
     List<SinglePendingCommit> pending =
-        MultiplePendingCommits.load(dfs, stats[0].getPath()).getCommits();
+        Pendingset.load(dfs, stats[0].getPath()).getCommits();
     assertEquals("Should have correct number of pending commits",
         files.size(), pending.size());
 

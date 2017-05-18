@@ -26,7 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -64,11 +63,14 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 /** Full integration test of an MR job. */
 public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
-  private static final int TEST_FILE_COUNT = 8;
+  private static final int TEST_FILE_COUNT = 2;
+  private static final int SCALE_TEST_FILE_COUNT = 20;
+
   private static MiniDFSTestCluster hdfs;
   private static MiniMRYarnCluster yarn = null;
   private static JobConf conf = null;
   private boolean uniqueFilenames = false;
+  private boolean scaleTest;
 
   protected static FileSystem getDFS() {
     return hdfs.getClusterFS();
@@ -98,10 +100,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     yarn = null;
   }
 
-  public static JobConf getConf() {
-    return conf;
-  }
-
   public static MiniDFSCluster getHdfs() {
     return hdfs.getCluster();
   }
@@ -110,9 +108,18 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     return hdfs.getLocalFS();
   }
 
-  /** Test Mapper. */
+  /**
+   *  Test Mapper.
+   *  This is executed in separate process, and must not make any assumptions
+   *  about external state.
+   */
   public static class MapClass
       extends Mapper<LongWritable, Text, LongWritable, Text> {
+
+    private int operations;
+    private String id = "";
+    private LongWritable l = new LongWritable();
+    private Text t = new Text();
 
     @Override
     protected void setup(Context context)
@@ -120,12 +127,20 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
       super.setup(context);
       // force in Log4J logging
       org.apache.log4j.BasicConfigurator.configure();
+      boolean scaleMap = context.getConfiguration()
+          .getBoolean(KEY_SCALE_TESTS_ENABLED, false);
+      operations = scaleMap ? 1000 : 10;
+      id = context.getTaskAttemptID().toString();
     }
 
     @Override
     protected void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
-      context.write(key, value);
+      for (int i = 0; i < operations; i++) {
+        l.set(i);
+        t.set(String.format("%s:%05d", id, i));
+        context.write(l, t);
+      }
     }
   }
 
@@ -144,6 +159,21 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
    */
   protected abstract String committerName();
 
+
+  @Override
+  public void setup() throws Exception {
+    super.setup();
+    scaleTest = getTestPropertyBool(
+        getConfiguration(),
+        KEY_SCALE_TESTS_ENABLED,
+        DEFAULT_SCALE_TESTS_ENABLED);
+  }
+
+  @Override
+  protected int getTestTimeoutMillis() {
+    return SCALE_TEST_TIMEOUT_SECONDS * 1000;
+  }
+
   @Test
   public void testMRJob() throws Exception {
     S3AFileSystem fs = getFileSystem();
@@ -153,28 +183,30 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
 
     String commitUUID = UUID.randomUUID().toString();
     String suffix = uniqueFilenames ? ("-" + commitUUID) : "";
-    int numFiles = TEST_FILE_COUNT;
-    Set<String> expectedPaths = Sets.newHashSet();
+    int numFiles = getTestFileCount();
+    List<String> expectedFiles = new ArrayList<>(numFiles);
     Set<String> expectedKeys = Sets.newHashSet();
     for (int i = 0; i < numFiles; i += 1) {
       File file = temp.newFile(String.valueOf(i) + ".text");
       try (FileOutputStream out = new FileOutputStream(file)) {
         out.write(("file " + i).getBytes(StandardCharsets.UTF_8));
       }
-      String filename = "part-m-0000" + i +
-          suffix;
+      String filename = String.format("part-m-%05d%s", i, suffix);
       Path path = new Path(outputPath, filename);
-      expectedPaths.add(path.toString());
+      expectedFiles.add(path.toString());
       expectedKeys.add(fs.pathToKey(path));
     }
+    Collections.sort(expectedFiles);
 
     Job mrJob = Job.getInstance(yarn.getConfig(), "test-committer-job");
-    JobConf jobConf = (JobConf)mrJob.getConfiguration();
+    JobConf jobConf = (JobConf) mrJob.getConfiguration();
     jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
         uniqueFilenames);
 
     jobConf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         committerFactoryClassname());
+    // pass down the scale test flag
+    jobConf.setBoolean(KEY_SCALE_TESTS_ENABLED, scaleTest);
 
     mrJob.setOutputFormatClass(LoggingTextOutputFormat.class);
     FileOutputFormat.setOutputPath(mrJob, outputPath);
@@ -208,22 +240,24 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     mrJob.setMaxMapAttempts(1);
 
     mrJob.submit();
-    boolean succeeded = mrJob.waitForCompletion(true);
-    assertTrue("MR job failed", succeeded);
+    try (DurationInfo d = new DurationInfo("Job Execution")) {
+      boolean succeeded = mrJob.waitForCompletion(true);
+      assertTrue("MR job failed", succeeded);
+    }
 
     assertIsDirectory(outputPath);
-    Set<String> actualFiles = Sets.newHashSet();
     FileStatus[] results = fs.listStatus(outputPath, TEMP_FILE_FILTER);
-    assertTrue("No files in output directory", results.length != 0);
-    LOG.info("Found {} files", results.length);
+    int fileCount = results.length;
+    List<String> actualFiles = new ArrayList<>(fileCount);
+    assertTrue("No files in output directory", fileCount != 0);
+    LOG.info("Found {} files", fileCount);
     for (FileStatus result : results) {
       LOG.debug("result: {}", result);
       actualFiles.add(result.getPath().toString());
     }
+    Collections.sort(actualFiles);
 
-    assertEquals("Should commit the correct file paths",
-        expectedPaths, actualFiles);
-    // now load in the success data marker: this guarantees that a s3guard
+    // load in the success data marker: this guarantees that a s3guard
     // committer was used
     SuccessData successData = SuccessData.load(fs,
         new Path(outputPath, SUCCESS_FILE_NAME));
@@ -237,13 +271,25 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     List<String> successFiles = successData.getFilenames();
     assertTrue("No filenames in " + commitDetails,
         !successFiles.isEmpty());
+
+    assertEquals("Should commit the expected files",
+        expectedFiles, actualFiles);
+
     Set<String> summaryKeys = Sets.newHashSet();
     summaryKeys.addAll(successFiles);
     assertEquals("Summary keyset doesn't list the the expected paths "
-            + commitDetails, expectedKeys, summaryKeys);
+        + commitDetails, expectedKeys, summaryKeys);
     assertPathDoesNotExist("temporary dir",
         new Path(outputPath, CommitConstants.PENDING_DIR_NAME));
     customPostExecutionValidation(outputPath, successData);
+  }
+
+  /**
+   * Get the file count for the test
+   * @return the number of mappers to create.
+   */
+  public int getTestFileCount() {
+    return scaleTest ? SCALE_TEST_FILE_COUNT : TEST_FILE_COUNT;
   }
 
   /**

@@ -39,7 +39,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AInstrumentation;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
-import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 
@@ -182,14 +182,14 @@ public class CommitActions {
    * not load/validate.
    * @throws IOException on a failure to list the files.
    */
-  public Pair<MultiplePendingCommits,
+  public Pair<Pendingset,
       List<Pair<LocatedFileStatus, IOException>>>
       loadSinglePendingCommits(
           Path pendingDir,
           boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
-    MultiplePendingCommits commits = new MultiplePendingCommits(
+    Pendingset commits = new Pendingset(
         statusList.size());
     List<Pair<LocatedFileStatus, IOException>> failures = new ArrayList<>(1);
     for (LocatedFileStatus status : statusList) {

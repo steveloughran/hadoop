@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.files.MultiplePendingCommits;
+import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -484,7 +484,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
         .run(new Tasks.Task<FileStatus, IOException>() {
           @Override
           public void run(FileStatus pendingCommitFile) throws IOException {
-            MultiplePendingCommits commits = MultiplePendingCommits.load(
+            Pendingset commits = Pendingset.load(
                 fs, pendingCommitFile.getPath());
             pending.addAll(commits.getCommits());
           }
