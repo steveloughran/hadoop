@@ -268,27 +268,26 @@ public final class CommitUtils {
   }
 
   /**
-   * Verify that the path is a delayed commit path.
+   * Verify that the path is a pending commit path.
    * @param fs filesystem
    * @param path path
-   * @throws PathCommitException if the path isn't a delayed commit path
+   * @throws PathCommitException if the path isn't a pending commit path
    */
   public static void verifyIsDelayedCommitPath(S3AFileSystem fs,
       Path path) throws PathCommitException {
     verifyIsMagicCommitFS(fs);
-    if (!fs.isDelayedCompletePath(path)) {
+    if (!fs.isPendingCommitPath(path)) {
       throw new PathCommitException(path, E_BAD_PATH);
     }
   }
-
   /**
-   * Verify that an S3A FS instance is a delayed commit FS.
+   * Verify that an S3A FS instance is a pending commit FS.
    * @param fs filesystem
-   * @throws PathCommitException if the FS isn't a delayed commit FS.
+   * @throws PathCommitException if the FS isn't a pending commit FS.
    */
   public static void verifyIsMagicCommitFS(S3AFileSystem fs)
       throws PathCommitException {
-    if (!fs.isDelayedCompleteEnabled()) {
+    if (!fs.isPendingCommitEnabled()) {
       // dump out details to console for support diagnostics
       LOG.error("{}: {}:\n{}", E_NORMAL_FS, fs.getUri().toString(), fs);
       // then fail
@@ -314,7 +313,7 @@ public final class CommitUtils {
    * Get the S3A FS of a path.
    * @param path path to examine
    * @param conf config
-   * @param magicCommitRequired is delayed complete requires of the FS
+   * @param magicCommitRequired is pending complete requires of the FS
    * @return the filesystem
    * @throws PathCommitException output path isn't to an S3A FS instance, or
    * if {@code magicCommitRequired} is set, if doesn't support these commits.

@@ -387,7 +387,7 @@ class S3ABlockOutputStream extends OutputStream {
             bytes)) {
           multiPartUpload.complete(partETags);
         } else {
-          LOG.info("multipart upload delayed until Job commit");
+          LOG.info("upload completion delayed until job commit");
         }
       }
       LOG.debug("Upload complete for {}", writeOperationHelper);

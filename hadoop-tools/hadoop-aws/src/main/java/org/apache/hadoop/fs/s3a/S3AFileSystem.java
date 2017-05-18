@@ -98,7 +98,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
-import org.apache.hadoop.fs.s3a.commit.DelayedCommitFSIntegration;
+import org.apache.hadoop.fs.s3a.commit.PendingCommitFSIntegration;
 import org.apache.hadoop.fs.s3a.commit.DefaultPutTracker;
 import org.apache.hadoop.fs.s3a.s3guard.DirListingMetadata;
 import org.apache.hadoop.fs.s3a.s3guard.MetadataStoreListFilesIterator;
@@ -171,7 +171,7 @@ public class S3AFileSystem extends FileSystem {
   private String blockOutputBuffer;
   private S3ADataBlocks.BlockFactory blockFactory;
   private int blockOutputActiveBlocks;
-  private DelayedCommitFSIntegration committerIntegration;
+  private PendingCommitFSIntegration committerIntegration;
 
   /** Add any deprecated keys. */
   @SuppressWarnings("deprecation")
@@ -268,18 +268,18 @@ public class S3AFileSystem extends FileSystem {
       serverSideEncryptionAlgorithm = getEncryptionAlgorithm(conf);
       inputPolicy = S3AInputPolicy.getPolicy(
           conf.getTrimmed(INPUT_FADVISE, INPUT_FADV_NORMAL));
-      boolean committerEnabled = conf.getBoolean(
+      boolean magicCommitterEnabled = conf.getBoolean(
           CommitConstants.MAGIC_COMMITTER_ENABLED,
           CommitConstants.DEFAULT_MAGIC_COMMITTER_ENABLED);
-      if (committerEnabled) {
-        LOG.info("S3Guard Committer is enabled");
+      if (magicCommitterEnabled) {
+        LOG.info("Magic committer is enabled");
       }
-      committerIntegration = new DelayedCommitFSIntegration(
-          this, committerEnabled);
+      committerIntegration = new PendingCommitFSIntegration(
+          this, magicCommitterEnabled);
 
       // is fast upload enabled? If the committer is turned on, this
       // is always true.
-      blockUploadEnabled = committerEnabled
+      blockUploadEnabled = magicCommitterEnabled
           || conf.getBoolean(FAST_UPLOAD, DEFAULT_FAST_UPLOAD);
 
       if (blockUploadEnabled) {
@@ -2659,22 +2659,21 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Is delayed complete enabled?
-   * @return true if delayed completion is turned on.
+   * Is pending commit enabled?
+   * @return true if pending commit support is turned on.
    */
-  public boolean isDelayedCompleteEnabled() {
-    return committerIntegration.isDelayedCommitEnabled();
+  public boolean isPendingCommitEnabled() {
+    return committerIntegration.isPendingCommitEnabled();
   }
 
   /**
-   * Predicate: is a path a delayed commit path?
-   * True if delayed commit is enabled and the path contains the pending path
-   * somewhere in it.
+   * Predicate: is a path a pending commit path?
+   * True if pending commit is enabled and the path qualifies as special.
    * @param path path to examine
    * @return true if the path is or is under a pending directory
    */
-  public boolean isDelayedCompletePath(Path path) {
-    return committerIntegration.isDelayedCompletePath(path);
+  public boolean isPendingCommitPath(Path path) {
+    return committerIntegration.isPendingCommitPath(path);
   }
 
   /**

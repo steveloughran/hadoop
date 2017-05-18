@@ -31,30 +31,29 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 /**
  * Adds the code needed for S3A integration.
  * It's pulled out to keep S3A FS class slightly less complex.
- * This class can be instantiated even when delayed commit is disabled;
+ * This class can be instantiated even when pending commit is disabled;
  * in this case:
  * <ol>
- *   <li>{@link #isDelayedCompletePath(Path)} will always return false.</li>
+ *   <li>{@link #isPendingCommitPath(Path)} will always return false.</li>
  *   <li>{@link #getTracker(Path, String)} will always return an instance
  *   of {@link DefaultPutTracker}.</li>
  * </ol>
- *
  */
-public class DelayedCommitFSIntegration {
+public class PendingCommitFSIntegration {
   private static final Logger LOG =
-      LoggerFactory.getLogger(DelayedCommitFSIntegration.class);
+      LoggerFactory.getLogger(PendingCommitFSIntegration.class);
   private final S3AFileSystem owner;
-  private final boolean delayedCommitEnabled;
+  private final boolean pendingCommitEnabled;
 
   /**
    * Instantiate.
-   * @param owner pwner class
-   * @param delayedCommitEnabled is delayed commit enabled.
+   * @param owner owner class
+   * @param pendingCommitEnabled is pending commit enabled.
    */
-  public DelayedCommitFSIntegration(S3AFileSystem owner,
-      boolean delayedCommitEnabled) {
+  public PendingCommitFSIntegration(S3AFileSystem owner,
+      boolean pendingCommitEnabled) {
     this.owner = owner;
-    this.delayedCommitEnabled = delayedCommitEnabled;
+    this.pendingCommitEnabled = pendingCommitEnabled;
   }
 
   /**
@@ -62,11 +61,11 @@ public class DelayedCommitFSIntegration {
    * the PUT, that is: where the final path is expected to go?
    * @param elements path split to elements
    * @param key key
-   * @return key for final put. If this is not a delayed complete operation, the
+   * @return key for final put. If this is not a pending commit, the
    * same as the key in.
    */
   public String keyOfFinalDestination(List<String> elements, String key) {
-    if (isDelayedCommitPath(elements)) {
+    if (isPendingCommitPath(elements)) {
       return elementsToKey(finalDestination(elements));
     } else {
       return key;
@@ -84,10 +83,10 @@ public class DelayedCommitFSIntegration {
   public DefaultPutTracker getTracker(Path path, String key) {
     final List<String> elements = splitPathToElements(path);
     DefaultPutTracker tracker;
-    if (isDelayedCommitPath(elements)) {
+    if (isPendingCommitPath(elements)) {
       final String destKey = keyOfFinalDestination(elements, key);
       String pendingKey = key + CommitConstants.PENDING_SUFFIX;
-      tracker = new DelayedCommitTracker(path,
+      tracker = new PendingCommitTracker(path,
           owner.getBucket(),
           destKey, pendingKey,
           owner.createWriteOperationHelper(pendingKey));
@@ -107,39 +106,37 @@ public class DelayedCommitFSIntegration {
    * @return a list of elements, possibly empty
    */
   private List<String> finalDestination(List<String> elements) {
-    return delayedCommitEnabled ?
+    return pendingCommitEnabled ?
         CommitUtils.finalDestination(elements)
         : elements;
   }
 
   /**
-   * Is delayed complete enabled?
-   * @return true if delayed completion is turned on.
+   * Is pending commit enabled?
+   * @return true if pending commit is turned on.
    */
-  public boolean isDelayedCommitEnabled() {
-    return delayedCommitEnabled;
+  public boolean isPendingCommitEnabled() {
+    return pendingCommitEnabled;
   }
 
   /**
-   * Predicate: is a path a delayed commit path?
-   * True if delayed commit is enabled and the path contains the pending path
-   * somewhere in it.
+   * Predicate: is a path a pending commit path?
    * @param path path to examine
    * @return true if the path is or is under a pending directory
    */
-  public boolean isDelayedCompletePath(Path path) {
-    return isDelayedCommitPath(splitPathToElements(path));
+  public boolean isPendingCommitPath(Path path) {
+    return isPendingCommitPath(splitPathToElements(path));
   }
 
   /**
-   * Is this path a delayed commit path in this filesystem?
-   * True if delayed commit is enabled, the path is magic
-   * and the path is not already a pending path.
+   * Is this path a pending commit path in this filesystem?
+   * True if pending commit is enabled, the path is magic
+   * and the path is not actually a pending file.
    * @param elements element list
-   * @return true if the path is for delayed commits
+   * @return true if the path is for pending commits
    */
-  private boolean isDelayedCommitPath(List<String> elements) {
-    return delayedCommitEnabled && isMagicPath(elements) &&
+  private boolean isPendingCommitPath(List<String> elements) {
+    return pendingCommitEnabled && isMagicPath(elements) &&
         !isPendingFile(elements);
   }
 

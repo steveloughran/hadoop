@@ -42,9 +42,9 @@ import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
  * Write a huge file via the commit mechanism, commit it and verify that it is
  * there.
  */
-public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
+public class ITestS3AHugePendingCommits extends AbstractSTestS3AHugeFiles {
   private static final Logger LOG = LoggerFactory.getLogger(
-      ITestS3ADelayedPutHugeFiles.class);
+      ITestS3AHugePendingCommits.class);
 
   private Path finalDirectory;
   private Path pendingDir;
@@ -128,6 +128,7 @@ public class ITestS3ADelayedPutHugeFiles extends AbstractSTestS3AHugeFiles {
   private void skipQuietly(String text) {
     describe("Skipping: %s", text);
   }
+
   @Override
   public void test_050_readHugeFile() throws Throwable {
     skipQuietly("readHugeFile");

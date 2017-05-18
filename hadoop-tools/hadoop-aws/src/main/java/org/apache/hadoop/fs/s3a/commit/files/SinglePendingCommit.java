@@ -46,7 +46,7 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
 import static org.apache.hadoop.util.StringUtils.join;
 
 /**
- * This is the serialization format for the delayed commit operation.
+ * This is the serialization format for uploads yet to be committerd.
  *
  * It's marked as {@link Serializable} so that it can be passed in RPC
  * calls; for this to work it relies on the fact that java.io ArrayList

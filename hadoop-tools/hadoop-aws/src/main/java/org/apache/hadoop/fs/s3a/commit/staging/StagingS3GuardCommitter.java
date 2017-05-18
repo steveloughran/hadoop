@@ -762,7 +762,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     LOG.debug("{}: attempt path is {}", getRole(), attemptPath);
 
     // add the commits file to the wrapped committer's task attempt location.
-    // this complete file will be committed by the wrapped committer at the end
     // of this method.
     Path commitsAttemptPath = wrappedCommitter.getTaskAttemptPath(context);
     FileSystem commitsFS = commitsAttemptPath.getFileSystem(conf);

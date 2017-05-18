@@ -28,7 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 /**
  * Multipart put tracker.
  * Base class does nothing except declare that any
- * MPU must complete in the close() operation.
+ * MPU must complete in the {@close close()} operation.
  *
  */
 @InterfaceAudience.Private

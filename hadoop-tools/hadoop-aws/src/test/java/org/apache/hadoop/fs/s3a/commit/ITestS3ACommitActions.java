@@ -73,23 +73,23 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
   }
 
   @Test
-  public void testDelayedCompleteIntegrationNotPending() throws Throwable {
+  public void testPendingCommitNormalPath() throws Throwable {
     S3AFileSystem fs = getFileSystem();
-    DelayedCommitFSIntegration integration
-        = new DelayedCommitFSIntegration(fs, true);
+    PendingCommitFSIntegration integration
+        = new PendingCommitFSIntegration(fs, true);
     String filename = "notdelayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
     DefaultPutTracker tracker = integration.getTracker(destFile, origKey);
     assertFalse("wrong type: " + tracker + " for " + destFile,
-        tracker instanceof DelayedCommitTracker);
+        tracker instanceof PendingCommitTracker);
   }
 
   @Test
-  public void testDelayedCompleteIntegration() throws Throwable {
+  public void testPendingCommitMagicPath() throws Throwable {
     S3AFileSystem fs = getFileSystem();
-    DelayedCommitFSIntegration integration
-        = new DelayedCommitFSIntegration(fs, true);
+    PendingCommitFSIntegration integration
+        = new PendingCommitFSIntegration(fs, true);
     String filename = "delayed.txt";
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
@@ -110,17 +110,17 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     DefaultPutTracker tracker = integration.getTracker(pendingPath,
         pendingPathKey);
     assertTrue("wrong type: " + tracker + " for " + pendingPathKey,
-        tracker instanceof DelayedCommitTracker);
+        tracker instanceof PendingCommitTracker);
     assertEquals("tracker destination key", origKey, tracker.getDestKey());
 
     Path pendingSuffixedPath = new Path(pendingPath,
         "part-0000" + PENDING_SUFFIX);
     assertFalse("still a delayed complete path " + pendingSuffixedPath,
-        fs.isDelayedCompletePath(pendingSuffixedPath));
+        fs.isPendingCommitPath(pendingSuffixedPath));
     Path pendingSet = new Path(pendingPath,
         "part-0000" + PENDINGSET_SUFFIX);
     assertFalse("still a delayed complete path " + pendingSet,
-        fs.isDelayedCompletePath(pendingSet));
+        fs.isPendingCommitPath(pendingSet));
   }
 
   @Test

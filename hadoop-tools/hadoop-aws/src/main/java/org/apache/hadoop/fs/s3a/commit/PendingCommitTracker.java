@@ -35,12 +35,12 @@ import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 
 /**
- * Put tracker for delayed commits.
+ * Put tracker for pending commits.
  */
 @InterfaceAudience.Private
-public class DelayedCommitTracker extends DefaultPutTracker {
+public class PendingCommitTracker extends DefaultPutTracker {
   public static final Logger LOG = LoggerFactory.getLogger(
-      DelayedCommitTracker.class);
+      PendingCommitTracker.class);
 
   private final String pendingPartKey;
   private final Path path;
@@ -48,14 +48,14 @@ public class DelayedCommitTracker extends DefaultPutTracker {
   private final String bucket;
 
   /**
-   * Delayed commit tracker.
+   * Pending commit tracker.
    * @param path path nominally being written to
    * @param bucket dest bucket
    * @param destKey key for the destination
    * @param pendingPartKey key of the pending part
    * @param writer writer instance to use for operations
    */
-  public DelayedCommitTracker(Path path,
+  public PendingCommitTracker(Path path,
       String bucket,
       String destKey,
       String pendingPartKey,
@@ -110,7 +110,7 @@ public class DelayedCommitTracker extends DefaultPutTracker {
     PutObjectRequest put = writer.newPutRequest(
         new ByteArrayInputStream(bytes), bytes.length);
     writer.uploadObject(put);
-    LOG.debug("{} — put delayed commit information to {}:\n{}",
+    LOG.debug("{} — put commit information to {}:\n{}",
         this, path, commitData);
     return false;
   }
