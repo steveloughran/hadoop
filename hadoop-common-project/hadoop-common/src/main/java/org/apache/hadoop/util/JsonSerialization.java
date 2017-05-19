@@ -100,7 +100,7 @@ public class JsonSerialization<T> {
   @SuppressWarnings("unchecked")
   public synchronized T fromJson(String json)
       throws IOException, JsonParseException, JsonMappingException {
-    if (json.length() == 0) {
+    if (json.isEmpty()) {
       throw new EOFException("No data");
     }
     try {
