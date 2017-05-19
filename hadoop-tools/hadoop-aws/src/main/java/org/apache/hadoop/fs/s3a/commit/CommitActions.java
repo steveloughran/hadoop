@@ -305,7 +305,7 @@ public class CommitActions {
    * Save the success data to the {@code _SUCCESS} file.
    * @param outputPath output directory
    * @param successData success data to save.
-   * @param addMetrics
+   * @param addMetrics should the FS metrics be added?
    * @throws IOException IO problem
    */
   public void createSuccessMarker(Path outputPath,

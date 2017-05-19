@@ -584,8 +584,7 @@ public class StagingTestBase {
     doAnswer(
         new Answer<Void>() {
           @Override
-          public Void answer(
-              InvocationOnMock invocation) throws Throwable {
+          public Void answer(InvocationOnMock invocation) throws Throwable {
             LOG.debug("abortMultipartUpload for {}", mockClient);
             synchronized (lock) {
               if (results.aborts.size() == errors.failOnAbort) {
@@ -607,8 +606,7 @@ public class StagingTestBase {
     // deleteObject mocking
     doAnswer(new Answer<Void>() {
           @Override
-          public Void answer(
-              InvocationOnMock invocation) throws Throwable {
+          public Void answer(InvocationOnMock invocation) throws Throwable {
             LOG.debug("deleteObject for {}", mockClient);
             synchronized (lock) {
               results.deletes.add(invocation.getArgumentAt(
@@ -623,8 +621,7 @@ public class StagingTestBase {
     // deleteObject mocking
     doAnswer(new Answer<Void>() {
           @Override
-          public Void answer(
-              InvocationOnMock invocation) throws Throwable {
+          public Void answer(InvocationOnMock invocation) throws Throwable {
             LOG.debug("deleteObject for {}", mockClient);
             synchronized (lock) {
               results.deletes.add(new DeleteObjectRequest(
@@ -646,7 +643,6 @@ public class StagingTestBase {
             return "Mock3AClient " + results + " " + errors;
           }
         });
-
 
     return mockClient;
   }

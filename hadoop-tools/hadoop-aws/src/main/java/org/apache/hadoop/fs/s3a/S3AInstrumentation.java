@@ -954,16 +954,16 @@ public class S3AInstrumentation {
       incrementCounter(COMMITTER_COMMITS_CREATED, 1);
     }
 
-    /** A commit has been created. */
+    /**
+     * A commit has been completed.
+     * @param size size in bytes
+     */
     public void commitCompleted(long size) {
       incrementCounter(COMMITTER_COMMITS_COMPLETED, 1);
       incrementCounter(COMMITTER_BYTES_COMMITTED, size);
     }
 
-    /**
-     * A commit has been completed.
-     * @param size size in bytes
-     */
+    /** A commit has been aborted. */
     public void commitAborted() {
       incrementCounter(COMMITTER_COMMITS_ABORTED, 1);
     }

@@ -285,7 +285,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   }
 
   /**
-   * Get the file count for the test
+   * Get the file count for the test.
    * @return the number of mappers to create.
    */
   public int getTestFileCount() {
