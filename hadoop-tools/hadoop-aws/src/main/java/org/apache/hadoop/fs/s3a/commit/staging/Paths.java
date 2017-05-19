@@ -28,12 +28,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.fs.s3a.Constants;
-import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.UserGroupInformation;
+
+import static org.apache.hadoop.fs.s3a.Constants.BUFFER_DIR;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
+import static org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants.*;
 
 /**
  * Path operations for the staging committers.
@@ -176,16 +178,19 @@ public final class Paths {
    * @param conf configuration
    * @return a path under which temporary work can go.
    */
-  public static Path tempDirForFileSystem(FileSystem fs,
+  public static Path tempDirForStaging(FileSystem fs,
       Configuration conf) {
     Path temp;
     switch (fs.getScheme()) {
     case "file":
       temp = fs.makeQualified(new Path(System.getProperty(
-          StagingCommitterConstants.JAVA_IO_TMPDIR)));
+          JAVA_IO_TMPDIR)));
       break;
+
     case "s3a":
-      temp = new Path("/tmp");
+      // the Staging committer may reject this if it doesn't believe S3A
+      // is consistent.
+      temp = new Path(FILESYSTEM_TEMP_PATH);
       break;
 
     // here assume that /tmp is valid
@@ -218,17 +223,16 @@ public final class Paths {
    */
   public static Path getMultipartUploadCommitsDirectory(Configuration conf,
       String uuid) throws IOException {
-    Path userTmp = new Path(tempDirForFileSystem(FileSystem.get(conf), conf),
+    Path userTmp = new Path(tempDirForStaging(FileSystem.get(conf), conf),
         UserGroupInformation.getCurrentUser().getShortUserName());
     Path work = new Path(userTmp, uuid);
-    return new Path(work, StagingCommitterConstants.STAGING_UPLOADS);
+    return new Path(work, STAGING_UPLOADS);
   }
 
   // TODO: verify this is correct, it comes from dse-storage
   private static Path localTemp(Configuration conf, int taskId, int attemptId)
       throws IOException {
-    String[] dirs = conf.getStrings(
-        Constants.BUFFER_DIR);
+    String[] dirs = conf.getStrings(BUFFER_DIR);
     Random rand = new Random(Objects.hashCode(taskId, attemptId));
     String dir = dirs[rand.nextInt(dirs.length)];
 

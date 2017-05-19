@@ -12,12 +12,18 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# Work in Progress: S3A Committer
+# S3A Committers
 
 <!-- DISABLEDMACRO{toc|fromDepth=0|toDepth=5} -->
 
 This page covers the S3A Committers, which can commit work directly
 to an S3 object store which supports consistent metadata.
+
+These committers are designed to solve a fundamental problem which 
+the standard committers of work cannot do to S3: consistent, high performance,
+reliable commitment of work done by individual workers into the final set of
+results of a job.
+
 
 ## Choosing a committer
 
@@ -67,12 +73,12 @@ The initial option set:
 | `fs.s3a.committer.staging.conflict-mode` | how to resolve directory conflicts during commit: `fail`, `append`, or `replace`; defaults to `fail`. |
 | `fs.s3a.committer.staging.unique-filenames` | Should the committer generate unique filenames by including a unique ID in the name of each created file? |
 | `fs.s3a.committer.staging.uuid` | a UUID that identifies a write; `spark.sql.sources.writeJobUUID` is used if not set |
-| `fs.s3a.committer.staging.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults to 10MB. |
-| `fs.s3a.committer.threads` | number of threads to use to complete S3 uploads during job commit; defaults to 8. |
 | `fs.s3a.committer.tmp.path` | Directory in the cluster filesystem used for storing information on the uncommitted files. |
-| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | flag to control creation of `_SUCCESS` marker file on job completion. Default: true |
-| `fs.s3a.multipart.size` | Size in bytes of each part of a multipart upload. Default: "100M" |
-| `fs.s3a.buffer.dir` | Directory in local filesystem under which data is saved before being uploaded |
+| `fs.s3a.committer.staging.upload.size` | size, in bytes, to use for parts of the upload to S3; defaults: `10M` |
+| `fs.s3a.committer.threads` | number of threads to use to complete S3 uploads during job commit; default: `8` |
+| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | flag to control creation of `_SUCCESS` marker file on job completion. Default: `true` |
+| `fs.s3a.multipart.size` | Size in bytes of each part of a multipart upload. Default: `100M` |
+| `fs.s3a.buffer.dir` | Directory in local filesystem under which data is saved before being uploaded. Example: `/tmp/hadoop/s3a/` |
 
 Generated files are initially written to a local directory underneath one of the temporary
 directories listed in `fs.s3a.buffer.dir`.
@@ -189,7 +195,6 @@ rename these directories to the final destination as way of committing work.
 This is the perfect solution for commiting work against any filesystem with
 consistent listing operations and where the `FileSystem.rename()` command
 is an atomic `O(1)` operation.
-
 
 Using rename allows individual tasks to work in temporary directories, with the
 rename as the atomic operation can be used to explicitly commit tasks and
@@ -1219,3 +1224,31 @@ in assertions in the test suite.
 
 Without making any stability guarantees, it may be useful to extend this with
 more information, including aggregate metrics of work, filesystem metrics, etc.
+
+
+## Troubleshooting
+
+### `Filesystem does not have support for 'magic' committer`
+
+org.apache.hadoop.fs.s3a.commit.PathCommitException: `s3a://landsat-pds': Filesystem does not have support for 'magic' committer enabled in configuration option fs.s3a.committer.magic.enabled
+
+The Job is configured to use the magic committer, but the S3A bucket has not been explicitly
+called out as supporting it.
+
+The destination bucket **must** be declared as supporting the magic committer.
+ 
+ 
+This can be done for those buckets which are known to be consistent, either
+because the [S3Guard](s3guard.html) is used to provide consistency,
+
+```xml
+<property>
+  <name>fs.s3a.bucket.landsat-pds.committer.magic.enabled</name>
+  <value>true</value>
+</property>
+
+```
+
+*IMPORTANT*: only enable the magic committer against object stores which
+offer consistent listings. By default, Amazon S3 does not do this -which is
+why the option `fs.s3a.committer.magic.enabled` is disabled by default. 

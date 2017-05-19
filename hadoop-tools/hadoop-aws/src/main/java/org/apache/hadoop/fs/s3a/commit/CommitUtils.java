@@ -55,7 +55,8 @@ public final class CommitUtils {
 
   /** Error message if filesystem isn't magic: {@value}. */
   public static final String E_NORMAL_FS
-      = "Filesystem does not have support for 'magic' committer enabled";
+      = "Filesystem does not have support for 'magic' committer enabled" +
+      " in configuration option " + CommitConstants.MAGIC_COMMITTER_ENABLED;
 
   /** Error message if the dest FS isn't S3A: {@value}. */
   public static final String E_WRONG_FS

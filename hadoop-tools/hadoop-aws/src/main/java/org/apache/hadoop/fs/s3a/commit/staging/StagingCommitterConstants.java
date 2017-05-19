@@ -28,6 +28,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 public final class StagingCommitterConstants {
 
+  public static final String FILESYSTEM_TEMP_PATH = "/tmp";
+
   private StagingCommitterConstants() {
   }
 
