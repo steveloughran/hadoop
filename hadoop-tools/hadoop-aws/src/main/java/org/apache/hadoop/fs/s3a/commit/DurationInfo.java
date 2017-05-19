@@ -21,13 +21,22 @@ package org.apache.hadoop.fs.s3a.commit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 /**
  * A duration with logging of final state at info in the close() call.
  */
+@InterfaceAudience.Private
 public class DurationInfo extends Duration
     implements AutoCloseable {
   private final String text;
   private static final Logger LOG = LoggerFactory.getLogger(DurationInfo.class);
+
+  /**
+   * Create the duration text from a {@code String.format()}code call.
+   * @param format format string
+   * @param args list of arguments
+   */
   public DurationInfo(String format, Object... args) {
     this.text = String.format(format, args);
     LOG.info("Starting: {}", text);
@@ -35,12 +44,12 @@ public class DurationInfo extends Duration
 
   @Override
   public String toString() {
-    return text + ": " + super.toString();
+    return text + ": duration " + super.toString();
   }
 
   @Override
   public void close() {
     finished();
-    LOG.info("{}", this);
+    LOG.info(this.toString());
   }
 }

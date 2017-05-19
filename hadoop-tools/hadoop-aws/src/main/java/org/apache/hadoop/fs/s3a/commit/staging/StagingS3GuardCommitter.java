@@ -473,15 +473,6 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return getDestS3AFS().keyToQualifiedPath(getFinalKey(relative, context));
   }
 
-  // TODO
-  /*
-  @Override
-  public Path getCommittedTaskPath(TaskAttemptContext context) {
-    // return the location in HDFS where the multipart upload context is
-    return wrappedCommitter.getCommittedTaskPath(context);
-  }
-  */
-
   /**
    * Return the local work path as the destination for writing work.
    * @param context the context of the task attempt.
@@ -574,6 +565,9 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     try {
       pendingCommitFiles = attemptFS.listStatus(
           jobAttemptPath, Paths.HiddenPathFilter.get());
+    } catch (FileNotFoundException e) {
+      // file is not present, raise without bothering to report
+      throw e;
     } catch (IOException e) {
       // unable to work with endpoint, if suppressing errors decide our actions
       if (suppressExceptions) {
@@ -697,7 +691,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
   public void setupTask(TaskAttemptContext context) throws IOException {
     Path taskAttemptPath = getTaskAttemptPath(context);
     try (DurationInfo d = new
-        DurationInfo("%s: creating task attempt path %s ",
+        DurationInfo("%s: setup task attempt path %s ",
         getRole(), taskAttemptPath)) {
       // create the local FS
       taskAttemptPath.getFileSystem(getConf()).mkdirs(taskAttemptPath);

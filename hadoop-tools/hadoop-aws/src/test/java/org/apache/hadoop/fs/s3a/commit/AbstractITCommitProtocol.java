@@ -45,6 +45,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapFile;
 import org.apache.hadoop.io.NullWritable;
@@ -59,9 +60,11 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MapFileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.task.JobContextImpl;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.*;
@@ -211,8 +214,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @return new committer
    * @throws IOException failure
    */
-  public abstract AbstractS3GuardCommitter createCommitter(
+  protected abstract AbstractS3GuardCommitter createCommitter(
       JobContext context) throws IOException;
+
+  protected abstract String getCommitterFactoryName();
 
   protected Path getOutDir() {
     return outDir;
@@ -456,7 +461,6 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       committer.setupTask(tContext);
     }
     describe("setup complete\n");
-
   }
 
   /**
@@ -1391,6 +1395,53 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         throws IOException {
       return createFailingCommitter(context);
     }
+  }
+
+  @Test
+  public void testOutputFormatIntegration() throws Throwable {
+    Configuration conf = getConfiguration();
+    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+        getCommitterFactoryName());
+    Job job = newJob();
+    job.setOutputFormatClass(LoggingTextOutputFormat.class);
+    conf = job.getConfiguration();
+    conf.set(MRJobConfig.TASK_ATTEMPT_ID, attempt0);
+    conf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
+    JobContext jContext = new JobContextImpl(conf, taskAttempt0.getJobID());
+    TaskAttemptContext tContext = new TaskAttemptContextImpl(conf,
+        taskAttempt0);
+    LoggingTextOutputFormat outputFormat = (LoggingTextOutputFormat)
+        ReflectionUtils.newInstance(tContext.getOutputFormatClass(), conf);
+    AbstractS3GuardCommitter committer = (AbstractS3GuardCommitter)
+        outputFormat.getOutputCommitter(tContext);
+
+    // setup
+    setup(committer, jContext, tContext);
+    JobData jobData = new JobData(job, jContext, tContext, committer);
+    abortInTeardown(jobData);
+    LoggingTextOutputFormat.LoggingLineRecordWriter recordWriter
+        = outputFormat.getRecordWriter(tContext);
+    IntWritable iw = new IntWritable(1);
+    recordWriter.write(iw, iw);
+    Path dest = recordWriter.getDest();
+    validateTaskAttemptPathDuringWrite(dest);
+    recordWriter.close(tContext);
+    // at this point
+    validateTaskAttemptPathAfterWrite(dest);
+    assertTrue("Committer does not have data to commit " + committer,
+        committer.needsTaskCommit(tContext));
+    committer.commitTask(tContext);
+    committer.commitJob(jContext);
+    // validate output
+    verifySuccessMarker(outDir);
+  }
+
+  protected void validateTaskAttemptPathDuringWrite(Path p) throws IOException {
+
+  }
+
+  protected void validateTaskAttemptPathAfterWrite(Path p) throws IOException {
+
   }
 
 }

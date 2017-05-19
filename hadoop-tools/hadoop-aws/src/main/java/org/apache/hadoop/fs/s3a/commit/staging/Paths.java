@@ -183,21 +183,21 @@ public final class Paths {
     Path temp;
     switch (fs.getScheme()) {
     case "file":
-      temp = fs.makeQualified(new Path(System.getProperty(
-          JAVA_IO_TMPDIR)));
+      temp = fs.makeQualified(
+          new Path(System.getProperty(JAVA_IO_TMPDIR)));
       break;
 
     case "s3a":
       // the Staging committer may reject this if it doesn't believe S3A
       // is consistent.
-      temp = new Path(FILESYSTEM_TEMP_PATH);
+      temp = fs.makeQualified(new Path(FILESYSTEM_TEMP_PATH));
       break;
 
     // here assume that /tmp is valid
     case "hdfs":
     default:
       String pathname = conf.getTrimmed(
-          CommitConstants.FS_S3A_COMMITTER_TMP_PATH, "/tmp");
+          FS_S3A_COMMITTER_TMP_PATH, FILESYSTEM_TEMP_PATH);
       temp = fs.makeQualified(new Path(pathname));
     }
     return temp;

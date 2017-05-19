@@ -117,6 +117,11 @@ public class MockS3AFileSystem extends S3AFileSystem {
       throws IOException {
   }
 
+  @Override
+  public boolean isPendingCommitEnabled() {
+    return true;
+  }
+
   /**
    * Make operation to set the s3 client public.
    * @param client client.

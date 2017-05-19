@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
 import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
@@ -62,6 +63,11 @@ public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
   @Override
   public void testMapFileOutputCommitter() throws Exception {
     skip("Partioning committer is not suitable for Map Output");
+  }
+
+  @Override
+  protected String getCommitterFactoryName() {
+    return CommitConstants.PARTITION_COMMITTER_FACTORY;
   }
 
   /**

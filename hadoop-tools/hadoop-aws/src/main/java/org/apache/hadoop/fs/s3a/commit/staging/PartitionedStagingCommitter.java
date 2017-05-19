@@ -80,12 +80,12 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
     // it doesn't matter that the partitions are already there, and for REPLACE,
     // deletion should be done during task commit.
     if (getConflictResolutionMode(context) == ConflictResolution.FAIL) {
-      FileSystem s3 = getDestFS();
+      FileSystem fs = getDestFS();
       for (String partition : partitions) {
         // getFinalPath adds the UUID to the file name. this needs the parent.
         Path partitionPath = getFinalPath(partition + "/file",
             context).getParent();
-        if (s3.exists(partitionPath)) {
+        if (fs.exists(partitionPath)) {
           throw new PathExistsException(partitionPath.toString());
         }
       }
@@ -108,7 +108,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
   protected void preCommitJob(JobContext context,
       List<SinglePendingCommit> pending) throws IOException {
 
-    FileSystem s3 = getDestFS();
+    FileSystem fs = getDestFS();
     Set<Path> partitions = Sets.newLinkedHashSet();
     for (SinglePendingCommit commit : pending) {
       Path filePath = commit.destinationPath();
@@ -127,7 +127,7 @@ public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
       for (Path partitionPath : partitions) {
         LOG.info("{}: removing partition path to be replaced: " +
             getRole(), partitionPath);
-        s3.delete(partitionPath, true);
+        fs.delete(partitionPath, true);
       }
       break;
     default:

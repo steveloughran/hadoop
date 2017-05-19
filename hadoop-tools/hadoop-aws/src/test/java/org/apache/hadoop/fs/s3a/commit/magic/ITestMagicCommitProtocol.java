@@ -19,10 +19,13 @@
 package org.apache.hadoop.fs.s3a.commit.magic;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
 import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -64,6 +67,11 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   }
 
   @Override
+  protected String getCommitterFactoryName() {
+    return CommitConstants.MAGIC_COMMITTER_FACTORY;
+  }
+
+  @Override
   protected AbstractS3GuardCommitter createCommitter(TaskAttemptContext context)
       throws IOException {
     return new MagicS3GuardCommitter(getOutDir(), context);
@@ -78,6 +86,19 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   public AbstractS3GuardCommitter createFailingCommitter(
       TaskAttemptContext tContext) throws IOException {
     return new CommitterWithFailedThenSucceed(getOutDir(), tContext);
+  }
+
+  protected void validateTaskAttemptPathDuringWrite(Path p) throws IOException {
+    String pathStr = p.toString();
+    assertTrue("not magic " + pathStr,
+        pathStr.contains(CommitConstants.MAGIC_DIR_NAME));
+    assertPathDoesNotExist("task attempt visible", p);
+  }
+
+  protected void validateTaskAttemptPathAfterWrite(Path p) throws IOException {
+    assertPathDoesNotExist("task attempt visible", p);
+    Path pendingFile = new Path(p.toString() + CommitConstants.PENDING_SUFFIX);
+    assertPathExists("pending file", pendingFile);
   }
 
   /**

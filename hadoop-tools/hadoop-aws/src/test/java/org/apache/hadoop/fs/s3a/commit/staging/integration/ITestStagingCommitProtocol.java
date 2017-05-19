@@ -21,7 +21,10 @@ package org.apache.hadoop.fs.s3a.commit.staging.integration;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
@@ -49,7 +52,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     Configuration conf = super.createConfiguration();
     conf.setInt(CommitConstants.FS_S3A_COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
-        DIRECTORY_COMMITTER_FACTORY);
+        getCommitterFactoryName());
     // disable unique filenames so that the protocol tests of FileOutputFormat
     // and this test generate consistent names.
     //conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, true);
@@ -67,6 +70,11 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid,
         getTaskAttempt0());
     rmdir(tempDir, conf);
+  }
+
+  @Override
+  protected String getCommitterFactoryName() {
+    return CommitConstants.STAGING_COMMITTER_FACTORY;
   }
 
   @Override
@@ -97,6 +105,21 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     return expectJobCommitFailure(jContext, committer,
         IOException.class);
   }
+
+  protected void validateTaskAttemptPathDuringWrite(Path p) throws IOException {
+    // this is expected to be local FS
+    LocalFileSystem local = FileSystem.getLocal(getConfiguration());
+    ContractTestUtils.assertPathExists(local, "task attempt",
+        p);
+  }
+
+  protected void validateTaskAttemptPathAfterWrite(Path p) throws IOException {
+    // this is expected to be local FS
+    LocalFileSystem local = FileSystem.getLocal(getConfiguration());
+    ContractTestUtils.assertPathExists(local, "task attempt",
+        p);
+  }
+
 
   /**
    * The class provides a overridden implementation of commitJobInternal which

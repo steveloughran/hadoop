@@ -22,9 +22,11 @@ import java.io.IOException;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
 import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterConstants;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -47,6 +49,11 @@ public class ITestDirectoryCommitProtocol extends ITestStagingCommitProtocol {
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
     return new DirectoryStagingCommitter(getOutDir(), context);
+  }
+
+  @Override
+  protected String getCommitterFactoryName() {
+    return CommitConstants.DIRECTORY_COMMITTER_FACTORY;
   }
 
   @Override
