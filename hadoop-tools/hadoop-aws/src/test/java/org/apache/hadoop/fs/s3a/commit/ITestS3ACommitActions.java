@@ -82,7 +82,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     String origKey = fs.pathToKey(destFile);
     DefaultPutTracker tracker = integration.getTracker(destFile, origKey);
     assertFalse("wrong type: " + tracker + " for " + destFile,
-        tracker instanceof PendingCommitTracker);
+        tracker instanceof MagicCommitTracker);
   }
 
   @Test
@@ -110,7 +110,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     DefaultPutTracker tracker = integration.getTracker(pendingPath,
         pendingPathKey);
     assertTrue("wrong type: " + tracker + " for " + pendingPathKey,
-        tracker instanceof PendingCommitTracker);
+        tracker instanceof MagicCommitTracker);
     assertEquals("tracker destination key", origKey, tracker.getDestKey());
 
     Path pendingSuffixedPath = new Path(pendingPath,

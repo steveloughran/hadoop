@@ -86,7 +86,7 @@ public class PendingCommitFSIntegration {
     if (isPendingCommitPath(elements)) {
       final String destKey = keyOfFinalDestination(elements, key);
       String pendingKey = key + CommitConstants.PENDING_SUFFIX;
-      tracker = new PendingCommitTracker(path,
+      tracker = new MagicCommitTracker(path,
           owner.getBucket(),
           destKey, pendingKey,
           owner.createWriteOperationHelper(pendingKey));

@@ -38,9 +38,9 @@ import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
  * Put tracker for pending commits.
  */
 @InterfaceAudience.Private
-public class PendingCommitTracker extends DefaultPutTracker {
+public class MagicCommitTracker extends DefaultPutTracker {
   public static final Logger LOG = LoggerFactory.getLogger(
-      PendingCommitTracker.class);
+      MagicCommitTracker.class);
 
   private final String pendingPartKey;
   private final Path path;
@@ -55,7 +55,7 @@ public class PendingCommitTracker extends DefaultPutTracker {
    * @param pendingPartKey key of the pending part
    * @param writer writer instance to use for operations
    */
-  public PendingCommitTracker(Path path,
+  public MagicCommitTracker(Path path,
       String bucket,
       String destKey,
       String pendingPartKey,
@@ -107,11 +107,13 @@ public class PendingCommitTracker extends DefaultPutTracker {
     commitData.setLength(bytesWritten);
     commitData.bindCommitData(parts);
     byte[] bytes = commitData.toBytes();
+    LOG.info("Closing file {}: {} byte(s) will be published when the job" +
+            " completes", path.toUri(), bytesWritten);
+    LOG.debug("{} — closing file and saving commit information to {}:\n{}",
+        this, path, commitData);
     PutObjectRequest put = writer.newPutRequest(
         new ByteArrayInputStream(bytes), bytes.length);
     writer.uploadObject(put);
-    LOG.debug("{} — put commit information to {}:\n{}",
-        this, path, commitData);
     return false;
   }
 
