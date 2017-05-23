@@ -136,8 +136,6 @@ public class CommitActions {
     } else {
       statistics.commitCompleted(commit.getLength());
     }
-
-    LOG.debug("Commit outcome: {}", outcome);
     return outcome;
   }
 

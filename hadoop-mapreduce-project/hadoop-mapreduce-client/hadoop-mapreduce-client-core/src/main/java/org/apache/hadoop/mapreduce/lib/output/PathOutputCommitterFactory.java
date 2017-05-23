@@ -61,7 +61,7 @@ public class PathOutputCommitterFactory extends Configured {
    */
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new FileOutputCommitter(outputPath, context);
+    return createDefaultCommitter(outputPath, context);
   }
 
   /**
@@ -89,6 +89,7 @@ public class PathOutputCommitterFactory extends Configured {
    */
   protected final PathOutputCommitter createDefaultCommitter(Path outputPath,
       JobContext context) throws IOException {
+    LOG.debug("Creating file output committer for path {}", outputPath);
     return new FileOutputCommitter(outputPath, context);
   }
 
@@ -99,7 +100,6 @@ public class PathOutputCommitterFactory extends Configured {
    */
   public static PathOutputCommitterFactory getOutputCommitterFactory(
       Configuration conf) {
-
     Class<? extends PathOutputCommitterFactory> factory =
         conf.getClass(OUTPUTCOMMITTER_FACTORY_CLASS,
             PathOutputCommitterFactory.class,

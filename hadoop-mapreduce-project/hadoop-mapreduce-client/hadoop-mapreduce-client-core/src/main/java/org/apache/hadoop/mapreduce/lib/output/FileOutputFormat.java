@@ -239,7 +239,9 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
                                                 InterruptedException {
     PathOutputCommitter committer = (PathOutputCommitter)
       context.getOutputCommitter();
-    return committer.getWorkPath();
+    Path workPath = committer.getWorkPath();
+    LOG.debug("Work path is {}", workPath);
+    return workPath;
   }
 
   /**
@@ -327,8 +329,8 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
   }
 
   public synchronized 
-     OutputCommitter getOutputCommitter(TaskAttemptContext context
-                                        ) throws IOException {
+     OutputCommitter getOutputCommitter(TaskAttemptContext context)
+      throws IOException {
     if (committer == null) {
       Path output = getOutputPath(context);
       committer = PathOutputCommitterFactory.getOutputCommitterFactory(

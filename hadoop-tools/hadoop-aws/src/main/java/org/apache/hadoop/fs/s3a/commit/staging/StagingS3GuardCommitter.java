@@ -83,7 +83,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       StagingS3GuardCommitter.class);
-  public static final String NAME = "StagingS3GuardCommitter";
+  public static final String NAME = "StagingCommitter";
   private final Path constructorOutputPath;
   private final long uploadPartSize;
   private final String uuid;
@@ -813,10 +813,10 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
         // although overwrite=false, there's still a risk of > 1 entry being
         // committed if the FS doesn't have create-no-overwrite consistency.
 
-        LOG.debug("Saving {} commits to file {}",
-            pendingCommits.size(), commitsAttemptPath);
+        LOG.debug("Saving {} pending commit(s)) to file {}",
+            pendingCommits.size(),
+            commitsAttemptPath);
         pendingCommits.save(commitsFS, commitsAttemptPath, false);
-
         threw = false;
 
       } finally {

@@ -359,7 +359,12 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       List<SinglePendingCommit> pending) throws IOException {
     List<String> filenames = new ArrayList<>(pending.size());
     for (SinglePendingCommit commit : pending) {
-      filenames.add(commit.getDestinationKey());
+      String key = commit.getDestinationKey();
+      if (!key.startsWith("/")) {
+        // fix up so that FS.makeQualified() sets up the path OK
+        key = "/" + key;
+      }
+      filenames.add(key);
     }
     maybeCreateSuccessMarker(context, filenames);
   }

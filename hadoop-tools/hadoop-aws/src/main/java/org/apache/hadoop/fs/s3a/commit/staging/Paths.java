@@ -83,30 +83,6 @@ public final class Paths {
   }
 
   /**
-   * Iterate up a path's parents until the root element is found.
-   * @param path path to scan
-   * @return the root element
-   */
-  public static Path getRoot(Path path) {
-    Path current = path;
-    while (!current.isRoot()) {
-      current = current.getParent();
-    }
-    return current;
-  }
-
-  /**
-   * Split a path into its parent path and filename.
-   * @param pathStr path
-   * @return a divided path string.
-   */
-  public static Pair<String, String> splitFilename(String pathStr) {
-    int lastSlash = pathStr.lastIndexOf('/');
-    return Pair.of(pathStr.substring(0, lastSlash),
-        pathStr.substring(lastSlash + 1));
-  }
-
-  /**
    * Get the parent path of a string path: everything up to but excluding
    * the last "/" in the path.
    * @param pathStr path as a string
