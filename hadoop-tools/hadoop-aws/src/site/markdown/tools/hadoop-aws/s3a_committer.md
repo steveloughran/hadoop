@@ -12,7 +12,7 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# S3A Committers
+# The S3A Committers
 
 <!-- DISABLEDMACRO{toc|fromDepth=0|toDepth=5} -->
 
@@ -23,6 +23,10 @@ These committers are designed to solve a fundamental problem which
 the standard committers of work cannot do to S3: consistent, high performance,
 reliable commitment of work done by individual workers into the final set of
 results of a job.
+
+For details on their internal design, see
+[S3A Committers: Architecture and Implementation](s3a_committer_architecture.html).
+
 
 
 ### Why you Must Not Use the normal committers to write to Amazon S3

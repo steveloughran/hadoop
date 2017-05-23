@@ -12,11 +12,13 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# S3A Committer Architecture
+# S3A Committers: Architecture and Implementation
 
 <!-- DISABLEDMACRO{toc|fromDepth=0|toDepth=5} -->
 
 This document covers the architecture and implementation details of the S3A committers.
+
+For information on using the committers, see [the S3A Committers](s3a_committer.html).
 
 
 ## Problem: Efficient, reliable commits of work to consistent S3 buckets
