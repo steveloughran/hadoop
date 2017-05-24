@@ -368,6 +368,11 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
     return getCommittedTaskPath(getAppAttemptId(context), context);
   }
 
+  /**
+   * Validate the task attempt context; makes sure
+   * that the task attempt ID data is valid.
+   * @param context task context
+   */
   private static void validateContext(TaskAttemptContext context) {
     Preconditions.checkNotNull(context, "null context");
     Preconditions.checkNotNull(context.getTaskAttemptID(),
