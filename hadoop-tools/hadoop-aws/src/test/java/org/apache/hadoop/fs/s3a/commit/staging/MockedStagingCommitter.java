@@ -34,7 +34,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 /**
  * Committer subclass that uses a mocked S3A connection for testing.
  */
-class MockedStagingCommitter extends StagingS3GuardCommitter {
+class MockedStagingCommitter extends StagingCommitter {
 
   private MockFileCommitActions mockCommitActions;
 

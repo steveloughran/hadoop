@@ -163,7 +163,7 @@ public class StagingTestBase {
   }
 
   protected static void assertConflictResolution(
-      StagingS3GuardCommitter committer,
+      StagingCommitter committer,
       JobContext job,
       ConflictResolution mode) {
     Assert.assertEquals("Conflict resolution mode in " + committer,

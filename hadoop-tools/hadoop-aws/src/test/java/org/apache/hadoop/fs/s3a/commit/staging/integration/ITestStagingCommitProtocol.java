@@ -31,13 +31,11 @@ import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.FaultInjection;
 import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.fs.s3a.commit.staging.Paths;
-import org.apache.hadoop.fs.s3a.commit.staging.StagingS3GuardCommitter;
+import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
-
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.DIRECTORY_COMMITTER_FACTORY;
 
 /** Test the staging committer's handling of the base protocol operations. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
@@ -65,7 +63,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
 
     // identify working dir for staging and delete
     Configuration conf = getConfiguration();
-    String uuid = StagingS3GuardCommitter.getUploadUUID(conf,
+    String uuid = StagingCommitter.getUploadUUID(conf,
         getTaskAttempt0().getJobID());
     Path tempDir = Paths.getLocalTaskAttemptTempDir(conf, uuid,
         getTaskAttempt0());
@@ -80,13 +78,13 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected AbstractS3GuardCommitter createCommitter(
       TaskAttemptContext context) throws IOException {
-    return new StagingS3GuardCommitter(getOutDir(), context);
+    return new StagingCommitter(getOutDir(), context);
   }
 
   @Override
   public AbstractS3GuardCommitter createCommitter(JobContext context)
       throws IOException {
-    return new StagingS3GuardCommitter(getOutDir(), context);
+    return new StagingCommitter(getOutDir(), context);
   }
 
   public AbstractS3GuardCommitter createFailingCommitter(
@@ -126,7 +124,7 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
    * causes the commit failed for the first time then succeed.
    */
   private static final class CommitterWithFailedThenSucceed extends
-      StagingS3GuardCommitter implements FaultInjection {
+      StagingCommitter implements FaultInjection {
 
     private final FaultInjectionImpl injection = new FaultInjectionImpl(true);
 

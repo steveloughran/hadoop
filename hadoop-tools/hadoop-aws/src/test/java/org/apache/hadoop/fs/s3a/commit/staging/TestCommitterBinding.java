@@ -23,6 +23,8 @@ import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.STAGING_COMMITTER_FACTORY;
 
@@ -39,12 +41,28 @@ public class TestCommitterBinding extends Assert {
         factory instanceof StagingCommitterFactory);
   }
 
+  private final Throwable verifyCauseClass(Throwable ex,
+      Class<? extends Throwable> clazz) throws Throwable {
+    Throwable cause = ex.getCause();
+    if (cause == null) {
+      throw ex;
+    }
+    if (!cause.getClass().equals(clazz)) {
+      throw cause;
+    }
+    return cause;
+  }
+
   @Test
   public void testBadCommitterFactory() throws Throwable {
     Configuration conf = new Configuration();
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         "Not a factory");
-    PathOutputCommitterFactory factory
-        = PathOutputCommitterFactory.getOutputCommitterFactory(conf);
+    RuntimeException ex = LambdaTestUtils.intercept(
+        RuntimeException.class,
+        () -> PathOutputCommitterFactory.getOutputCommitterFactory(conf));
+    verifyCauseClass(
+        verifyCauseClass(ex, RuntimeException.class),
+        ClassNotFoundException.class);
   }
 }

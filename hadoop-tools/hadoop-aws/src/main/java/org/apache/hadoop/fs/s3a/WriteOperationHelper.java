@@ -175,9 +175,7 @@ public class WriteOperationHelper {
     owner.setOptionalMultipartUploadRequestParameters(initiateMPURequest);
 
     return calls.execute("initiate MultiPartUpload", key,
-        () ->
-            owner.getAmazonS3Client()
-                .initiateMultipartUpload(initiateMPURequest).getUploadId());
+        () -> owner.initiateMultipartUpload(initiateMPURequest).getUploadId());
   }
 
   /**

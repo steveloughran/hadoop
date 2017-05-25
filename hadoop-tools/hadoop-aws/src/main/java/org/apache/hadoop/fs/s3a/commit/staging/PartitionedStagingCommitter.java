@@ -39,7 +39,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  * Partitioned committer.
  * This writes data to specific "partition" subdirectories
  */
-public class PartitionedStagingCommitter extends StagingS3GuardCommitter {
+public class PartitionedStagingCommitter extends StagingCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       PartitionedStagingCommitter.class);

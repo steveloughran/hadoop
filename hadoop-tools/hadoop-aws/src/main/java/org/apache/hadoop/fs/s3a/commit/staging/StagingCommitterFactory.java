@@ -44,12 +44,12 @@ public class StagingCommitterFactory
   public PathOutputCommitter createTaskCommitter(S3AFileSystem fileSystem,
       Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new StagingCommitter(outputPath, context);
   }
 
   public PathOutputCommitter createJobCommitter(S3AFileSystem fileSystem,
       Path outputPath,
       JobContext context) throws IOException {
-    return new StagingS3GuardCommitter(outputPath, context);
+    return new StagingCommitter(outputPath, context);
   }
 }

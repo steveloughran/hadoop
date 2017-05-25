@@ -79,10 +79,10 @@ import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
  *   </li>
  * </ol>
  */
-public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
+public class StagingCommitter extends AbstractS3GuardCommitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(
-      StagingS3GuardCommitter.class);
+      StagingCommitter.class);
   public static final String NAME = "StagingCommitter";
   private final Path constructorOutputPath;
   private final long uploadPartSize;
@@ -103,7 +103,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context job context
    * @throws IOException on a failure
    */
-  public StagingS3GuardCommitter(Path outputPath,
+  public StagingCommitter(Path outputPath,
       JobContext context)
       throws IOException {
     super(outputPath, context);
@@ -129,7 +129,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
    * @param context task context
    * @throws IOException on a failure
    */
-  public StagingS3GuardCommitter(Path outputPath,
+  public StagingCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
     constructorOutputPath = getOutputPath();
@@ -216,8 +216,7 @@ public class StagingS3GuardCommitter extends AbstractS3GuardCommitter {
 
   @Override
   public String toString() {
-    final StringBuilder sb = new StringBuilder(
-        "StagingS3GuardCommitter{");
+    final StringBuilder sb = new StringBuilder("StagingCommitter{");
     sb.append(super.toString());
     sb.append(", finalOutputPath=").append(finalOutputPath);
     sb.append(", conflictResolution=").append(conflictResolution);

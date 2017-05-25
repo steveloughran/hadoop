@@ -40,7 +40,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  *   <li>REPLACE: delete the destination directory.</li>
  * </ul>
  */
-public class DirectoryStagingCommitter extends StagingS3GuardCommitter {
+public class DirectoryStagingCommitter extends StagingCommitter {
   private static final Logger LOG = LoggerFactory.getLogger(
       DirectoryStagingCommitter.class);
   public static final String NAME = "DirectoryStagingCommitter";

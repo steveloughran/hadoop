@@ -233,7 +233,7 @@ public class TestStagingPartitionedTaskCommit
     assertEquals("Should have correct paths", expected, files);
   }
 
-  public Set<String> buildExpectedList(StagingS3GuardCommitter committer) {
+  public Set<String> buildExpectedList(StagingCommitter committer) {
     Set<String> expected = Sets.newHashSet();
     boolean unique = committer.useUniqueFilenames();
     for (String relative : relativeFiles) {

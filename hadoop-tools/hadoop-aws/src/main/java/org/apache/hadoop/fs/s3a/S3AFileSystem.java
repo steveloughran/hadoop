@@ -50,6 +50,7 @@ import com.amazonaws.services.s3.model.CopyObjectRequest;
 import com.amazonaws.services.s3.model.DeleteObjectsRequest;
 import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
+import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.ListMultipartUploadsRequest;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.MultiObjectDeleteException;
@@ -2365,6 +2366,19 @@ public class S3AFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * Initiate an MPU
+   * @param request request to initiate
+   * @return the result of the call
+   * @throws AmazonClientException on failures inside the AWS SDK
+   * @throws IOException Other IO problems
+   */
+  InitiateMultipartUploadResult initiateMultipartUpload(
+      InitiateMultipartUploadRequest request) throws IOException {
+    LOG.debug("Initiate multipart upload to {}", request.getKey());
+    incrementStatistic(OBJECT_MULTIPART_UPLOAD_INITIATED);
+    return getAmazonS3Client().initiateMultipartUpload(request);
+  }
 
   protected void setOptionalCopyObjectRequestParameters(
       CopyObjectRequest copyObjectRequest) throws IOException {

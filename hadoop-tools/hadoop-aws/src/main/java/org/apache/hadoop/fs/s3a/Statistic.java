@@ -77,6 +77,8 @@ public enum Statistic {
       "Number of continued object listings made"),
   OBJECT_METADATA_REQUESTS("object_metadata_requests",
       "Number of requests for object metadata"),
+  OBJECT_MULTIPART_UPLOAD_INITIATED("object_multipart_initiated",
+      "Object multipart upload initiated"),
   OBJECT_MULTIPART_UPLOAD_ABORTED("object_multipart_aborted",
       "Object multipart upload aborted"),
   OBJECT_PUT_REQUESTS("object_put_requests",

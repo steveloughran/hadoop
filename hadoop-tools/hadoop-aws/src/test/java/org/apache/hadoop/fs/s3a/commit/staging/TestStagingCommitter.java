@@ -165,10 +165,10 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     String jobUUID = UUID.randomUUID().toString();
     config.set(FS_S3A_COMMITTER_STAGING_UUID, jobUUID);
 
-    final int taskId = StagingS3GuardCommitter.getTaskId(tac);
-    final int attemptId = StagingS3GuardCommitter.getAttemptId(tac);
+    final int taskId = StagingCommitter.getTaskId(tac);
+    final int attemptId = StagingCommitter.getAttemptId(tac);
     assertEquals("Upload UUID", jobUUID,
-        StagingS3GuardCommitter.getUploadUUID(config, JOB_ID));
+        StagingCommitter.getUploadUUID(config, JOB_ID));
 
     // the temp directory is chosen based on a random seeded by the task and
     // attempt ids, so the result is deterministic if those ids are fixed.
@@ -655,7 +655,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
     return committedUploads;
   }
 
-  private Set<String> commitTask(StagingS3GuardCommitter staging,
+  private Set<String> commitTask(StagingCommitter staging,
       TaskAttemptContext attempt,
       int numFiles)
       throws IOException {
