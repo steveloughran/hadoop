@@ -562,6 +562,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     TaskAttemptContext tContext = jobData.tContext;
     AbstractS3GuardCommitter committer = jobData.committer;
 
+    assertNotNull("null workPath in committer " + committer,
+        committer.getWorkPath());
+    assertNotNull("null outputPath in committer " + committer,
+        committer.getOutputPath());
+
     // do commit. Here there will be pending data
     committer.commitTask(tContext);
     assertTaskAttemptPathDoesNotExist(committer, tContext);

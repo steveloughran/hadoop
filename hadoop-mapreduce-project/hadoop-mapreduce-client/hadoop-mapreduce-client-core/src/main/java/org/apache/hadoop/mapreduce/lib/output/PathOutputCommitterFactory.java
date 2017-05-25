@@ -61,7 +61,7 @@ public class PathOutputCommitterFactory extends Configured {
    */
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return createDefaultCommitter(outputPath, context);
+    return new FileOutputCommitter(outputPath, context);
   }
 
   /**
