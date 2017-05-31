@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -767,9 +769,7 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
     // keep track of unfinished commits in case one fails. if something fails,
     // we will try to abort the ones that had already succeeded.
     int commitCount = taskOutput.size();
-    final List<SinglePendingCommit> commits =
-        Collections.synchronizedList(new ArrayList<>(commitCount));
-
+    final Queue<SinglePendingCommit> commits = new ConcurrentLinkedQueue<>();
     LOG.info("{}: uploading from staging directory to S3", getRole());
     LOG.info("{}: Saving pending data information to {}",
         getRole(), commitsAttemptPath);
@@ -782,8 +782,7 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
       // before the uploads, report some progress
       context.progress();
 
-      Pendingset pendingCommits = new Pendingset(
-          commitCount);
+      Pendingset pendingCommits = new Pendingset(commitCount);
       try {
         Tasks.foreach(taskOutput)
             .stopOnFailure()

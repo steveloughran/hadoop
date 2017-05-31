@@ -341,12 +341,14 @@ public class CommitActions {
    * @param localFile local file (be  a file)
    * @param destPath destination path
    * @param partition partition/subdir. Not used
-   * @param uploadPartSize size of upload  @return a pending upload entry
+   * @param uploadPartSize size of upload
+   * @return a pending upload entry
    * @return the commit data
    * @throws IOException failure
    */
   public SinglePendingCommit uploadFileToPendingCommit(File localFile,
-      Path destPath, String partition,
+      Path destPath,
+      String partition,
       long uploadPartSize)
       throws IOException {
 
