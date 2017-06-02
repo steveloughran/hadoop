@@ -36,7 +36,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class S3AStorageStatistics extends StorageStatistics {
+public class S3AStorageStatistics extends StorageStatistics
+    implements Iterable<StorageStatistics.LongStatistic> {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3AStorageStatistics.class);
 
@@ -96,6 +97,11 @@ public class S3AStorageStatistics extends StorageStatistics {
   @Override
   public Iterator<LongStatistic> getLongStatistics() {
     return new LongIterator();
+  }
+
+  @Override
+  public Iterator<LongStatistic> iterator() {
+    return getLongStatistics();
   }
 
   @Override

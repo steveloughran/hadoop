@@ -972,6 +972,8 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     LOG.info("Success data {}", successData.toString());
     LOG.info("Metrics\n{}",
         successData.dumpMetrics("  ", " = ", "\n"));
+    LOG.info("Diagnostics\n{}",
+        successData.dumpDiagnostics("  ", " = ", "\n"));
     return successData;
   }
 

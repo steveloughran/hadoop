@@ -64,7 +64,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public static final String NAME = "MagicS3GuardCommitter";
 
   /**
-   * Instantiate.
+   * Create a job committer.
    * @param outputPath output path
    * @param context job context
    * @throws IOException on a failure
@@ -75,7 +75,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   }
 
   /**
-   * Create a committer.
+   * Create a task committer.
    * @param outputPath the job's output path
    * @param context the task's context
    * @throws IOException on a failure
@@ -191,7 +191,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       throws IOException {
     CommitActions.MaybeIOE outcome = new CommitActions.MaybeIOE();
     try (DurationInfo d =
-             new DurationInfo("Aborting outstanding uploads for Job %s",
+             new DurationInfo("Cleanup: aborting outstanding uploads for Job %s",
                  jobIdString(context))) {
       if (getCommitActions() != null) {
         Path pending = getJobAttemptPath(context);

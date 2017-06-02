@@ -839,7 +839,6 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
       }
     }
 
-    // TODO: what else is needed here?
     LOG.debug("Committing wrapped task");
     wrappedCommitter.commitTask(context);
 

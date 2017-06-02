@@ -32,6 +32,7 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -44,7 +45,8 @@ import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
-import static org.apache.hadoop.fs.s3a.commit.CommitConstants.SUCCESS_FILE_NAME;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
+import static org.apache.hadoop.fs.s3a.Constants.*;
 
 /**
  * The implementation of the various actions a committer needs.
@@ -276,6 +278,8 @@ public class CommitActions {
       if (pendingFile.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
         try {
           abortSingleCommit(SinglePendingCommit.load(fs, pendingFile));
+        } catch (FileNotFoundException e){
+          LOG.debug("listed file already deleted: {}", pendingFile);
         } catch (IOException | IllegalArgumentException e){
           if (outcome == null) {
             outcome = new MaybeIOE(makeIOE(pendingFile.toString(), e));
@@ -315,8 +319,19 @@ public class CommitActions {
     if (addMetrics) {
       addFileSystemStatistics(successData.getMetrics());
     }
+    // add any diagnostics
+    Configuration conf = fs.getConf();
+    successData.addDiagnostic(S3_METADATA_STORE_IMPL,
+        conf.getTrimmed(S3_METADATA_STORE_IMPL, "" ));
+    successData.addDiagnostic(METADATASTORE_AUTHORITATIVE,
+        conf.getTrimmed(METADATASTORE_AUTHORITATIVE, "false" ));
+    successData.addDiagnostic(MAGIC_COMMITTER_ENABLED,
+        conf.getTrimmed(MAGIC_COMMITTER_ENABLED, "false" ));
+
+    // now write
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
-    LOG.debug("Touching success marker for job {}", markerPath);
+    LOG.debug("Touching success marker for job {}: {}", markerPath,
+        successData);
     successData.save(fs, markerPath, true);
   }
 

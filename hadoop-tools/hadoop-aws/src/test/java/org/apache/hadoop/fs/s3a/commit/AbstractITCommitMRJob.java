@@ -266,6 +266,8 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
         commitDetails);
     LOG.info("Committer statistics: \n{}",
         successData.dumpMetrics("  ", " = ", "\n"));
+    LOG.info("Diagnostics\n{}",
+        successData.dumpDiagnostics("  ", " = ", "\n"));
     assertEquals("Wrong committer in " + commitDetails,
         committerName(), successData.getCommitter());
     List<String> successFiles = successData.getFilenames();
