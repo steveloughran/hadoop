@@ -25,14 +25,13 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.event.ProgressEvent;
 import com.amazonaws.event.ProgressEventType;
 import com.amazonaws.event.ProgressListener;
-import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
@@ -48,8 +47,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.s3a.commit.DefaultPutTracker;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.util.Progressable;
 
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
@@ -87,14 +84,6 @@ class S3ABlockOutputStream extends OutputStream {
   private final ProgressListener progressListener;
   private final ListeningExecutorService executorService;
 
-  /**
-   * Retry policy for multipart commits; not all AWS SDK versions retry that.
-   */
-  private final RetryPolicy retryPolicy =
-      RetryPolicies.retryUpToMaximumCountWithProportionalSleep(
-          5,
-          2000,
-          TimeUnit.MILLISECONDS);
   /**
    * Factory for blocks.
    */
@@ -633,29 +622,18 @@ class S3ABlockOutputStream extends OutputStream {
      * @param partETags list of partial uploads
      * @throws IOException on any problem
      */
-    private CompleteMultipartUploadResult complete(List<PartETag> partETags)
+    private void complete(List<PartETag> partETags)
         throws IOException {
-      int retryCount = 0;
-      AmazonClientException lastException;
-      String operation =
-          String.format("Completing multi-part upload for key '%s'," +
-                  " id '%s' with %s partitions ",
-              key, uploadId, partETags.size());
-      do {
-        try {
-          LOG.debug(operation);
-          return writeOperationHelper.finalizeMultipartUpload(key,
-              uploadId,
-              partETags,
-              bytesSubmitted);
-        } catch (AmazonClientException e) {
-          lastException = e;
-          statistics.exceptionInMultipartComplete();
-        }
-      } while (shouldRetry(operation, lastException, retryCount++));
-      // this point is only reached if the operation failed more than
-      // the allowed retry count
-      throw translateException(operation, key, lastException);
+      AtomicInteger errorCount = new AtomicInteger(0);
+      try {
+        writeOperationHelper.completeMPUwithRetries(
+            uploadId,
+            partETags,
+            bytesSubmitted,
+            errorCount);
+      } finally {
+        statistics.exceptionInMultipartComplete(errorCount.get());
+      }
     }
 
     /**
@@ -678,46 +656,12 @@ class S3ABlockOutputStream extends OutputStream {
           lastException = e;
           statistics.exceptionInMultipartAbort();
         }
-      } while (shouldRetry(operation, lastException, retryCount++));
+      } while (writeOperationHelper.shouldRetry(operation, lastException,
+          retryCount++));
       // this point is only reached if the operation failed more than
       // the allowed retry count
       LOG.warn("Unable to abort multipart upload, you may need to purge  " +
           "uploaded parts", lastException);
-    }
-
-    /**
-     * Predicate to determine whether a failed operation should
-     * be attempted again.
-     * If a retry is advised, the exception is automatically logged and
-     * the filesystem statistic {@link Statistic#IGNORED_ERRORS} incremented.
-     * The method then sleeps for the sleep time suggested by the sleep policy;
-     * if the sleep is interrupted then {@code Thread.interrupted()} is set
-     * to indicate the thread was interrupted; then false is returned.
-     *
-     * @param operation operation for log message
-     * @param e exception raised.
-     * @param retryCount  number of retries already attempted
-     * @return true if another attempt should be made
-     */
-    private boolean shouldRetry(String operation,
-        AmazonClientException e,
-        int retryCount) {
-      try {
-        RetryPolicy.RetryAction retryAction =
-            retryPolicy.shouldRetry(e, retryCount, 0, true);
-        boolean retry = retryAction == RetryPolicy.RetryAction.RETRY;
-        if (retry) {
-          fs.incrementStatistic(IGNORED_ERRORS);
-          LOG.info("Retrying {} after exception ", operation, e);
-          Thread.sleep(retryAction.delayMillis);
-        }
-        return retry;
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-        return false;
-      } catch (Exception ignored) {
-        return false;
-      }
     }
 
   }

@@ -52,10 +52,10 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
  * Test the low-level binding of the S3A FS to the magic commit mechanism,
  * and handling of the commit operations.
  */
-public class ITestS3ACommitActions extends AbstractCommitITest {
+public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ITestS3ACommitActions.class);
+      LoggerFactory.getLogger(ITestS3ACommitOperations.class);
   private static final byte[] DATASET = dataset(1000, 'a', 32);
 
   @Override
@@ -136,7 +136,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
 
-    CommitActions actions = newActions();
+    CommitOperations actions = newActions();
     // abort,; rethrow on failure
     LOG.info("First abort call");
     actions.abortAllSinglePendingCommits(pendingDataPath.getParent(), true)
@@ -145,8 +145,8 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     assertPathDoesNotExist("dest file was created", destFile);
   }
 
-  private CommitActions newActions() {
-    return new CommitActions(getFileSystem());
+  private CommitOperations newActions() {
+    return new CommitOperations(getFileSystem());
   }
 
   /**
@@ -249,7 +249,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
         pendingFilePath);
     SinglePendingCommit commit = SinglePendingCommit.load(getFileSystem(),
         pendingDataPath);
-    CommitActions actions = newActions();
+    CommitOperations actions = newActions();
     actions.commitOrFail(commit);
     verifyCommitExists(commit);
   }
@@ -320,7 +320,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
   @Test
   public void testUploadEmptyFile() throws Throwable {
     File tempFile = File.createTempFile("commit", ".txt");
-    CommitActions actions = newActions();
+    CommitOperations actions = newActions();
     Path dest = methodPath("testUploadEmptyFile");
     S3AFileSystem fs = getFileSystem();
     SinglePendingCommit pendingCommit =
@@ -339,7 +339,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
     File tempFile = File.createTempFile("commit", ".txt");
     String text = "hello, world";
     FileUtils.write(tempFile, text, "UTF-8");
-    CommitActions actions = newActions();
+    CommitOperations actions = newActions();
     Path dest = methodPath("testUploadSmallFile");
     S3AFileSystem fs = getFileSystem();
     SinglePendingCommit pendingCommit =
@@ -356,7 +356,7 @@ public class ITestS3ACommitActions extends AbstractCommitITest {
   public void testUploadMissingFile() throws Throwable {
     File tempFile = File.createTempFile("commit", ".txt");
     tempFile.delete();
-    CommitActions actions = newActions();
+    CommitOperations actions = newActions();
     Path dest = methodPath("testUploadMissingile");
     actions.uploadFileToPendingCommit(tempFile, dest, null,
         DEFAULT_MULTIPART_SIZE);

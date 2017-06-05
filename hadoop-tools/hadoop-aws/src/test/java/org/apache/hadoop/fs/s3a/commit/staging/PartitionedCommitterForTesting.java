@@ -28,24 +28,24 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
  * Partitioned committer which uses an instance of
- * {@link MockFileCommitActions} for committing.
+ * {@link MockFileCommitOperations} for committing.
  */
 class PartitionedCommitterForTesting extends
     PartitionedStagingCommitter {
-  private final MockFileCommitActions mockCommitActions;
+  private final MockFileCommitOperations mockCommitActions;
 
   PartitionedCommitterForTesting(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
-    this.mockCommitActions = new MockFileCommitActions(getDestS3AFS());
-    setCommitActions(mockCommitActions);
+    this.mockCommitActions = new MockFileCommitOperations(getDestS3AFS());
+    setCommitOperations(mockCommitActions);
   }
 
   PartitionedCommitterForTesting(Path outputPath,
       JobContext context) throws IOException {
     super(outputPath, context);
-    this.mockCommitActions = new MockFileCommitActions(getDestS3AFS());
-    setCommitActions(mockCommitActions);
+    this.mockCommitActions = new MockFileCommitOperations(getDestS3AFS());
+    setCommitOperations(mockCommitActions);
   }
 
   @Override

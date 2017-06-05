@@ -26,7 +26,7 @@ import com.amazonaws.AmazonClientException;
  * Class to provide lambda expression access to AWS operations, including
  * any retry policy.
  */
-class AwsCall {
+class AwsLambda {
 
   /**
    * Execute an operation.

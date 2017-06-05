@@ -612,17 +612,17 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       LOG.warn("Precommit failure for job {}", jobIdString(context), e);
       abortJobInternal(context, pending, true);
-      getCommitActions().jobCompleted(false);
+      getCommitOperations().jobCompleted(false);
       throw e;
     }
     try (DurationInfo d = new DurationInfo("%s: committing Job %s",
         getRole(), jobIdString(context))) {
       commitJobInternal(context, pending);
     } catch (IOException e) {
-      getCommitActions().jobCompleted(false);
+      getCommitOperations().jobCompleted(false);
       throw e;
     }
-    getCommitActions().jobCompleted(true);
+    getCommitOperations().jobCompleted(true);
     maybeCreateSuccessMarkerFromCommits(context, pending);
   }
 
@@ -737,10 +737,10 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
     } catch (IOException e) {
       LOG.error("{}: commit of task {} failed",
           getRole(), context.getTaskAttemptID(), e);
-      getCommitActions().taskCompleted(false);
+      getCommitOperations().taskCompleted(false);
       throw e;
     }
-    getCommitActions().taskCompleted(true);
+    getCommitOperations().taskCompleted(true);
   }
 
   /**
@@ -798,7 +798,7 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
                 String partition = getPartition(relative);
                 String key = getFinalKey(relative, context);
                 Path destPath = getDestS3AFS().keyToQualifiedPath(key);
-                SinglePendingCommit commit = getCommitActions()
+                SinglePendingCommit commit = getCommitOperations()
                     .uploadFileToPendingCommit(
                         localFile,
                         destPath, partition,
@@ -831,7 +831,7 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
               .run(new Tasks.Task<SinglePendingCommit, IOException>() {
                 @Override
                 public void run(SinglePendingCommit commit) throws IOException {
-                  getCommitActions().abortSingleCommit(commit);
+                  getCommitOperations().abortSingleCommit(commit);
                 }
               });
           deleteTaskAttemptPathQuietly(context);

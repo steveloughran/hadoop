@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
@@ -42,9 +44,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
+import static org.apache.hadoop.fs.s3a.Statistic.IGNORED_ERRORS;
 
 
 /**
@@ -74,8 +80,22 @@ public class WriteOperationHelper {
       LoggerFactory.getLogger(WriteOperationHelper.class);
   private final S3AFileSystem owner;
   private final String key;
-  private final AwsCall calls = new AwsCall();
+  private final AwsLambda calls = new AwsLambda();
 
+  /**
+   * Retry policy for multipart commits; not all AWS SDK versions retry that.
+   */
+  private final RetryPolicy retryPolicy =
+      RetryPolicies.retryUpToMaximumCountWithProportionalSleep(
+          5,
+          2000,
+          TimeUnit.MILLISECONDS);
+
+  /**
+   * Constructor.
+   * @param owner owner FS creating the helper
+   * @param key the key the helper is initially bound to
+   */
   protected WriteOperationHelper(S3AFileSystem owner, String key) {
     checkArgument(key != null, "No key");
     this.owner = owner;
@@ -225,6 +245,50 @@ public class WriteOperationHelper {
           finishedWrite(destination, length);
           return result;
         });
+  }
+
+  /**
+   * This completes a multipart upload to the destination key via
+   * {@link #finalizeMultipartUpload(String, String, List, long)}.
+   * Here retries are handled to avoid losing all data
+   * on a transient failure.
+   * @param uploadId multipart operation Id
+   * @param partETags list of partial uploads
+   * @param length length of the upload
+   * @param errorCount a counter incremented by 1 on every error; for
+   * use in statistics
+   * @return the result of the operation.
+   * @throws IOException if problems arose which could not be retried, or
+   * the retry count was exceeded
+   */
+  public CompleteMultipartUploadResult completeMPUwithRetries(
+      String uploadId,
+      List<PartETag> partETags,
+      long length,
+      AtomicInteger errorCount)
+      throws IOException {
+    int retryCount = 0;
+    AmazonClientException lastException;
+    String operation =
+        String.format("Completing multi-part upload for key '%s'," +
+                "" +
+                " id '%s' with %s partitions ",
+            key, uploadId, partETags.size());
+    do {
+      try {
+        LOG.debug(operation);
+        return finalizeMultipartUpload(key,
+            uploadId,
+            partETags,
+            length);
+      } catch (AmazonClientException e) {
+        lastException = e;
+        errorCount.incrementAndGet();
+      }
+    } while (shouldRetry(operation, lastException, retryCount++));
+    // this point is only reached if the operation failed more than
+    // the allowed retry count
+    throw translateException(operation, key, lastException);
   }
 
   /**
@@ -416,5 +480,40 @@ public class WriteOperationHelper {
     return calls.execute("upload part",
         request.getKey(),
         () -> owner.uploadPart(request));
+  }
+
+  /**
+   * Predicate to determine whether a failed operation should
+   * be attempted again.
+   * If a retry is advised, the exception is automatically logged and
+   * the filesystem statistic {@link Statistic#IGNORED_ERRORS} incremented.
+   * The method then sleeps for the sleep time suggested by the sleep policy;
+   * if the sleep is interrupted then {@code Thread.interrupted()} is set
+   * to indicate the thread was interrupted; then false is returned.
+   *
+   * @param operation operation for log message
+   * @param e exception raised.
+   * @param retryCount  number of retries already attempted
+   * @return true if another attempt should be made
+   */
+  public boolean shouldRetry(String operation,
+      AmazonClientException e,
+      int retryCount) {
+    try {
+      RetryPolicy.RetryAction retryAction =
+          retryPolicy.shouldRetry(e, retryCount, 0, true);
+      boolean retry = retryAction == RetryPolicy.RetryAction.RETRY;
+      if (retry) {
+        owner.incrementStatistic(IGNORED_ERRORS);
+        LOG.info("Retrying {} after exception ", operation, e);
+        Thread.sleep(retryAction.delayMillis);
+      }
+      return retry;
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      return false;
+    } catch (Exception ignored) {
+      return false;
+    }
   }
 }

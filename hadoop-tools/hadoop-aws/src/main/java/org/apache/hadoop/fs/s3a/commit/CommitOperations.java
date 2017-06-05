@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
@@ -53,9 +54,9 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
  * This doesn't implement the protocol/binding to a specific execution engine,
  * just the operations needed to to build one.
  */
-public class CommitActions {
+public class CommitOperations {
   private static final Logger LOG = LoggerFactory.getLogger(
-      CommitActions.class);
+      CommitOperations.class);
 
   private final S3AFileSystem fs;
 
@@ -66,7 +67,7 @@ public class CommitActions {
    * Instantiate.
    * @param fs FS to bind to
    */
-  public CommitActions(S3AFileSystem fs) {
+  public CommitOperations(S3AFileSystem fs) {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
     statistics = fs.newCommitterStatistics();
@@ -74,7 +75,7 @@ public class CommitActions {
 
   @Override
   public String toString() {
-    return "CommitActions{" + fs.getUri() + '}';
+    return "CommitOperations{" + fs.getUri() + '}';
   }
 
   /**
@@ -115,11 +116,7 @@ public class CommitActions {
     try {
       commit.validate();
       destKey = commit.getDestinationKey();
-      // finalize the commit
-      createWriter(destKey).finalizeMultipartUpload(destKey,
-          commit.getUploadId(),
-          CommitUtils.toPartEtags(commit.getEtags()),
-          commit.getLength());
+      innerCommit(commit);
       LOG.debug("Successful commit");
       outcome = new MaybeIOE();
     } catch (IOException e) {
@@ -139,6 +136,27 @@ public class CommitActions {
       statistics.commitCompleted(commit.getLength());
     }
     return outcome;
+  }
+
+  /**
+   * Inner commit operation
+   * @param commit entry to commit
+   * @throws IOException
+   */
+  private void innerCommit(SinglePendingCommit commit) throws IOException {
+    // finalize the commit
+    AtomicInteger errorCount = new AtomicInteger(0);
+    try {
+      createWriter(commit.getDestinationKey())
+          .completeMPUwithRetries(
+              commit.getUploadId(),
+              CommitUtils.toPartEtags(commit.getEtags()),
+              commit.getLength(),
+              errorCount);
+    } finally {
+      // TODO: add something to the statistics here
+
+    }
   }
 
   /**
@@ -358,7 +376,6 @@ public class CommitActions {
    * @param partition partition/subdir. Not used
    * @param uploadPartSize size of upload
    * @return a pending upload entry
-   * @return the commit data
    * @throws IOException failure
    */
   public SinglePendingCommit uploadFileToPendingCommit(File localFile,

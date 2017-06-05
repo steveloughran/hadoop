@@ -72,7 +72,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
   private ExecutorService threadPool;
 
   /** Underlying commit operations. */
-  private CommitActions commitActions;
+  private CommitOperations commitOperations;
 
   /**
    * Final destination of work.
@@ -119,7 +119,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
     LOG.debug("{} instantiated for job \"{}\" ID {} with destination {}",
         role, jobName(context), jobIdString(context), outputPath);
     S3AFileSystem fs = getDestS3AFS();
-    commitActions = new CommitActions(fs);
+    commitOperations = new CommitOperations(fs);
   }
 
  /**
@@ -394,7 +394,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       successData.setTimestamp(now.getTime());
       successData.setDate(now.toString());
       successData.setFilenames(filenames);
-      commitActions.createSuccessMarker(getOutputPath(), successData, true);
+      commitOperations.createSuccessMarker(getOutputPath(), successData, true);
     }
   }
 
@@ -441,25 +441,25 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
               @Override
               public void run(SinglePendingCommit commit,
                   Exception exception) throws IOException {
-                getCommitActions().abortSingleCommit(commit);
+                getCommitOperations().abortSingleCommit(commit);
               }
             })
         .abortWith(new Tasks.Task<SinglePendingCommit, IOException>() {
           @Override
           public void run(SinglePendingCommit commit) throws IOException {
-            getCommitActions().abortSingleCommit(commit);
+            getCommitOperations().abortSingleCommit(commit);
           }
         })
         .revertWith(new Tasks.Task<SinglePendingCommit, IOException>() {
           @Override
           public void run(SinglePendingCommit commit) throws IOException {
-            getCommitActions().revertCommit(commit);
+            getCommitOperations().revertCommit(commit);
           }
         })
         .run(new Tasks.Task<SinglePendingCommit, IOException>() {
           @Override
           public void run(SinglePendingCommit commit) throws IOException {
-            getCommitActions().commitOrFail(commit);
+            getCommitOperations().commitOrFail(commit);
           }
         });
   }
@@ -539,7 +539,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
 
     try (DurationInfo d =
              new DurationInfo("%s: aborting all pending commits", r)) {
-      int count = getCommitActions()
+      int count = getCommitOperations()
           .abortPendingUploadsUnderPath(getOutputPath());
       if (count > 0) {
         LOG.warn("{}: deleted {} extra pending upload(s)", r, count);
@@ -601,16 +601,16 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
    * Subclasses may provide a mock version of this.
    * @return the commit actions instance to use for operations.
    */
-  protected CommitActions getCommitActions() {
-    return commitActions;
+  protected CommitOperations getCommitOperations() {
+    return commitOperations;
   }
 
   /**
    * For testing: set a new commit action.
-   * @param commitActions commit actions instance
+   * @param commitOperations commit actions instance
    */
-  protected void setCommitActions(CommitActions commitActions) {
-    this.commitActions = commitActions;
+  protected void setCommitOperations(CommitOperations commitOperations) {
+    this.commitOperations = commitOperations;
   }
 
   /**
@@ -708,13 +708,13 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
             public void run(SinglePendingCommit commit,
                 Exception exception) throws IOException {
               // TODO: why retry here?
-              getCommitActions().abortSingleCommit(commit);
+              getCommitOperations().abortSingleCommit(commit);
             }
           })
           .run(new Tasks.Task<SinglePendingCommit, IOException>() {
             @Override
             public void run(SinglePendingCommit commit) throws IOException {
-              getCommitActions().abortSingleCommit(commit);
+              getCommitOperations().abortSingleCommit(commit);
             }
           });
     }

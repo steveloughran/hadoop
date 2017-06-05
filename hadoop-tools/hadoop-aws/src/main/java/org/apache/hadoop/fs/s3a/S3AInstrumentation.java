@@ -833,10 +833,13 @@ public class S3AInstrumentation {
     }
 
     /**
-     * Note an exception in a multipart complete.
+     * Note exception in a multipart complete.
+     * @param count count of exceptions
      */
-    void exceptionInMultipartComplete() {
-      exceptionsInMultipartFinalize.incrementAndGet();
+    void exceptionInMultipartComplete(int count) {
+      if (count > 0) {
+        exceptionsInMultipartFinalize.addAndGet(count);
+      }
     }
 
     /**

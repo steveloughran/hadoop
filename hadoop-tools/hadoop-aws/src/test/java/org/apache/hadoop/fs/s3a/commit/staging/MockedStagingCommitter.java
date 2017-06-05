@@ -36,7 +36,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
  */
 class MockedStagingCommitter extends StagingCommitter {
 
-  private MockFileCommitActions mockCommitActions;
+  private MockFileCommitOperations mockCommitOperations;
 
   MockedStagingCommitter(Path outputPath,
       JobContext context)
@@ -53,9 +53,8 @@ class MockedStagingCommitter extends StagingCommitter {
   }
 
   private void createMockCommitActions() throws IOException {
-    mockCommitActions = new MockFileCommitActions(getDestS3AFS());
-
-    setCommitActions(mockCommitActions);
+    mockCommitOperations = new MockFileCommitOperations(getDestS3AFS());
+    setCommitOperations(mockCommitOperations);
   }
 
   /**
@@ -111,7 +110,7 @@ class MockedStagingCommitter extends StagingCommitter {
   public String toString() {
     final StringBuilder sb = new StringBuilder(
         "MockedStagingCommitter{");
-    sb.append("mockCommitActions=").append(mockCommitActions);
+    sb.append("mockCommitActions=").append(mockCommitOperations);
     sb.append(' ');
     sb.append(super.toString());
     sb.append('}');

@@ -19,25 +19,25 @@
 package org.apache.hadoop.fs.s3a.commit.staging;
 
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.fs.s3a.commit.CommitActions;
+import org.apache.hadoop.fs.s3a.commit.CommitOperations;
 
 /**
- * Extension of {@link CommitActions} for mocking S3A in tests.
+ * Extension of {@link CommitOperations} for mocking S3A in tests.
  */
-public class MockFileCommitActions extends CommitActions {
+public class MockFileCommitOperations extends CommitOperations {
 
   /**
    * Creator.
    * @param fs filesystem to work with.
    */
-  public MockFileCommitActions(S3AFileSystem fs) {
+  public MockFileCommitOperations(S3AFileSystem fs) {
     super(fs);
   }
 
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(
-        "MockFileCommitActions{");
+        "MockFileCommitOperations{");
     sb.append(super.toString());
     sb.append('}');
     return sb.toString();

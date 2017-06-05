@@ -109,7 +109,7 @@ public class ITestS3AHugePendingCommits extends AbstractSTestS3AHugeFiles {
 
     assertPathExists("No pending file", pendingDataFile);
     ContractTestUtils.NanoTimer timer = new ContractTestUtils.NanoTimer();
-    CommitActions actions = new CommitActions(fs);
+    CommitOperations actions = new CommitOperations(fs);
     Preconditions.checkArgument(jobDir != null, "null pendingDir");
     Pair<Pendingset, List<Pair<LocatedFileStatus, IOException>>>
         results = actions.loadSinglePendingCommits(jobDir, false);
