@@ -918,7 +918,7 @@ public class S3AFileSystem extends FileSystem {
             throw new RenameFailedException(src, dst,
                 "destination parent is not a directory");
           }
-        } catch (FileNotFoundException ignored) {
+        } catch (FileNotFoundException e2) {
           throw new RenameFailedException(src, dst,
               "destination has no parent ");
         }
@@ -2208,7 +2208,6 @@ public class S3AFileSystem extends FileSystem {
     Progressable progress = null;
     PutObjectRequest putObjectRequest = newPutObjectRequest(key, om, srcfile);
     executePut(putObjectRequest, progress);
-
     if (delSrc) {
       local.delete(src, false);
     }
