@@ -139,7 +139,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public void finishedWrite(String key, long length) {
+  void finishedWrite(String key, long length) {
 
   }
 
@@ -269,7 +269,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   }
 
   @Override
-  public void deleteObjectAtPath(Path f, String key, boolean isFile)
+  void deleteObjectAtPath(Path f, String key, boolean isFile)
       throws AmazonClientException, IOException {
     deleteObject(key);
   }

@@ -956,7 +956,7 @@ public class S3AFileSystem extends FileSystem {
         S3Guard.addMoveFile(metadataStore, srcPaths, dstMetas, src, dst,
             length, getDefaultBlockSize(dst), username);
       }
-      innerDelete(srcStatus, false, false);
+      innerDelete(srcStatus, false);
     } else {
       LOG.debug("rename: renaming directory {} to {}", src, dst);
 
@@ -1036,7 +1036,7 @@ public class S3AFileSystem extends FileSystem {
 
     if (src.getParent() != dst.getParent()) {
       deleteUnnecessaryFakeDirectories(dst.getParent());
-      createFakeDirectoryIfNecessary(src.getParent());
+      maybeCreateFakeParentDirectory(src);
     }
     return true;
   }
@@ -1195,14 +1195,15 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Delete an object, also updating the filesystem and metastore.
+   * Delete an object, also updating the metastore.
+   * This call does <i>not</i> create any mock parent entries.
    * @param f path path to delete
    * @param key key of entry
    * @param isFile is the path a file (used for instrumentation only)
    * @throws AmazonClientException problems working with S3
    * @throws IOException IO failure
    */
-  public void deleteObjectAtPath(Path f, String key, boolean isFile)
+  void deleteObjectAtPath(Path f, String key, boolean isFile)
       throws AmazonClientException, IOException {
     if (isFile) {
       instrumentation.fileDeleted(1);
@@ -1339,12 +1340,8 @@ public class S3AFileSystem extends FileSystem {
     LOG.debug("PUT {} bytes to {} via transfer manager ",
         len, putObjectRequest.getKey());
     incrementPutStartStatistics(len);
-    try {
-      Upload upload = transfers.upload(putObjectRequest);
-      return new UploadInfo(upload, len);
-    } catch (AmazonClientException e) {
-      throw e;
-    }
+    Upload upload = transfers.upload(putObjectRequest);
+    return new UploadInfo(upload, len);
   }
 
   /**
@@ -1519,7 +1516,7 @@ public class S3AFileSystem extends FileSystem {
    */
   public boolean delete(Path f, boolean recursive) throws IOException {
     try {
-      return innerDelete(innerGetFileStatus(f, true), recursive, true);
+      return innerDelete(innerGetFileStatus(f, true), recursive);
     } catch (FileNotFoundException e) {
       LOG.debug("Couldn't delete {} - does not exist", f);
       instrumentation.errorIgnored();
@@ -1530,22 +1527,17 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Delete objects. See {@link #delete(Path, boolean)}.
+   * Delete an object. See {@link #delete(Path, boolean)}.
    *
    * @param status fileStatus object
    * @param recursive if path is a directory and set to
    * true, the directory is deleted else throws an exception. In
    * case of a file the recursive can be set to either true or false.
-   * @param createFakeDirectory create a fake dir if needed (adds extra GETs).
-   * This is a hint: when s3guard is on the directory tree is always created.
    * @return true, except in the corner cases of root directory deletion
    * @throws IOException due to inability to delete a directory or file.
    * @throws AmazonClientException on failures inside the AWS SDK
    */
-  @InterfaceAudience.Private
-  public boolean innerDelete(S3AFileStatus status,
-      boolean recursive,
-      boolean createFakeDirectory)
+  private boolean innerDelete(S3AFileStatus status, boolean recursive)
       throws IOException, AmazonClientException {
     Path f = status.getPath();
     LOG.debug("Delete path {} - recursive {}", f , recursive);
@@ -1610,10 +1602,7 @@ public class S3AFileSystem extends FileSystem {
       deleteObjectAtPath(f, key, true);
     }
 
-    Path parent = f.getParent();
-    if (parent != null && (createFakeDirectory || hasMetadataStore())) {
-      createFakeDirectoryIfNecessary(parent);
-    }
+    maybeCreateFakeParentDirectory(f);
     return true;
   }
 
@@ -1643,12 +1632,34 @@ public class S3AFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * Create a fake directory if required.
+   * That is: it is not the root path and the path does not exist.
+   * @param f path to create
+   * @throws IOException IO problem
+   * @throws AmazonClientException untranslated AWS client problem
+   */
   private void createFakeDirectoryIfNecessary(Path f)
       throws IOException, AmazonClientException {
     String key = pathToKey(f);
     if (!key.isEmpty() && !s3Exists(f)) {
       LOG.debug("Creating new fake directory at {}", f);
       createFakeDirectory(key);
+    }
+  }
+
+  /**
+   * Create a fake parent directory if required.
+   * That is: it parent is not the root path and does not yet exist.
+   * @param path whose parent is created if needed.
+   * @throws IOException IO problem
+   * @throws AmazonClientException untranslated AWS client problem
+   */
+  void maybeCreateFakeParentDirectory(Path path)
+      throws IOException, AmazonClientException {
+    Path parent = path.getParent();
+    if (parent != null) {
+      createFakeDirectoryIfNecessary(parent);
     }
   }
 

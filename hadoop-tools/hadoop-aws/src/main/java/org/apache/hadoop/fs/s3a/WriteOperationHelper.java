@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 
@@ -464,9 +465,13 @@ public class WriteOperationHelper {
    */
   public void revertCommit(String destKey) throws IOException {
     calls.execute("revert commit", destKey,
-        () ->
-            owner.deleteObjectAtPath(owner.keyToPath(destKey),
-                destKey, true));
+        () -> {
+          Path destPath = owner.keyToPath(destKey);
+          owner.deleteObjectAtPath(destPath,
+              destKey, true);
+          owner.maybeCreateFakeParentDirectory(destPath);
+        }
+    );
   }
 
   /**

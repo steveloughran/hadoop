@@ -361,4 +361,30 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     actions.uploadFileToPendingCommit(tempFile, dest, null,
         DEFAULT_MULTIPART_SIZE);
   }
+
+  @Test
+  public void testRevertCommit() throws Throwable {
+    Path destFile = methodPath("part-0000");
+    S3AFileSystem fs = getFileSystem();
+    touch(fs, destFile);
+    CommitOperations actions = newActions();
+    SinglePendingCommit commit = new SinglePendingCommit();
+    commit.setDestinationKey(fs.pathToKey(destFile));
+    actions.revertCommit(commit);
+    assertPathExists("parent of reverted commit",
+        destFile.getParent());
+  }
+
+  @Test
+  public void testRevertMissingCommit() throws Throwable {
+    Path destFile = methodPath("part-0000");
+    S3AFileSystem fs = getFileSystem();
+    fs.delete(destFile, false);
+    CommitOperations actions = newActions();
+    SinglePendingCommit commit = new SinglePendingCommit();
+    commit.setDestinationKey(fs.pathToKey(destFile));
+    actions.revertCommit(commit);
+    assertPathExists("parent of reverted (nonexistent) commit",
+        destFile.getParent());
+  }
 }
