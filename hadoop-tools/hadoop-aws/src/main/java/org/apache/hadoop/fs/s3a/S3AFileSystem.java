@@ -1530,13 +1530,14 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Delete an object. See {@link #delete(Path, boolean)}.
+   * Delete objects. See {@link #delete(Path, boolean)}.
    *
    * @param status fileStatus object
    * @param recursive if path is a directory and set to
    * true, the directory is deleted else throws an exception. In
    * case of a file the recursive can be set to either true or false.
    * @param createFakeDirectory create a fake dir if needed (adds extra GETs).
+   * This is a hint: when s3guard is on the directory tree is always created.
    * @return true, except in the corner cases of root directory deletion
    * @throws IOException due to inability to delete a directory or file.
    * @throws AmazonClientException on failures inside the AWS SDK
@@ -1610,7 +1611,7 @@ public class S3AFileSystem extends FileSystem {
     }
 
     Path parent = f.getParent();
-    if (parent != null && createFakeDirectory) {
+    if (parent != null && (createFakeDirectory || hasMetadataStore())) {
       createFakeDirectoryIfNecessary(parent);
     }
     return true;
