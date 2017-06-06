@@ -437,7 +437,6 @@ public final class Constants {
   public static final String FAIL_INJECT_INCONSISTENCY_MSEC =
       "fs.s3a.failinject.inconsistency.msec";
 
-<<<<<<< HEAD
   @InterfaceStability.Unstable
   public static final String FAIL_INJECT_INCONSISTENCY_PROBABILITY =
       "fs.s3a.failinject.inconsistency.probability";
