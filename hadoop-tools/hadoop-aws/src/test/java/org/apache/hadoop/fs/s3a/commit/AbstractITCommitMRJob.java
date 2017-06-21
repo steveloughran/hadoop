@@ -62,7 +62,7 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /** Full integration test of an MR job. */
-public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
+public abstract class AbstractITCommitMRJob extends AbstractCommitITest {
 
   private static final int TEST_FILE_COUNT = 2;
   private static final int SCALE_TEST_FILE_COUNT = 20;
@@ -109,27 +109,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     return hdfs.getLocalFS();
   }
 
-  /**
-   * Should the inconsistent S3A client be used?
-   * Default value: true.
-   * @return true for inconsistent listing
-   */
-  public boolean useInconsistentClient() {
-    return true;
-  }
-
-  /**
-   * switch to an inconsistent path if in inconsistent mode.
-   * {@inheritDoc}
-   */
-  @Override
-  protected Path path(String filepath) throws IOException {
-    return useInconsistentClient() ?
-           super.path(InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_SUBSTRING
-               + "/" + filepath)
-           : super.path(filepath);
-  }
-
   @Rule
   public final TemporaryFolder temp = new TemporaryFolder();
 
@@ -144,7 +123,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
    * {@link AbstractS3GuardCommitter#getName()}.
    */
   protected abstract String committerName();
-
 
   @Override
   public void setup() throws Exception {
@@ -164,7 +142,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   public void testMRJob() throws Exception {
     S3AFileSystem fs = getFileSystem();
     // final dest is in S3A
-    boolean useInconsistentClient = useInconsistentClient();
     Path outputPath = path("testMRJob");
     StorageStatisticsTracker tracker = new StorageStatisticsTracker(fs);
 
@@ -181,7 +158,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
       String filename = String.format("part-m-%05d%s", i, suffix);
       Path path = new Path(outputPath, filename);
       expectedFiles.add(path.toString());
-      expectedKeys.add(fs.pathToKey(path));
+      expectedKeys.add("/" + fs.pathToKey(path));
     }
     Collections.sort(expectedFiles);
 
@@ -203,11 +180,6 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     String committerPath = "file:" + mockResultsFile;
     jobConf.set("mock-results-file", committerPath);
     jobConf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, commitUUID);
-
-    if (useInconsistentClient) {
-      enableInconsistentS3Client(jobConf,
-          InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_MSEC);
-    }
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     FileInputFormat.addInputPath(mrJob, new Path(temp.getRoot().toURI()));
@@ -237,6 +209,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
       assertTrue("MR job failed", succeeded);
     }
 
+    waitForConsistency();
     assertIsDirectory(outputPath);
     FileStatus[] results = fs.listStatus(outputPath, TEMP_FILE_FILTER);
     int fileCount = results.length;

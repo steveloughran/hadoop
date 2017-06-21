@@ -116,9 +116,11 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   }
 
   public void rmdir(Path dir, Configuration conf) throws IOException {
-    describe("deleting %s", dir);
-    FileSystem fs = dir.getFileSystem(conf);
-    fs.delete(dir, true);
+    if (dir != null) {
+      describe("deleting %s", dir);
+      FileSystem fs = dir.getFileSystem(conf);
+      fs.delete(dir, true);
+    }
   }
 
   /**
@@ -164,8 +166,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
       abortJobQuietly(abortInTeardown);
     }
     if (outDir != null) {
-      abortMultipartUploadsUnderPath(outDir);
-      cleanupDestDir();
+      try {
+        abortMultipartUploadsUnderPath(outDir);
+        cleanupDestDir();
+      } catch (IOException e) {
+        LOG.info("Exception during cleanup", e);
+      }
     }
     S3AFileSystem fileSystem = getFileSystem();
     if (fileSystem != null) {
