@@ -47,6 +47,8 @@ import java.net.URISyntaxException;
 import java.util.List;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
+import static org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_MSEC;
+import static org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_SUBSTRING;
 import static org.apache.hadoop.fs.s3a.S3ATestConstants.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3AUtils.propagateBucketOptions;
@@ -794,6 +796,23 @@ public final class S3ATestUtils {
     }
   }
 
-  public final static PathFilter TEMP_FILE_FILTER = new FilterTempFiles();
+  public static final PathFilter TEMP_FILE_FILTER = new FilterTempFiles();
 
+  /**
+   * Turn on the inconsistent S3A FS client in a configuration,
+   * with 100% probability of inconsistency, default delays.
+   * For this to go live, the paths must include the element
+   * {@link InconsistentAmazonS3Client#DEFAULT_DELAY_KEY_SUBSTRING}.
+   * @param conf configuration to patch
+   * @param delay delay in millis
+   */
+  public static void enableInconsistentS3Client(Configuration conf,
+      long delay) {
+    LOG.info("Enabling inconsistent S3 client");
+    conf.setClass(S3_CLIENT_FACTORY_IMPL, InconsistentS3ClientFactory.class,
+        S3ClientFactory.class);
+    conf.set(FAIL_INJECT_INCONSISTENCY_KEY, DEFAULT_DELAY_KEY_SUBSTRING);
+    conf.setFloat(FAIL_INJECT_INCONSISTENCY_PROBABILITY, 1.0f);
+    conf.setLong(FAIL_INJECT_INCONSISTENCY_MSEC, delay);
+  }
 }

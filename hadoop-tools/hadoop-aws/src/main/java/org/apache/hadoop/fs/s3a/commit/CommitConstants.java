@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.DirectoryStagingCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.PartitonedStagingCommitterFactory;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitterFactory;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 
 /**
  * Constants for working with committers.
@@ -89,10 +88,10 @@ public final class CommitConstants {
    * Flag to trigger creation of a marker file on job completion.
    */
   public static final String CREATE_SUCCESSFUL_JOB_OUTPUT_DIR_MARKER
-      = FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
+      = "mapreduce.fileoutputcommitter.marksuccessfuljobs";
 
   /**
-   * Marker file to create on success.
+   * Marker file to create on success: {@value}.
    */
   public static final String SUCCESS_FILE_NAME = "_SUCCESS";
 

@@ -269,12 +269,12 @@ public final class CommitUtils {
   }
 
   /**
-   * Verify that the path is a pending commit path.
+   * Verify that the path is a magic one
    * @param fs filesystem
    * @param path path
    * @throws PathCommitException if the path isn't a pending commit path
    */
-  public static void verifyIsDelayedCommitPath(S3AFileSystem fs,
+  public static void verifyIsMagicCommitPath(S3AFileSystem fs,
       Path path) throws PathCommitException {
     verifyIsMagicCommitFS(fs);
     if (!fs.isPendingCommitPath(path)) {

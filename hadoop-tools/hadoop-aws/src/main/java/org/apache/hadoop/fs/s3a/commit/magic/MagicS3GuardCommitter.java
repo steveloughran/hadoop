@@ -84,7 +84,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
     setWorkPath(getTaskAttemptPath(context));
-    verifyIsDelayedCommitPath(getDestS3AFS(), getWorkPath());
+    verifyIsMagicCommitPath(getDestS3AFS(), getWorkPath());
     LOG.debug("Task attempt {} has work path {}",
         context.getTaskAttemptID(),
         getWorkPath());

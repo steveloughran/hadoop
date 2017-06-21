@@ -624,10 +624,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * file existence and contents, as well as optionally, the success marker.
    * @param dir directory to scan.
    * @param expectSuccessMarker check the success marker?
-   * @throws IOException failure.
+   * @throws Exception failure.
    */
   private void validateContent(Path dir, boolean expectSuccessMarker)
-      throws IOException {
+      throws Exception {
     if (expectSuccessMarker) {
       verifySuccessMarker(dir);
     }
@@ -647,21 +647,38 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
 
   /**
    * Identify any path under the directory which begins with the
-   * {@code "part-m-00000"} sequence.
+   * {@code "part-m-00000"} sequence. There's some compensation for
+   * eventual consistency here.
    * @param dir directory to scan
    * @return the full path
    * @throws FileNotFoundException the path is missing.
-   * @throws IOException failure.
+   * @throws Exception failure.
    */
-  protected Path getPart0000(Path dir) throws IOException {
-    FileSystem fs = dir.getFileSystem(getConfiguration());
-    FileStatus[] statuses = fs.listStatus(dir,
-        new PathFilter() {
+  protected Path getPart0000(final Path dir) throws Exception {
+    final FileSystem fs = dir.getFileSystem(getConfiguration());
+    return eventually(CONSISTENCY_WAIT, CONSISTENCY_PROBE_INTERVAL,
+        new Callable<Path>() {
           @Override
-          public boolean accept(Path path) {
-            return path.getName().startsWith(PART_00000);
+          public Path call() throws Exception {
+            return getPart0000Immediately(fs, dir);
           }
         });
+  }
+
+  /**
+   * Identify any path under the directory which begins with the
+   * {@code "part-m-00000"} sequence. There's some compensation for
+   * eventual consistency here.
+   * @param fs FS to probe
+   * @param dir directory to scan
+   * @return the full path
+   * @throws FileNotFoundException the path is missing.
+   * @throws Exception failure.
+   */
+  private Path getPart0000Immediately(FileSystem fs, Path dir)
+      throws IOException {
+    FileStatus[] statuses = fs.listStatus(dir,
+        (path) -> path.getName().startsWith(PART_00000));
     if (statuses.length != 1) {
       // fail, with a listing of the parent dir
       ContractTestUtils.assertPathExists(fs, "Output file",
@@ -674,10 +691,10 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * Look for the partFile subdir of the output dir.
    * @param fs filesystem
    * @param dir output dir
-   * @throws IOException IO failure.
+   * @throws Exception failure.
    */
   private void validateMapFileOutputContent(
-      FileSystem fs, Path dir) throws IOException {
+      FileSystem fs, Path dir) throws Exception {
     // map output is a directory with index and data files
     assertPathExists("Map output", dir);
     Path expectedMapDir = getPart0000(dir);
@@ -832,6 +849,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     committer.commitTask(tContext);
 
     // this is only task commit; there MUST be no part- files in the dest dir
+    waitForConsistency();
     try {
       RemoteIterator<LocatedFileStatus> files
           = getFileSystem().listFiles(outDir, false);
@@ -843,7 +861,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
                   status.getPath().toString().contains("part"));
             }
           });
-    } catch (FileNotFoundException e) {
+    } catch (FileNotFoundException ignored) {
       LOG.info("Outdir {} is not created by task commit phase ",
           outDir);
     }
@@ -930,9 +948,12 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
    * @return the caught exception
    * @throws Exception any unexpected failure.
    */
-  protected static IOException expectJobCommitFailure(JobContext jContext,
-      AbstractS3GuardCommitter committer, Class<? extends IOException> clazz)
+  protected static <E extends IOException> E expectJobCommitFailure(
+      JobContext jContext,
+      AbstractS3GuardCommitter committer,
+      Class<E> clazz)
       throws Exception {
+
     return intercept(clazz,
         new Callable<String>() {
           @Override
@@ -1038,6 +1059,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     // do commit
     commit(committer, jContext, tContext);
     S3AFileSystem fs = getFileSystem();
+    waitForConsistency();
     lsR(fs, outDir, true);
     String ls = ls(outDir);
     describe("\nvalidating");
@@ -1233,7 +1255,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     assertNoMultipartUploadsPending(outDir);
   }
 
-  public void assertPart0000DoesNotExist(Path dir) throws IOException {
+  public void assertPart0000DoesNotExist(Path dir) throws Exception {
     try {
       Path p = getPart0000(dir);
       // bad

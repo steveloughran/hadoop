@@ -94,7 +94,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path destFile = methodPath(filename);
     String origKey = fs.pathToKey(destFile);
     Path pendingPath = makePending(destFile);
-    verifyIsDelayedCommitPath(fs, pendingPath);
+    verifyIsMagicCommitPath(fs, pendingPath);
     String pendingPathKey = fs.pathToKey(pendingPath);
     assertTrue("wrong path of " + pendingPathKey,
         pendingPathKey.endsWith(filename));
@@ -371,8 +371,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     SinglePendingCommit commit = new SinglePendingCommit();
     commit.setDestinationKey(fs.pathToKey(destFile));
     actions.revertCommit(commit);
-    assertPathExists("parent of reverted commit",
-        destFile.getParent());
+    assertPathExists("parent of reverted commit", destFile.getParent());
   }
 
   @Test

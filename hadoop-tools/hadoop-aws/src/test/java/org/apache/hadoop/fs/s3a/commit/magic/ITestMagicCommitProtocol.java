@@ -47,6 +47,15 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
     return "ITestMagicCommitProtocol";
   }
 
+  /**
+   * Need consistency here.
+   * @return false
+   */
+  @Override
+  public boolean useInconsistentClient() {
+    return false;
+  }
+
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();

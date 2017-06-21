@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.AbstractS3ATestBase;
+import org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.StorageStatisticsTracker;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
@@ -109,39 +110,24 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   }
 
   /**
-   *  Test Mapper.
-   *  This is executed in separate process, and must not make any assumptions
-   *  about external state.
+   * Should the inconsistent S3A client be used?
+   * Default value: true.
+   * @return true for inconsistent listing
    */
-  public static class MapClass
-      extends Mapper<LongWritable, Text, LongWritable, Text> {
+  public boolean useInconsistentClient() {
+    return true;
+  }
 
-    private int operations;
-    private String id = "";
-    private LongWritable l = new LongWritable();
-    private Text t = new Text();
-
-    @Override
-    protected void setup(Context context)
-        throws IOException, InterruptedException {
-      super.setup(context);
-      // force in Log4J logging
-      org.apache.log4j.BasicConfigurator.configure();
-      boolean scaleMap = context.getConfiguration()
-          .getBoolean(KEY_SCALE_TESTS_ENABLED, false);
-      operations = scaleMap ? 1000 : 10;
-      id = context.getTaskAttemptID().toString();
-    }
-
-    @Override
-    protected void map(LongWritable key, Text value, Context context)
-        throws IOException, InterruptedException {
-      for (int i = 0; i < operations; i++) {
-        l.set(i);
-        t.set(String.format("%s:%05d", id, i));
-        context.write(l, t);
-      }
-    }
+  /**
+   * switch to an inconsistent path if in inconsistent mode.
+   * {@inheritDoc}
+   */
+  @Override
+  protected Path path(String filepath) throws IOException {
+    return useInconsistentClient() ?
+           super.path(InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_SUBSTRING
+               + "/" + filepath)
+           : super.path(filepath);
   }
 
   @Rule
@@ -178,6 +164,7 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
   public void testMRJob() throws Exception {
     S3AFileSystem fs = getFileSystem();
     // final dest is in S3A
+    boolean useInconsistentClient = useInconsistentClient();
     Path outputPath = path("testMRJob");
     StorageStatisticsTracker tracker = new StorageStatisticsTracker(fs);
 
@@ -216,6 +203,11 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
     String committerPath = "file:" + mockResultsFile;
     jobConf.set("mock-results-file", committerPath);
     jobConf.set(CommitConstants.FS_S3A_COMMITTER_STAGING_UUID, commitUUID);
+
+    if (useInconsistentClient) {
+      enableInconsistentS3Client(jobConf,
+          InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_MSEC);
+    }
 
     mrJob.setInputFormatClass(TextInputFormat.class);
     FileInputFormat.addInputPath(mrJob, new Path(temp.getRoot().toURI()));
@@ -313,6 +305,42 @@ public abstract class AbstractITCommitMRJob extends AbstractS3ATestBase {
       SuccessData successData)
       throws Exception {
 
+  }
+
+  /**
+   *  Test Mapper.
+   *  This is executed in separate process, and must not make any assumptions
+   *  about external state.
+   */
+  public static class MapClass
+      extends Mapper<LongWritable, Text, LongWritable, Text> {
+
+    private int operations;
+    private String id = "";
+    private LongWritable l = new LongWritable();
+    private Text t = new Text();
+
+    @Override
+    protected void setup(Context context)
+        throws IOException, InterruptedException {
+      super.setup(context);
+      // force in Log4J logging
+      org.apache.log4j.BasicConfigurator.configure();
+      boolean scaleMap = context.getConfiguration()
+          .getBoolean(KEY_SCALE_TESTS_ENABLED, false);
+      operations = scaleMap ? 1000 : 10;
+      id = context.getTaskAttemptID().toString();
+    }
+
+    @Override
+    protected void map(LongWritable key, Text value, Context context)
+        throws IOException, InterruptedException {
+      for (int i = 0; i < operations; i++) {
+        l.set(i);
+        t.set(String.format("%s:%05d", id, i));
+        context.write(l, t);
+      }
+    }
   }
 
 }

@@ -35,6 +35,15 @@ public class ITMagicCommitMRJob extends AbstractITCommitMRJob {
     return MAGIC_COMMITTER_FACTORY;
   }
 
+  /**
+   * Need consistency here.
+   * @return false
+   */
+  @Override
+  public boolean useInconsistentClient() {
+    return false;
+  }
+
   @Override
   protected String committerName() {
     return MagicS3GuardCommitter.NAME;
