@@ -23,11 +23,13 @@ import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.STAGING_COMMITTER_FACTORY;
 
+/**
+ * Test the committer factory logic.
+ */
 public class TestCommitterBinding extends Assert {
 
   @Test
@@ -41,7 +43,7 @@ public class TestCommitterBinding extends Assert {
         factory instanceof StagingCommitterFactory);
   }
 
-  private final Throwable verifyCauseClass(Throwable ex,
+  private Throwable verifyCauseClass(Throwable ex,
       Class<? extends Throwable> clazz) throws Throwable {
     Throwable cause = ex.getCause();
     if (cause == null) {

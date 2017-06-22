@@ -139,7 +139,7 @@ public class CommitOperations {
   }
 
   /**
-   * Inner commit operation
+   * Inner commit operation.
    * @param commit entry to commit
    * @throws IOException
    */
@@ -340,11 +340,11 @@ public class CommitOperations {
     // add any diagnostics
     Configuration conf = fs.getConf();
     successData.addDiagnostic(S3_METADATA_STORE_IMPL,
-        conf.getTrimmed(S3_METADATA_STORE_IMPL, "" ));
+        conf.getTrimmed(S3_METADATA_STORE_IMPL, ""));
     successData.addDiagnostic(METADATASTORE_AUTHORITATIVE,
-        conf.getTrimmed(METADATASTORE_AUTHORITATIVE, "false" ));
+        conf.getTrimmed(METADATASTORE_AUTHORITATIVE, "false"));
     successData.addDiagnostic(MAGIC_COMMITTER_ENABLED,
-        conf.getTrimmed(MAGIC_COMMITTER_ENABLED, "false" ));
+        conf.getTrimmed(MAGIC_COMMITTER_ENABLED, "false"));
 
     // now write
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);

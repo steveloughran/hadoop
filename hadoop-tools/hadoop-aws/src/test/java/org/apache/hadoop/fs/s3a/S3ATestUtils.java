@@ -47,8 +47,7 @@ import java.net.URISyntaxException;
 import java.util.List;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
-import static org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_MSEC;
-import static org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client.DEFAULT_DELAY_KEY_SUBSTRING;
+import static org.apache.hadoop.fs.s3a.InconsistentAmazonS3Client.*;
 import static org.apache.hadoop.fs.s3a.S3ATestConstants.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 import static org.apache.hadoop.fs.s3a.S3AUtils.propagateBucketOptions;

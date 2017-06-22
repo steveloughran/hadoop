@@ -1016,7 +1016,7 @@ public class S3AInstrumentation {
     private final Map<String, Long> map =
         new HashMap<>(COUNTERS_TO_CREATE.length * 2);
 
-    public MetricsToMap(MetricsCollector parent) {
+    MetricsToMap(MetricsCollector parent) {
       this.parent = parent;
     }
 

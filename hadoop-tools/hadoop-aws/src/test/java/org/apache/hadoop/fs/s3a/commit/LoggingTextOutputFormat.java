@@ -30,7 +30,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.GzipCodec;
-import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -73,6 +72,12 @@ public class LoggingTextOutputFormat<K, V> extends TextOutputFormat<K, V> {
     }
   }
 
+  /**
+   * Write a line; counts the number of lines written and logs @ debug in the
+   * close() call.
+   * @param <K> key
+   * @param <V> value
+   */
   public static class LoggingLineRecordWriter<K, V>
       extends LineRecordWriter<K, V> {
     private final Path dest;

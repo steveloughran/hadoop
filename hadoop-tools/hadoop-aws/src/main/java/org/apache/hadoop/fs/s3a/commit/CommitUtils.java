@@ -269,7 +269,7 @@ public final class CommitUtils {
   }
 
   /**
-   * Verify that the path is a magic one
+   * Verify that the path is a magic one.
    * @param fs filesystem
    * @param path path
    * @throws PathCommitException if the path isn't a pending commit path

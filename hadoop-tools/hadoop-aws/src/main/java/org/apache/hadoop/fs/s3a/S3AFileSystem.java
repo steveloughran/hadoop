@@ -2378,7 +2378,7 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
-   * Initiate an MPU
+   * Initiate an MPU.
    * @param request request to initiate
    * @return the result of the call
    * @throws AmazonClientException on failures inside the AWS SDK
