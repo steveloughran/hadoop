@@ -28,16 +28,23 @@ import java.io.IOException;
  */
 public class AWSClientIOException extends IOException {
 
+  private final String operation;
+
   public AWSClientIOException(String operation,
       AmazonClientException cause) {
-    super(operation + ": " + (cause != null ? cause.toString() : ""),
-        cause);
+    super(cause);
     Preconditions.checkArgument(operation != null, "Null 'operation' argument");
     Preconditions.checkArgument(cause != null, "Null 'cause' argument");
+    this.operation = operation;
   }
 
   public AmazonClientException getCause() {
     return (AmazonClientException) super.getCause();
+  }
+
+  @Override
+  public String getMessage() {
+    return operation + ": " + getCause().getMessage();
   }
 
 }
