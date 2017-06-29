@@ -441,4 +441,13 @@ public final class Constants {
   public static final String FAIL_INJECT_INCONSISTENCY_PROBABILITY =
       "fs.s3a.failinject.inconsistency.probability";
 
+  public static final String RETRY_LIMIT = "fs.s3a.retry.limit";
+  public static final int RETRY_LIMIT_DEFAULT = 4;
+  public static final String RETRY_INTERVAL = "fs.s3a.retry.interval";
+  public static final String RETRY_INTERVAL_DEFAULT = "500ms";
+  public static final String RETRY_THROTTLE_LIMIT = "fs.s3a.retry.throttle.limit";
+  public static final int RETRY_THROTTLE_LIMIT_DEFAULT = 10;
+  public static final String RETRY_THROTTLE_INTERVAL = "fs.s3a.retry.throttle.interval";
+  public static final String RETRY_THROTTLE_INTERVAL_DEFAULT = "100ms";
+
 }

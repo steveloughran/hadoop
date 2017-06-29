@@ -18,15 +18,11 @@
 
 package org.apache.hadoop.fs.s3a;
 
-import static org.apache.hadoop.fs.s3a.Constants.*;
-import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
-import static org.apache.hadoop.fs.s3a.S3AUtils.*;
-import static org.junit.Assert.*;
-
 import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
 import java.nio.file.AccessDeniedException;
 import java.util.Collections;
 import java.util.Map;
@@ -35,8 +31,13 @@ import java.util.concurrent.ExecutionException;
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
-
 import org.junit.Test;
+
+import static org.apache.hadoop.fs.s3a.Constants.ENDPOINT;
+import static org.apache.hadoop.fs.s3a.S3ATestUtils.verifyExceptionClass;
+import static org.apache.hadoop.fs.s3a.S3AUtils.*;
+import static org.junit.Assert.*;
+
 
 /**
  * Unit test suite covering translation of AWS SDK exceptions to S3A exceptions.
@@ -45,42 +46,62 @@ public class TestS3AExceptionTranslation {
 
   @Test
   public void test301ContainsEndpoint() throws Exception {
+    String bucket = "bucket.s3-us-west-2.amazonaws.com";
     AmazonS3Exception s3Exception = createS3Exception("wrong endpoint", 301,
         Collections.singletonMap(S3AUtils.ENDPOINT_KEY,
-            "bucket.s3-us-west-2.amazonaws.com"));
-    AWSS3IOException ex = (AWSS3IOException)verifyTranslated(
-        AWSS3IOException.class, s3Exception);
-    assertEquals(301, ex.getStatusCode());
+            bucket));
+    AWSRedirectException ex = (AWSRedirectException)verifyTranslated(
+        AWSRedirectException.class, s3Exception);
+    assertStatusCode(301, ex);
     assertNotNull(ex.getMessage());
-    assertTrue(ex.getMessage().contains("bucket.s3-us-west-2.amazonaws.com"));
-    assertTrue(ex.getMessage().contains(ENDPOINT));
+
+    assertContained(ex.getMessage(), bucket);
+    assertContained(ex.getMessage(), ENDPOINT);
+    assertContained(ex.toString(), bucket);
+  }
+
+  protected void assertContained(String text, String contained) {
+    assertTrue("string \""+ contained + "\" not found in \"" + text + "\"",
+        text != null && text.contains(contained));
+  }
+
+  protected void verifyTranslated(int status, Class expected) throws Exception {
+    verifyTranslated(expected, createS3Exception(status));
+  }
+
+
+  @Test
+  public void test400isBad() throws Exception {
+    verifyTranslated(400, AWSBadRequestException.class);
   }
 
   @Test
   public void test401isNotPermittedFound() throws Exception {
-    verifyTranslated(AccessDeniedException.class,
-        createS3Exception(401));
+    verifyTranslated(401,AccessDeniedException.class);
   }
 
   @Test
   public void test403isNotPermittedFound() throws Exception {
-    verifyTranslated(AccessDeniedException.class,
-        createS3Exception(403));
+    verifyTranslated(403,AccessDeniedException.class);
   }
 
   @Test
   public void test404isNotFound() throws Exception {
-    verifyTranslated(FileNotFoundException.class, createS3Exception(404));
+    verifyTranslated(404, FileNotFoundException.class);
   }
 
   @Test
   public void test410isNotFound() throws Exception {
-    verifyTranslated(FileNotFoundException.class, createS3Exception(410));
+    verifyTranslated(410, FileNotFoundException.class);
   }
 
   @Test
   public void test416isEOF() throws Exception {
-    verifyTranslated(EOFException.class, createS3Exception(416));
+    verifyTranslated(416, EOFException.class);
+  }
+  @Test
+  public void test503isThrottled() throws Exception {
+    verifyTranslated(503, AWSServiceThrottledException.class);
   }
 
   @Test
@@ -89,7 +110,7 @@ public class TestS3AExceptionTranslation {
     AWSS3IOException ex = (AWSS3IOException)verifyTranslated(
         AWSS3IOException.class,
         createS3Exception(451));
-    assertEquals(451, ex.getStatusCode());
+    assertStatusCode(451, ex);
   }
 
   @Test
@@ -100,7 +121,16 @@ public class TestS3AExceptionTranslation {
     AWSServiceIOException ex = (AWSServiceIOException)verifyTranslated(
         AWSServiceIOException.class,
         ase);
-    assertEquals(500, ex.getStatusCode());
+    assertStatusCode(500, ex);
+  }
+
+  protected void assertStatusCode(int expected, AWSServiceIOException ex) {
+    assertNotNull("Null exception", ex);
+    if (expected != ex.getStatusCode()) {
+      throw new AssertionError("Expected status code " + expected
+          + "but got " + ex.getStatusCode(),
+          ex);
+    }
   }
 
   @Test
@@ -130,7 +160,8 @@ public class TestS3AExceptionTranslation {
 
   private void assertContainsInterrupted(boolean expected, Throwable thrown)
       throws Throwable {
-    if (containsInterruptedException(thrown) != expected) {
+    boolean wasInterrupted = containsInterruptedException(thrown) != null;
+    if (wasInterrupted != expected) {
       throw thrown;
     }
   }
@@ -160,6 +191,14 @@ public class TestS3AExceptionTranslation {
         new ExecutionException(
             new AmazonClientException(
               new InterruptedIOException(""))));
+  }
+
+  @Test(expected = SocketTimeoutException.class)
+  public void testExtractSocketTimeoutException() throws Throwable {
+    throw extractException("", "",
+        new ExecutionException(
+            new AmazonClientException(
+              new SocketTimeoutException(""))));
   }
 
 }

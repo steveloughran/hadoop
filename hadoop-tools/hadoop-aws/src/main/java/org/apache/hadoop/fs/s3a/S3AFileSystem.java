@@ -1109,6 +1109,20 @@ public class S3AFileSystem extends FileSystem {
   }
 
   /**
+   * Callback when an operation was retried.
+   * Increments the statistics of ignored errors or throttled requests,
+   * depending up on the exception class.
+   * @param ex exception.
+   */
+  public void operationRetried(Exception ex) {
+    storageStatistics.incrementCounter(
+        ex instanceof AWSServiceThrottledException
+        ? THROTTLED_REQUESTS
+        : IGNORED_ERRORS,
+        1);
+  }
+
+  /**
    * Get the storage statistics of this filesystem.
    * @return the storage statistics
    */

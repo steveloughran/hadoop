@@ -48,6 +48,7 @@ import java.io.InterruptedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.AccessDeniedException;
 import java.util.Collection;
@@ -138,9 +139,14 @@ public final class S3AUtils {
         path != null ? (" on " + path) : "",
         exception);
     if (!(exception instanceof AmazonServiceException)) {
-      if (containsInterruptedException(exception)) {
-        return (IOException)new InterruptedIOException(message)
-            .initCause(exception);
+      Exception innerCause = containsInterruptedException(exception);
+      if (innerCause != null) {
+        // interrupted IO, or a socket exception underneath that class
+        IOException ioe = innerCause instanceof SocketTimeoutException ?
+          new SocketTimeoutException(message)
+          : new InterruptedIOException(message);
+        ioe.initCause(exception);
+        return ioe;
       }
       return new AWSClientIOException(message, exception);
     } else {
@@ -152,9 +158,11 @@ public final class S3AUtils {
           ? (AmazonS3Exception) ase
           : null;
       int status = ase.getStatusCode();
+      message = message + ":" + ase.getErrorCode();
       switch (status) {
 
       case 301:
+      case 307:
         if (s3Exception != null) {
           if (s3Exception.getAdditionalDetails() != null &&
               s3Exception.getAdditionalDetails().containsKey(ENDPOINT_KEY)) {
@@ -164,11 +172,16 @@ public final class S3AUtils {
                 + "the bucket.",
                 s3Exception.getAdditionalDetails().get(ENDPOINT_KEY), ENDPOINT);
           }
-          ioe = new AWSS3IOException(message, s3Exception);
+          ioe = new AWSRedirectException(message, s3Exception);
         } else {
-          ioe = new AWSServiceIOException(message, ase);
+          ioe = new AWSRedirectException(message, ase);
         }
         break;
+
+      case 400:
+        ioe = new AWSBadRequestException(message, ase);
+        break;
+
       // permissions
       case 401:
       case 403:
@@ -187,6 +200,12 @@ public final class S3AUtils {
       // a shorter one while it is being read.
       case 416:
         ioe = new EOFException(message);
+        ioe.initCause(ase);
+        break;
+
+      // throttling
+      case 503:
+        ioe = new AWSServiceThrottledException(message, ase);
         break;
 
       default:
@@ -227,15 +246,15 @@ public final class S3AUtils {
    * Recurse down the exception loop looking for any inner details about
    * an interrupted exception.
    * @param thrown exception thrown
-   * @return true if down the execution chain the operation was an interrupt
+   * @return the actual exception if the operation was an interrupt
    */
-  static boolean containsInterruptedException(Throwable thrown) {
+  static Exception containsInterruptedException(Throwable thrown) {
     if (thrown == null) {
-      return false;
+      return null;
     }
     if (thrown instanceof InterruptedException ||
         thrown instanceof InterruptedIOException) {
-      return true;
+      return (Exception)thrown;
     }
     // tail recurse
     return containsInterruptedException(thrown.getCause());

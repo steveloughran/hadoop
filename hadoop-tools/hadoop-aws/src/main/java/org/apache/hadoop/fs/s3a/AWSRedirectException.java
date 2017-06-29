@@ -18,26 +18,21 @@
 
 package org.apache.hadoop.fs.s3a;
 
-import com.amazonaws.AmazonClientException;
-import com.google.common.base.Preconditions;
-
-import java.io.IOException;
+import com.amazonaws.AmazonServiceException;
 
 /**
- * IOException equivalent of an {@link AmazonClientException}.
+ * Request is redirected.
+ * If this gets as far as the user, it's unrecoverable
  */
-public class AWSClientIOException extends IOException {
+public class AWSRedirectException extends AWSServiceIOException {
 
-  public AWSClientIOException(String operation,
-      AmazonClientException cause) {
-    super(operation + ": " + (cause != null ? cause.toString() : ""),
-        cause);
-    Preconditions.checkArgument(operation != null, "Null 'operation' argument");
-    Preconditions.checkArgument(cause != null, "Null 'cause' argument");
+  /**
+   * Instantiate.
+   * @param operation operation which triggered this
+   * @param cause the underlying cause
+   */
+  public AWSRedirectException(String operation,
+      AmazonServiceException cause) {
+    super(operation, cause);
   }
-
-  public AmazonClientException getCause() {
-    return (AmazonClientException) super.getCause();
-  }
-
 }
