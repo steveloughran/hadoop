@@ -40,12 +40,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.S3AInstrumentation;
+import org.apache.hadoop.fs.s3a.S3ALambda;
+import org.apache.hadoop.fs.s3a.S3ARetryPolicy;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
 import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 
-import static org.apache.hadoop.fs.s3a.S3AUtils.deleteQuietly;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
 
@@ -63,6 +64,9 @@ public class CommitOperations {
   /** Statistics. */
   private final S3AInstrumentation.CommitterStatistics statistics;
 
+  private final S3ALambda lambda;
+  private final S3ALambda.Retrying onRetry;
+
   /**
    * Instantiate.
    * @param fs FS to bind to
@@ -71,6 +75,8 @@ public class CommitOperations {
     Preconditions.checkArgument(fs != null, "null fs");
     this.fs = fs;
     statistics = fs.newCommitterStatistics();
+    lambda = new S3ALambda(new S3ARetryPolicy(fs.getConf()));
+    onRetry = (ex, retries, idempotent) -> fs.operationRetried(ex);
   }
 
   @Override
@@ -141,22 +147,16 @@ public class CommitOperations {
   /**
    * Inner commit operation.
    * @param commit entry to commit
-   * @throws IOException
+   * @throws IOException failure
    */
   private void innerCommit(SinglePendingCommit commit) throws IOException {
     // finalize the commit
-    AtomicInteger errorCount = new AtomicInteger(0);
-    try {
-      createWriter(commit.getDestinationKey())
+    createWriter(commit.getDestinationKey())
           .completeMPUwithRetries(
               commit.getUploadId(),
               CommitUtils.toPartEtags(commit.getEtags()),
               commit.getLength(),
-              errorCount);
-    } finally {
-      // TODO: add something to the statistics here
-
-    }
+              new AtomicInteger(0));
   }
 
   /**
@@ -170,13 +170,12 @@ public class CommitOperations {
       Path pendingDir,
       boolean recursive) throws IOException {
     final List<LocatedFileStatus> result = new ArrayList<>();
-    FileStatus fileStatus = fs.getFileStatus(pendingDir);
+    FileStatus fileStatus = getFileStatus(pendingDir);
     if (!fileStatus.isDirectory()) {
       throw new PathCommitException(pendingDir,
           "Not a directory : " + fileStatus);
     }
-    RemoteIterator<LocatedFileStatus> pendingFiles
-        = fs.listFiles(pendingDir, recursive);
+    RemoteIterator<LocatedFileStatus> pendingFiles = ls(pendingDir, recursive);
     if (!pendingFiles.hasNext()) {
       LOG.info("No files to commit under {}", pendingDir);
     }
@@ -202,9 +201,9 @@ public class CommitOperations {
    */
   public Pair<Pendingset,
       List<Pair<LocatedFileStatus, IOException>>>
-      loadSinglePendingCommits(
-          Path pendingDir,
-          boolean recursive) throws IOException {
+  loadSinglePendingCommits(
+      Path pendingDir,
+      boolean recursive) throws IOException {
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     Pendingset commits = new Pendingset(
@@ -229,8 +228,9 @@ public class CommitOperations {
    * exception.
    */
   public IOException makeIOE(String key, Exception ex) {
-    return ex instanceof IOException ? (IOException) ex
-        : new PathCommitException(key, ex.toString(), ex);
+    return ex instanceof IOException
+           ? (IOException) ex
+           : new PathCommitException(key, ex.toString(), ex);
   }
 
   /**
@@ -242,20 +242,17 @@ public class CommitOperations {
   public void abortSingleCommit(SinglePendingCommit commit)
       throws IOException {
     String destKey = commit.getDestinationKey();
-    String origin = commit.getFilename() !=null ?
-        (" defined in " + commit.getFilename())
-        : "";
+    String origin = commit.getFilename() != null
+                    ? (" defined in " + commit.getFilename())
+                    : "";
     String uploadId = commit.getUploadId();
     LOG.info("Aborting commit to object {}{}", destKey, origin);
-    try {
-      abortMultipartCommit(destKey, uploadId);
-    } finally {
-      statistics.commitAborted();
-    }
+    abortMultipartCommit(destKey, uploadId);
   }
 
   /**
-   * Create an {@code AbortMultipartUpload} request and POST it to S3.
+   * Create an {@code AbortMultipartUpload} request and POST it to S3,
+   * incrementing statistics afterwards.
    * @param destKey destination key
    * @param uploadId upload to cancel
    * @throws IOException on any failure
@@ -282,7 +279,7 @@ public class CommitOperations {
     Preconditions.checkArgument(pendingDir != null, "null pendingDir");
     RemoteIterator<LocatedFileStatus> pendingFiles;
     try {
-      pendingFiles = fs.listFiles(pendingDir, recursive);
+      pendingFiles = ls(pendingDir, recursive);
     } catch (FileNotFoundException e) {
       LOG.info("No directory to abort {}", pendingDir);
       return new MaybeIOE();
@@ -296,18 +293,47 @@ public class CommitOperations {
       if (pendingFile.getName().endsWith(CommitConstants.PENDING_SUFFIX)) {
         try {
           abortSingleCommit(SinglePendingCommit.load(fs, pendingFile));
-        } catch (FileNotFoundException e){
+        } catch (FileNotFoundException e) {
           LOG.debug("listed file already deleted: {}", pendingFile);
-        } catch (IOException | IllegalArgumentException e){
+        } catch (IOException | IllegalArgumentException e) {
           if (outcome == null) {
             outcome = new MaybeIOE(makeIOE(pendingFile.toString(), e));
           }
-        } finally{
-          deleteQuietly(fs, pendingFile, false);
+        } finally {
+          lambda.quietly("ls", pendingFile.toString(),
+              () -> lambda.retry("ls", pendingFile.toString(), true,
+                  () -> fs.delete(pendingFile, false),
+                  onRetry));
         }
       }
     }
-    return outcome == null ? new MaybeIOE(): outcome;
+    return outcome == null ? new MaybeIOE() : outcome;
+  }
+
+  /**
+   * Robust list files
+   * @param path path
+   * @param recursive recursive listing?
+   * @return iterator (which is *not* robust)
+   * @throws IOException IOE
+   */
+  protected RemoteIterator<LocatedFileStatus> ls(Path path, boolean recursive)
+      throws IOException {
+    return lambda.retry("ls", path.toString(), true,
+        () -> fs.listFiles(path, recursive),
+        onRetry);
+  }
+
+  /**
+   * Robust get file status call
+   * @param path path
+   * @return file status
+   * @throws IOException failure
+   */
+  protected FileStatus getFileStatus(Path path) throws IOException {
+    return lambda.retry("ls", path.toString(), true,
+        () -> fs.getFileStatus(path),
+        onRetry);
   }
 
   /**
@@ -350,7 +376,9 @@ public class CommitOperations {
     Path markerPath = new Path(outputPath, SUCCESS_FILE_NAME);
     LOG.debug("Touching success marker for job {}: {}", markerPath,
         successData);
-    successData.save(fs, markerPath, true);
+    lambda.retry("save", markerPath.toString(), true,
+        () -> successData.save(fs, markerPath, true),
+        onRetry);
   }
 
   /**

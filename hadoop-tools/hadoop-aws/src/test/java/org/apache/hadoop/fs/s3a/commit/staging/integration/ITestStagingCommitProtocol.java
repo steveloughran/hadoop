@@ -25,6 +25,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.s3a.InconsistentS3ClientFactory;
+import org.apache.hadoop.fs.s3a.S3ClientFactory;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
 import org.apache.hadoop.fs.s3a.commit.AbstractS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
@@ -36,6 +38,8 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
+
+import static org.apache.hadoop.fs.s3a.Constants.S3_CLIENT_FACTORY_IMPL;
 
 /** Test the staging committer's handling of the base protocol operations. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
@@ -51,6 +55,10 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
     conf.setInt(CommitConstants.FS_S3A_COMMITTER_THREADS, 1);
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         getCommitterFactoryName());
+    // switch to the inconsistent filesystem
+    conf.setClass(S3_CLIENT_FACTORY_IMPL, InconsistentS3ClientFactory.class,
+        S3ClientFactory.class);
+
     // disable unique filenames so that the protocol tests of FileOutputFormat
     // and this test generate consistent names.
     //conf.setBoolean(COMMITTER_UNIQUE_FILENAMES, true);

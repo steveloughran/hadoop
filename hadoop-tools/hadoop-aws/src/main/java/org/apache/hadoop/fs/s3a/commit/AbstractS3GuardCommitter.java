@@ -707,7 +707,6 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
             @Override
             public void run(SinglePendingCommit commit,
                 Exception exception) throws IOException {
-              // TODO: why retry here?
               getCommitOperations().abortSingleCommit(commit);
             }
           })

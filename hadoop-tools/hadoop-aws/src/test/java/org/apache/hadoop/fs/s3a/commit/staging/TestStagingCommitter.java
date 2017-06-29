@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit.staging;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,7 @@ import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.google.common.collect.Sets;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,6 +44,7 @@ import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -101,6 +104,7 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   private StagingTestBase.ClientResults results = null;
   private StagingTestBase.ClientErrors errors = null;
   private AmazonS3 mockClient = null;
+  private File tmpDir;
 
   /**
    * Describe a test in the logs.
@@ -152,11 +156,27 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
 
     // get the task's configuration copy so modifications take effect
     this.conf = tac.getConfiguration();
-    // TODO: is this the right path?
-    this.conf.set(Constants.BUFFER_DIR, "/tmp/local-0,/tmp/local-1");
     this.conf.setInt(MULTIPART_SIZE, 100);
 
+    tmpDir = File.createTempFile("testStagingCommitter", "");
+    tmpDir.delete();
+    tmpDir.mkdirs();
+
+    String tmp = tmpDir.getCanonicalPath();
+    this.conf.set(Constants.BUFFER_DIR,
+        String.format("%s/local-0/, %s/local-1 ", tmp, tmp));
+
     this.committer = new MockedStagingCommitter(OUTPUT_PATH, tac);
+
+  }
+
+  @After
+  public void cleanup() {
+    try {
+      FileUtils.deleteDirectory(tmpDir);
+    } catch (IOException ignored) {
+
+    }
   }
 
   @Test

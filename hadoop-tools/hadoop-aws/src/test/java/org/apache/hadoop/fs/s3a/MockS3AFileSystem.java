@@ -69,6 +69,7 @@ public class MockS3AFileSystem extends S3AFileSystem {
   private int logEvents = LOG_NAME;
   private final S3AInstrumentation instrumentation =
       new S3AInstrumentation(FS_URI);
+  private Configuration conf;
 
   public MockS3AFileSystem(S3AFileSystem mock,
       Pair<StagingTestBase.ClientResults, StagingTestBase.ClientErrors> outcome) {
@@ -115,6 +116,12 @@ public class MockS3AFileSystem extends S3AFileSystem {
   @Override
   public void initialize(URI name, Configuration originalConf)
       throws IOException {
+    conf = originalConf;
+  }
+
+  @Override
+  public Configuration getConf() {
+    return conf;
   }
 
   @Override

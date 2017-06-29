@@ -207,7 +207,7 @@ public final class Paths {
   // TODO: verify this is correct, it comes from dse-storage
   private static Path localTemp(Configuration conf, int taskId, int attemptId)
       throws IOException {
-    String[] dirs = conf.getStrings(BUFFER_DIR);
+    String[] dirs = conf.getTrimmedStrings(BUFFER_DIR);
     Random rand = new Random(Objects.hashCode(taskId, attemptId));
     String dir = dirs[rand.nextInt(dirs.length)];
 

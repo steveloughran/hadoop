@@ -320,7 +320,6 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
 
   @Override
   protected Path getJobAttemptPath(int appAttemptId) {
-    //TODO Is this valid?
     return new Path(getPendingJobAttemptsPath(commitsDirectory),
         String.valueOf(appAttemptId));
   }
@@ -801,7 +800,8 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
                 SinglePendingCommit commit = getCommitOperations()
                     .uploadFileToPendingCommit(
                         localFile,
-                        destPath, partition,
+                        destPath,
+                        partition,
                         uploadPartSize);
                 LOG.debug("{}: adding pending commit {}", getRole(), commit);
                 commits.add(commit);

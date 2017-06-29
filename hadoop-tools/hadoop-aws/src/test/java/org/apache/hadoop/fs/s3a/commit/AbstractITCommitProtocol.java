@@ -1403,7 +1403,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
         new Path(outSubDir, SUB_DIR));
 
     // validate output
-    // TODO: why false here?
+    // There's no success marker in the subdirectory
     validateContent(outSubDir, false);
   }
 

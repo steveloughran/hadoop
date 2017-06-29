@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.AmazonClientException;
@@ -45,13 +44,11 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
-import static org.apache.hadoop.fs.s3a.Statistic.IGNORED_ERRORS;
 
 
 /**
@@ -81,16 +78,13 @@ public class WriteOperationHelper {
       LoggerFactory.getLogger(WriteOperationHelper.class);
   private final S3AFileSystem owner;
   private final String key;
-  private final AwsLambda calls = new AwsLambda();
+  private final S3ALambda calls;
 
   /**
    * Retry policy for multipart commits; not all AWS SDK versions retry that.
    */
-  private final RetryPolicy retryPolicy =
-      RetryPolicies.retryUpToMaximumCountWithProportionalSleep(
-          5,
-          2000,
-          TimeUnit.MILLISECONDS);
+  private final RetryPolicy retryPolicy;
+  private final S3ALambda.Retrying onRetry;
 
   /**
    * Constructor.
@@ -99,8 +93,22 @@ public class WriteOperationHelper {
    */
   protected WriteOperationHelper(S3AFileSystem owner, String key) {
     checkArgument(key != null, "No key");
+    this.retryPolicy = new S3ARetryPolicy(owner.getConf());
+    calls = new S3ALambda(retryPolicy);
     this.owner = owner;
     this.key = key;
+    onRetry = (ex, retries, idempotent) ->
+        operationRetried(ex, retries, idempotent);
+  }
+
+  /**
+   * Callback when an operation is retried
+   * @param ex exception
+   * @param retries number of retries
+   * @param idempotent is the method idempotent
+   */
+  void operationRetried(Exception ex, int retries, boolean idempotent) {
+    owner.operationRetried(ex);
   }
 
   /**
@@ -195,22 +203,24 @@ public class WriteOperationHelper {
     initiateMPURequest.setCannedACL(owner.getCannedACL());
     owner.setOptionalMultipartUploadRequestParameters(initiateMPURequest);
 
-    return calls.execute("initiate MultiPartUpload", key,
-        () -> owner.initiateMultipartUpload(initiateMPURequest).getUploadId());
+    return calls.retry("initiate MultiPartUpload", key, true,
+        () -> owner.initiateMultipartUpload(initiateMPURequest).getUploadId(),
+        onRetry);
   }
 
   /**
    * Abort a multipart upload operation. This is similar to
-   * {@link #abortMultipartUpload(String, String)} except that
-   * failures are processed.
+   * {@link #abortMultipartUpload(String, String)} but with
+   * retries and exception translation.
    * @param dest destination key of upload
    * @param uploadId multipart operation Id
    * @throws IOException on problems.
    */
   public void abortMultipartCommit(String dest, String uploadId)
       throws IOException {
-    calls.execute("aborting multipart commit", dest,
-        () -> abortMultipartUpload(dest, uploadId));
+    calls.retry("aborting multipart commit", dest, true,
+        () -> abortMultipartUpload(dest, uploadId),
+        onRetry);
   }
 
   /**
@@ -271,9 +281,8 @@ public class WriteOperationHelper {
     int retryCount = 0;
     AmazonClientException lastException;
     String operation =
-        String.format("Completing multi-part upload for key '%s'," +
-                "" +
-                " id '%s' with %s partitions ",
+        String.format("Completing multi-part upload for key '%s',"
+                + " id '%s' with %s partitions ",
             key, uploadId, partETags.size());
     do {
       try {
@@ -438,9 +447,10 @@ public class WriteOperationHelper {
    */
   public PutObjectResult putObject(PutObjectRequest putObjectRequest)
       throws IOException {
-    return calls.execute("put",
-        putObjectRequest.getKey(),
-        () -> owner.putObjectDirect(putObjectRequest));
+    return calls.retry("put",
+        putObjectRequest.getKey(), true,
+        () -> owner.putObjectDirect(putObjectRequest),
+        onRetry);
   }
 
   /**
@@ -458,8 +468,6 @@ public class WriteOperationHelper {
 
   /**
    * Revert a commit by deleting the file.
-   * TODO: Policy regarding creating a mock empty parent directory.
-   * TODO: Delete entirely?
    * @throws IOException on problems
    * @param destKey destination key
    */
@@ -482,9 +490,11 @@ public class WriteOperationHelper {
    */
   public UploadPartResult uploadPart(UploadPartRequest request)
       throws IOException {
-    return calls.execute("upload part",
+    return calls.retry("upload part",
         request.getKey(),
-        () -> owner.uploadPart(request));
+        true,
+        () -> owner.uploadPart(request),
+        onRetry);
   }
 
   /**
@@ -509,7 +519,7 @@ public class WriteOperationHelper {
           retryPolicy.shouldRetry(e, retryCount, 0, true);
       boolean retry = retryAction == RetryPolicy.RetryAction.RETRY;
       if (retry) {
-        owner.incrementStatistic(IGNORED_ERRORS);
+        owner.operationRetried(e);
         LOG.info("Retrying {} after exception ", operation, e);
         Thread.sleep(retryAction.delayMillis);
       }
