@@ -331,7 +331,7 @@ public class CommitOperations {
    * @throws IOException failure
    */
   protected FileStatus getFileStatus(Path path) throws IOException {
-    return lambda.retry("ls", path.toString(), true,
+    return lambda.retry("getFileStatus", path.toString(), true,
         () -> fs.getFileStatus(path),
         onRetry);
   }
