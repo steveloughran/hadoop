@@ -95,7 +95,6 @@ public class S3ARetryPolicy implements RetryPolicy {
     policyMap.put(InterruptedException.class, fail);
     // note this does not pick up subclasses (like socket timeout)
     policyMap.put(InterruptedIOException.class, fail);
-    policyMap.put(AWSBadRequestException.class, fail);
     policyMap.put(AWSRedirectException.class, fail);
     policyMap.put(FileNotFoundException.class, fail);
     policyMap.put(EOFException.class, fail);
@@ -103,6 +102,10 @@ public class S3ARetryPolicy implements RetryPolicy {
 
     // throttled requests are can be retried, always
     policyMap.put(AWSServiceThrottledException.class, throttlePolicy);
+
+    // policy on a 400/bad request still ambiguous. Given it
+    // comes and goes on test runs: try again
+    policyMap.put(AWSBadRequestException.class, maybeRetry);
 
     // other operations
     policyMap.put(AWSClientIOException.class, maybeRetry);

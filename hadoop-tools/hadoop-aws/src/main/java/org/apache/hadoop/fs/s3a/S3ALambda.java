@@ -22,9 +22,11 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 
 import com.amazonaws.AmazonClientException;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 
 /**
@@ -118,9 +120,9 @@ public class S3ALambda {
       boolean idempotent,
       VoidOperation operation)
       throws IOException {
-    retry(action, path, idempotent, operation, null);
- }
 
+    retry(action, path, idempotent, operation, NO_OP);
+ }
 
   /**
    * Execute a function with retry processing.
@@ -138,7 +140,8 @@ public class S3ALambda {
       boolean idempotent,
       Operation<T> operation)
       throws IOException {
-      return retry(action, path, idempotent, operation, null);
+
+      return retry(action, path, idempotent, operation, NO_OP);
     }
 
     /**
@@ -159,6 +162,8 @@ public class S3ALambda {
       Operation<T> operation,
       Retrying retrying)
       throws IOException {
+
+    Preconditions.checkArgument(retrying != null, "null retrying argument");
     int retryCount = 0;
     IOException caught;
     RetryPolicy.RetryAction retryAction;
@@ -170,18 +175,24 @@ public class S3ALambda {
       } catch (IOException e) {
         caught = e;
       }
+      int attempts = retryCount +1;
+      // log summary string at warn
+      LOG.warn("Attemp {} of {}{}: {}", action,
+          attempts,
+          (StringUtils.isNoneEmpty(path) ? (" on " + path) : ""),
+          caught.toString());
+      // full stack at debug
+      LOG.debug("Attempt {} of action={}; path={}",
+          attempts, action, path, caught);
       // here the exception must have been caught
       try {
         retryAction = retryPolicy.shouldRetry(caught, retryCount, 0,
                 idempotent);
         shouldRetry = retryAction.equals(RetryPolicy.RetryAction.RETRY);
         if (shouldRetry) {
-          LOG.info("Retrying {} after exception {}", operation,
+          LOG.debug("Retrying {} after exception {}", operation,
               caught.toString());
-          if (retrying != null) {
-            retrying.onRetry(caught, retryCount, idempotent);
-          }
-          LOG.debug("Retrying {} after exception ", operation, caught);
+          retrying.onRetry(caught, retryCount, idempotent);
           Thread.sleep(retryAction.delayMillis);
         }
         // increment the retry count
@@ -250,4 +261,9 @@ public class S3ALambda {
   public interface Retrying {
     void onRetry(Exception e, int retries, boolean idempotent);
   }
+
+  /**
+   * No op for a retrying callback.
+   */
+  public static final Retrying NO_OP = (e, retries, idempotent) -> { };
 }

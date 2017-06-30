@@ -50,7 +50,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
 
-
 /**
  * Helper for low-level operations against an S3 Bucket for writing data
  * and creating and committing pending writes.
@@ -97,12 +96,11 @@ public class WriteOperationHelper {
     calls = new S3ALambda(retryPolicy);
     this.owner = owner;
     this.key = key;
-    onRetry = (ex, retries, idempotent) ->
-        operationRetried(ex, retries, idempotent);
+    onRetry = this::operationRetried;
   }
 
   /**
-   * Callback when an operation is retried
+   * Callback when an operation is retried.
    * @param ex exception
    * @param retries number of retries
    * @param idempotent is the method idempotent
@@ -461,6 +459,7 @@ public class WriteOperationHelper {
    */
   public UploadResult uploadObject(PutObjectRequest putObjectRequest)
       throws IOException {
+    // no retry; rely on xfer manager logic
     return calls.execute("put",
         putObjectRequest.getKey(),
         () -> owner.executePut(putObjectRequest, null));
@@ -472,14 +471,14 @@ public class WriteOperationHelper {
    * @param destKey destination key
    */
   public void revertCommit(String destKey) throws IOException {
-    calls.execute("revert commit", destKey,
+    calls.retry("revert commit", destKey, true,
         () -> {
           Path destPath = owner.keyToPath(destKey);
           owner.deleteObjectAtPath(destPath,
               destKey, true);
           owner.maybeCreateFakeParentDirectory(destPath);
-        }
-    );
+        },
+        onRetry);
   }
 
   /**
