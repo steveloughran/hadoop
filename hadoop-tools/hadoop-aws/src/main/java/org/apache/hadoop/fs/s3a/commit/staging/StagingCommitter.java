@@ -535,7 +535,8 @@ public class StagingCommitter extends AbstractS3GuardCommitter {
    * @return a list of pending uploads.
    * @throws IOException Any IO failure
    */
-  protected List<SinglePendingCommit> getPendingUploadsToCommit(JobContext context)
+  protected List<SinglePendingCommit> getPendingUploadsToCommit(
+      JobContext context)
       throws IOException {
     return getPendingUploads(context, false);
   }

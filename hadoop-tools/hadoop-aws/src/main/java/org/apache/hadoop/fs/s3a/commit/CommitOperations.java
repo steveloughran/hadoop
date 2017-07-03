@@ -201,9 +201,9 @@ public class CommitOperations {
    */
   public Pair<Pendingset,
       List<Pair<LocatedFileStatus, IOException>>>
-  loadSinglePendingCommits(
-      Path pendingDir,
-      boolean recursive) throws IOException {
+      loadSinglePendingCommits(Path pendingDir, boolean recursive)
+      throws IOException {
+
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
     Pendingset commits = new Pendingset(
@@ -311,7 +311,7 @@ public class CommitOperations {
   }
 
   /**
-   * Robust list files
+   * Robust list files.
    * @param path path
    * @param recursive recursive listing?
    * @return iterator (which is *not* robust)
@@ -325,7 +325,7 @@ public class CommitOperations {
   }
 
   /**
-   * Robust get file status call
+   * Robust get file status call.
    * @param path path
    * @return file status
    * @throws IOException failure

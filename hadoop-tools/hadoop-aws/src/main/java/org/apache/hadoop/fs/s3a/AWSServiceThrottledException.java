@@ -21,7 +21,7 @@ package org.apache.hadoop.fs.s3a;
 import com.amazonaws.AmazonServiceException;
 
 /**
- * Exception raised when a service was throttled
+ * Exception raised when a service was throttled.
  */
 public class AWSServiceThrottledException extends AWSServiceIOException {
 

@@ -128,7 +128,7 @@ public class S3ARetryPolicy implements RetryPolicy {
       int retries,
       int failovers,
       boolean idempotent) throws Exception {
-     return retryPolicy.shouldRetry(e, retries, failovers, idempotent);
+    return retryPolicy.shouldRetry(e, retries, failovers, idempotent);
   }
 
   /**

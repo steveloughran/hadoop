@@ -58,7 +58,8 @@ import org.apache.hadoop.io.IOUtils;
 @InterfaceStability.Evolving
 public class JsonSerialization<T> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JsonSerialization.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JsonSerialization.class);
   private static final String UTF_8 = "UTF-8";
 
   private final Class<T> classType;
