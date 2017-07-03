@@ -31,8 +31,12 @@ public class AWSServiceThrottledException extends AWSServiceIOException {
    * @param cause the underlying cause
    */
   public AWSServiceThrottledException(String operation,
-      AmazonServiceException cause
-  ) {
+      AmazonServiceException cause) {
     super(operation, cause);
   }
+
+  /**
+   * HTTP status code which signals this failure mode was triggered: {@value}.
+   */
+  public static final int STATUS_CODE = 503;
 }

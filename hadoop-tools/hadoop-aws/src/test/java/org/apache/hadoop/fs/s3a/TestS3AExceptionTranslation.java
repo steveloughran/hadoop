@@ -27,20 +27,27 @@ import java.nio.file.AccessDeniedException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import org.junit.Test;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.test.LambdaTestUtils;
+
 import static org.apache.hadoop.fs.s3a.Constants.ENDPOINT;
+import static org.apache.hadoop.fs.s3a.Constants.RETRY_LIMIT_DEFAULT;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.verifyExceptionClass;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.junit.Assert.*;
 
 
 /**
- * Unit test suite covering translation of AWS SDK exceptions to S3A exceptions.
+ * Unit test suite covering translation of AWS SDK exceptions to S3A exceptions,
+ * an retry/recovery policies.
  */
 public class TestS3AExceptionTranslation {
 
@@ -199,6 +206,102 @@ public class TestS3AExceptionTranslation {
         new ExecutionException(
             new AmazonClientException(
               new SocketTimeoutException(""))));
+  }
+
+  private AmazonServiceException serviceException(int code, String text) {
+    AmazonServiceException ex = new AmazonServiceException(text);
+    ex.setStatusCode(code);
+    return ex;
+  }
+
+
+  private void assertRetryAction(String text,
+      RetryPolicy policy,
+      RetryPolicy.RetryAction expected,
+      Exception ex,
+      int retries,
+      boolean idempotent) throws Exception {
+    RetryPolicy.RetryAction outcome = policy.shouldRetry(ex, retries, 0,
+        idempotent);
+    if (!expected.action.equals(outcome.action)) {
+      throw new AssertionError(
+          String.format(
+              "%s Expected action %s from shouldRetry(%s, %s, %s), but got"
+                  + " %s",
+              text,
+              expected, ex.toString(), retries, idempotent,
+              outcome.action, ex));
+    }
+  }
+
+  @Test
+  public void testRetryThrottled() throws Throwable {
+    S3ARetryPolicy policy = new S3ARetryPolicy(new Configuration());
+    AmazonServiceException se = newThrottledException();
+    IOException ex = translateException("GET", "/", se);
+
+    assertRetryAction("Expected retry on first throttle",
+        policy, RetryPolicy.RetryAction.RETRY,
+        ex, 0, true);
+    assertRetryAction("Expected retry on repeated throttle",
+        policy, RetryPolicy.RetryAction.RETRY,
+        ex, 5, true);
+    assertRetryAction("Expected retry on non-idempotent throttle",
+        policy, RetryPolicy.RetryAction.RETRY,
+        ex, 5, false);
+  }
+
+  protected AmazonServiceException newThrottledException() {
+    return serviceException(
+        AWSServiceThrottledException.STATUS_CODE, "throttled");
+  }
+
+  /**
+   * Repeatedly retry until a throttle fails.
+   * @throws Throwable
+   */
+  @Test
+  public void testS3LambdaRetryOnThrottle() throws Throwable {
+    S3ALambda lambda = new S3ALambda(
+        new S3ARetryPolicy(new Configuration()));
+    final AtomicInteger counter = new AtomicInteger(0);
+    lambda.retry("test", null, false,
+      () -> {
+        if (counter.incrementAndGet() < 5) {
+          throw newThrottledException();
+        }
+      });
+  }
+
+  /**
+   * Non-idempotent operations fail on anything which isn't a throttle
+   * @throws Throwable
+   */
+  @Test(expected = AWSBadRequestException.class)
+  public void testS3LambdaRetryNonIdempotent() throws Throwable {
+    S3ALambda lambda = new S3ALambda(
+        new S3ARetryPolicy(new Configuration()));
+    lambda.retry("test", null, false,
+      () -> {
+          throw serviceException(400, "bad request");
+      });
+  }
+
+  /**
+   * Repeatedly retry until a throttle fails.
+   * @throws Throwable
+   */
+  @Test
+  public void testS3LambdaRetryIdempotent() throws Throwable {
+    S3ALambda lambda = new S3ALambda(
+        new S3ARetryPolicy(new Configuration()));
+    final AtomicInteger counter = new AtomicInteger(0);
+    lambda.retry("test", null, true,
+      () -> {
+        if (counter.incrementAndGet() < RETRY_LIMIT_DEFAULT) {
+          throw serviceException(400, "bad request");
+        }
+      });
   }
 
 }

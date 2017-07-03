@@ -68,18 +68,15 @@ public class S3ARetryPolicy implements RetryPolicy {
         TimeUnit.MILLISECONDS);
 
     // which is wrapped by a rejection of all non-idempotent calls
-    RetryPolicy maybeRetry = (e, retries, failovers, idempotent) ->
-        idempotent ?
-          fixedRetries.shouldRetry(e, retries, failovers, true)
-          : RetryAction.FAIL;
+    RetryPolicy maybeRetry = new IdempotencyRetryFilter(fixedRetries);
 
     // and a separate policy for throttle requests, which are considered
     // repeatable, even for non-idempotent calls, as the service
     // rejected the call entirely
     RetryPolicy throttlePolicy = retryUpToMaximumCountWithProportionalSleep(
-        conf.getInt(RETRY_LIMIT, RETRY_LIMIT_DEFAULT),
-        conf.getTimeDuration(RETRY_INTERVAL,
-            RETRY_INTERVAL_DEFAULT,
+        conf.getInt(RETRY_THROTTLE_LIMIT, RETRY_THROTTLE_LIMIT_DEFAULT),
+        conf.getTimeDuration(RETRY_THROTTLE_INTERVAL,
+            RETRY_THROTTLE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS),
         TimeUnit.MILLISECONDS);
 
@@ -111,7 +108,6 @@ public class S3ARetryPolicy implements RetryPolicy {
     policyMap.put(AWSClientIOException.class, maybeRetry);
     policyMap.put(AWSServiceIOException.class, maybeRetry);
     policyMap.put(AWSS3IOException.class, maybeRetry);
-    policyMap.put(AWSServiceThrottledException.class, maybeRetry);
     retryPolicy = retryByException(maybeRetry, policyMap);
   }
 
@@ -121,6 +117,39 @@ public class S3ARetryPolicy implements RetryPolicy {
       int failovers,
       boolean idempotent) throws Exception {
      return retryPolicy.shouldRetry(e, retries, failovers, idempotent);
+  }
+
+  /**
+   * Policy which fails fast any non-idempotent call; hands off
+   * all idempotent calls to the next retry policy.
+   */
+  private static final class IdempotencyRetryFilter implements RetryPolicy {
+
+    private final RetryPolicy next;
+
+    public IdempotencyRetryFilter(RetryPolicy next) {
+      this.next = next;
+    }
+
+    @Override
+    public RetryAction shouldRetry(Exception e,
+        int retries,
+        int failovers,
+        boolean idempotent) throws Exception {
+      return
+          idempotent ?
+              next.shouldRetry(e, retries, failovers, true)
+              : RetryAction.FAIL;
+    }
+
+    @Override
+    public String toString() {
+      final StringBuilder sb = new StringBuilder(
+          "IdempotencyRetryFilter{");
+      sb.append("next=").append(next);
+      sb.append('}');
+      return sb.toString();
+    }
   }
 
 }

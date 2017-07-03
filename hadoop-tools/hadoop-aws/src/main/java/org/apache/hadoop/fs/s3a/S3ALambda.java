@@ -105,6 +105,7 @@ public class S3ALambda {
         },
         retrying);
  }
+
  /**
    * Execute a void operation with retry processing.
    * @param action action to execute (used in error messages)
@@ -175,9 +176,9 @@ public class S3ALambda {
       } catch (IOException e) {
         caught = e;
       }
-      int attempts = retryCount +1;
+      int attempts = retryCount + 1;
       // log summary string at warn
-      LOG.warn("Attemp {} of {}{}: {}", action,
+      LOG.warn("Attempt {} of {}{}: {}", action,
           attempts,
           (StringUtils.isNoneEmpty(path) ? (" on " + path) : ""),
           caught.toString());
@@ -188,7 +189,8 @@ public class S3ALambda {
       try {
         retryAction = retryPolicy.shouldRetry(caught, retryCount, 0,
                 idempotent);
-        shouldRetry = retryAction.equals(RetryPolicy.RetryAction.RETRY);
+        shouldRetry = retryAction.action.equals(
+            RetryPolicy.RetryAction.RETRY.action);
         if (shouldRetry) {
           LOG.debug("Retrying {} after exception {}", operation,
               caught.toString());
