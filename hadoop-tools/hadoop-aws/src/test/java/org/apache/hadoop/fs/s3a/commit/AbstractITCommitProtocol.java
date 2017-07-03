@@ -115,11 +115,20 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     rmdir(this.outDir, getConfiguration());
   }
 
+  /**
+   * Clean up a directory.
+   * Waits for consistency if needed
+   * @param dir directory
+   * @param conf configuration
+   * @throws IOException failure
+   */
   public void rmdir(Path dir, Configuration conf) throws IOException {
     if (dir != null) {
       describe("deleting %s", dir);
       FileSystem fs = dir.getFileSystem(conf);
+      waitForConsistency();
       fs.delete(dir, true);
+      waitForConsistency();
     }
   }
 
@@ -143,7 +152,9 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
     String trailingDigits = testUniqueForkId.substring(l - 4, l);
     try {
       int digitValue = Integer.valueOf(trailingDigits);
-      jobId = String.format("200707121733_%04d", digitValue);
+      jobId = String.format("20070712%04d_%04d",
+          (long)(Math.random() * 1000),
+          digitValue);
       attempt0 = "attempt_" + jobId + "_m_000000_0";
       taskAttempt0 = TaskAttemptID.forName(attempt0);
       attempt1 = "attempt_" + jobId + "_m_000001_0";

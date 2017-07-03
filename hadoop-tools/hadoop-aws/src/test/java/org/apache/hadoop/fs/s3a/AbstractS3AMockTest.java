@@ -68,7 +68,7 @@ public abstract class AbstractS3AMockTest {
     fs = new S3AFileSystem();
     URI uri = URI.create(FS_S3A + "://" + BUCKET);
     fs.initialize(uri, conf);
-    s3 = fs.getAmazonS3Client();
+    s3 = fs.getAmazonS3ClientForTesting("mocking");
   }
 
   @After

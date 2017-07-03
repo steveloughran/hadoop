@@ -39,16 +39,15 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.retry.RetryPolicy;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.apache.hadoop.fs.s3a.S3AUtils.translateException;
 
 /**
  * Helper for low-level operations against an S3 Bucket for writing data
@@ -79,11 +78,8 @@ public class WriteOperationHelper {
   private final String key;
   private final S3ALambda calls;
 
-  /**
-   * Retry policy for multipart commits; not all AWS SDK versions retry that.
-   */
-  private final RetryPolicy retryPolicy;
   private final S3ALambda.Retrying onRetry;
+  private final AtomicInteger retryCount = new AtomicInteger(0);
 
   /**
    * Constructor.
@@ -92,8 +88,7 @@ public class WriteOperationHelper {
    */
   protected WriteOperationHelper(S3AFileSystem owner, String key) {
     checkArgument(key != null, "No key");
-    this.retryPolicy = new S3ARetryPolicy(owner.getConf());
-    calls = new S3ALambda(retryPolicy);
+    calls = new S3ALambda(new S3ARetryPolicy(owner.getConf()));
     this.owner = owner;
     this.key = key;
     onRetry = this::operationRetried;
@@ -106,7 +101,36 @@ public class WriteOperationHelper {
    * @param idempotent is the method idempotent
    */
   void operationRetried(Exception ex, int retries, boolean idempotent) {
+    retryCount.incrementAndGet();
     owner.operationRetried(ex);
+  }
+
+  /**
+   * Number of retries performed by this operation helper.
+   * @return a counter >= 0
+   */
+  public int getRetryCount() {
+    return retryCount.get();
+  }
+
+  /**
+   * Execute a function with retry processing.
+   * @param action action to execute (used in error messages)
+   * @param path path of work (used in error messages)
+   * @param idempotent does the operation have semantics
+   * which mean that it can be retried even if was already executed?
+   * @param operation operation to execute
+   * @param <T> type of return value
+   * @return the result of the call
+   * @throws IOException any IOE raised, or translated exception
+   */
+  public <T> T retry(String action,
+      String path,
+      boolean idempotent,
+      S3ALambda.Operation<T> operation)
+      throws IOException {
+
+    return calls.retry(action, path, idempotent, operation, onRetry);
   }
 
   /**
@@ -153,11 +177,11 @@ public class WriteOperationHelper {
    */
   public PutObjectRequest createPutObjectRequest(String dest,
       File sourceFile) {
-    int length = (int) sourceFile.length();
-    PutObjectRequest request = owner.newPutObjectRequest(dest,
-        newObjectMetadata(length),
+    Preconditions.checkState(sourceFile.length() < Integer.MAX_VALUE,
+        "File length is too big for a single PUT upload");
+    return owner.newPutObjectRequest(dest,
+        newObjectMetadata((int) sourceFile.length()),
         sourceFile);
-    return request;
   }
 
   /**
@@ -201,34 +225,8 @@ public class WriteOperationHelper {
     initiateMPURequest.setCannedACL(owner.getCannedACL());
     owner.setOptionalMultipartUploadRequestParameters(initiateMPURequest);
 
-    return calls.retry("initiate MultiPartUpload", key, true,
-        () -> owner.initiateMultipartUpload(initiateMPURequest).getUploadId(),
-        onRetry);
-  }
-
-  /**
-   * Abort a multipart upload operation. This is similar to
-   * {@link #abortMultipartUpload(String, String)} but with
-   * retries and exception translation.
-   * @param dest destination key of upload
-   * @param uploadId multipart operation Id
-   * @throws IOException on problems.
-   */
-  public void abortMultipartCommit(String dest, String uploadId)
-      throws IOException {
-    calls.retry("aborting multipart commit", dest, true,
-        () -> abortMultipartUpload(dest, uploadId),
-        onRetry);
-  }
-
-  /**
-   * Abort a multipart upload operation.
-   * @param upload multipart upload
-   * @throws IOException on problems.
-   */
-  public void abortMultipartCommit(MultipartUpload upload)
-      throws IOException {
-    abortMultipartCommit(upload.getKey(), upload.getUploadId());
+    return retry("initiate MultiPartUpload", key, true,
+        () -> owner.initiateMultipartUpload(initiateMPURequest).getUploadId());
   }
 
   /**
@@ -242,23 +240,32 @@ public class WriteOperationHelper {
    * @return the result of the operation.
    * @throws IOException on problems.
    */
-  public CompleteMultipartUploadResult finalizeMultipartUpload(
+  private CompleteMultipartUploadResult finalizeMultipartUpload(
       String destination,
       String uploadId,
       List<PartETag> partETags,
-      long length) throws IOException {
-    return calls.execute("Completing multipart commit", destination,
+      long length,
+      S3ALambda.Retrying retrying) throws IOException {
+    return calls.retry("Completing multipart commit", destination,
+        true,
         () -> {
+          // a copy of the list is required, so that the AWS SDK doesn't
+          // attempt to sort an unmodifiable list.
           CompleteMultipartUploadResult result =
-              completeMultipartUpload(uploadId, partETags);
+              owner.getAmazonS3Client().completeMultipartUpload(
+                  new CompleteMultipartUploadRequest(owner.getBucket(),
+                      key,
+                      uploadId,
+                      new ArrayList<>(partETags)));
           finishedWrite(destination, length);
           return result;
-        });
+        },
+        retrying);
   }
 
   /**
    * This completes a multipart upload to the destination key via
-   * {@link #finalizeMultipartUpload(String, String, List, long)}.
+   * {@code finalizeMultipartUpload()}.
    * Here retries are handled to avoid losing all data
    * on a transient failure.
    * @param uploadId multipart operation Id
@@ -276,27 +283,15 @@ public class WriteOperationHelper {
       long length,
       AtomicInteger errorCount)
       throws IOException {
-    int retryCount = 0;
-    AmazonClientException lastException;
-    String operation =
-        String.format("Completing multi-part upload for key '%s',"
-                + " id '%s' with %s partitions ",
-            key, uploadId, partETags.size());
-    do {
-      try {
-        LOG.debug(operation);
-        return finalizeMultipartUpload(key,
-            uploadId,
-            partETags,
-            length);
-      } catch (AmazonClientException e) {
-        lastException = e;
-        errorCount.incrementAndGet();
-      }
-    } while (shouldRetry(operation, lastException, retryCount++));
-    // this point is only reached if the operation failed more than
-    // the allowed retry count
-    throw translateException(operation, key, lastException);
+    checkNotNull(uploadId);
+    checkNotNull(partETags);
+    LOG.debug("Completing multipart upload {} with {} parts",
+        uploadId, partETags.size());
+    return finalizeMultipartUpload(key,
+        uploadId,
+        partETags,
+        length,
+        (e, r, i) -> errorCount.incrementAndGet());
   }
 
   /**
@@ -310,42 +305,21 @@ public class WriteOperationHelper {
   }
 
   /**
-   * Complete a multipart upload operation.
-   * This does not finalize the write.
-   * @param uploadId multipart operation Id
-   * @param partETags list of partial uploads
-   * @return the result of the operation.
-   * @throws AmazonClientException on problems.
-   */
-  private CompleteMultipartUploadResult completeMultipartUpload(
-      String uploadId,
-      List<PartETag> partETags) throws AmazonClientException {
-    checkNotNull(uploadId);
-    checkNotNull(partETags);
-    LOG.debug("Completing multipart upload {} with {} parts",
-        uploadId, partETags.size());
-    // a copy of the list is required, so that the AWS SDK doesn't
-    // attempt to sort an unmodifiable list.
-    return owner.getAmazonS3Client().completeMultipartUpload(
-        new CompleteMultipartUploadRequest(owner.getBucket(),
-            key,
-            uploadId,
-            new ArrayList<>(partETags)));
-  }
-
-  /**
    * Abort a multipart upload operation.
    * @param destKey destination key of the upload
    * @param uploadId multipart operation Id
    * @throws AmazonClientException on problems.
    */
-  public void abortMultipartUpload(String destKey, String uploadId)
-      throws AmazonClientException {
+  public void abortMultipartUpload(String destKey, String uploadId,
+      S3ALambda.Retrying retrying)
+      throws  IOException {
     LOG.debug("Aborting multipart upload {} to {}", uploadId, destKey);
-    owner.getAmazonS3Client().abortMultipartUpload(
-        new AbortMultipartUploadRequest(owner.getBucket(),
-            destKey,
-            uploadId));
+    calls.retry("aborting multipart commit", destKey, true,
+        () -> owner.getAmazonS3Client().abortMultipartUpload(
+            new AbortMultipartUploadRequest(owner.getBucket(),
+                destKey,
+                uploadId)),
+        retrying);
   }
 
   /**
@@ -356,16 +330,32 @@ public class WriteOperationHelper {
    */
   public int abortMultipartUploadsUnderPath(String prefix)
       throws IOException {
+    LOG.debug("Aborting multipart uploads under {}", prefix);
     int count = 0;
-    for (MultipartUpload upload: owner.listMultipartUploads(prefix)) {
+    List<MultipartUpload> multipartUploads =
+        retry("list multipart uploads", prefix, true,
+            () -> owner.listMultipartUploads(prefix));
+    LOG.debug("Number of outstanding uploads: {}", multipartUploads.size());
+    for (MultipartUpload upload: multipartUploads) {
       try {
-        abortMultipartCommit(upload);
+        abortMultipartCommit(upload.getKey(), upload.getUploadId());
         count++;
       } catch (FileNotFoundException e) {
         LOG.debug("Already aborted: {}", upload.getKey(), e);
       }
     }
     return count;
+  }
+
+  /**
+   * Abort a multipart commit operation.
+   * @param dest destination key of upload
+   * @param uploadId multipart operation Id
+   * @throws IOException on problems.
+   */
+  public void abortMultipartCommit(String dest, String uploadId)
+      throws IOException {
+    abortMultipartUpload(dest, uploadId, onRetry);
   }
 
   /**
@@ -445,10 +435,9 @@ public class WriteOperationHelper {
    */
   public PutObjectResult putObject(PutObjectRequest putObjectRequest)
       throws IOException {
-    return calls.retry("put",
+    return retry("put",
         putObjectRequest.getKey(), true,
-        () -> owner.putObjectDirect(putObjectRequest),
-        onRetry);
+        () -> owner.putObjectDirect(putObjectRequest));
   }
 
   /**
@@ -489,45 +478,10 @@ public class WriteOperationHelper {
    */
   public UploadPartResult uploadPart(UploadPartRequest request)
       throws IOException {
-    return calls.retry("upload part",
+    return retry("upload part",
         request.getKey(),
         true,
-        () -> owner.uploadPart(request),
-        onRetry);
+        () -> owner.uploadPart(request));
   }
 
-  /**
-   * Predicate to determine whether a failed operation should
-   * be attempted again.
-   * If a retry is advised, the exception is automatically logged and
-   * the filesystem statistic {@link Statistic#IGNORED_ERRORS} incremented.
-   * The method then sleeps for the sleep time suggested by the sleep policy;
-   * if the sleep is interrupted then {@code Thread.interrupted()} is set
-   * to indicate the thread was interrupted; then false is returned.
-   *
-   * @param operation operation for log message
-   * @param e exception raised.
-   * @param retryCount  number of retries already attempted
-   * @return true if another attempt should be made
-   */
-  public boolean shouldRetry(String operation,
-      AmazonClientException e,
-      int retryCount) {
-    try {
-      RetryPolicy.RetryAction retryAction =
-          retryPolicy.shouldRetry(e, retryCount, 0, true);
-      boolean retry = retryAction == RetryPolicy.RetryAction.RETRY;
-      if (retry) {
-        owner.operationRetried(e);
-        LOG.info("Retrying {} after exception ", operation, e);
-        Thread.sleep(retryAction.delayMillis);
-      }
-      return retry;
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      return false;
-    } catch (Exception ignored) {
-      return false;
-    }
-  }
 }

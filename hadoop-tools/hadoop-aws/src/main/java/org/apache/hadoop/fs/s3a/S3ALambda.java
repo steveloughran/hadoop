@@ -96,7 +96,7 @@ public class S3ALambda {
       String path,
       boolean idempotent,
       VoidOperation operation,
-     Retrying retrying)
+      Retrying retrying)
       throws IOException {
     retry(action, path, idempotent,
         () -> {

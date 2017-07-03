@@ -562,50 +562,6 @@ public class TestStagingCommitter extends StagingTestBase.MiniDFSTest {
   }
 
   @Test
-  public void testJobAbortFailure() throws Exception {
-    Path jobAttemptPath = jobCommitter.getJobAttemptPath(job);
-    FileSystem fs = jobAttemptPath.getFileSystem(conf);
-
-    Set<String> uploads = runTasks(job, 4, 3);
-
-    assertPathExists(fs, "jobAttemptPath", jobAttemptPath);
-
-
-    errors.failOnAbort(5);
-    errors.recoverAfterFailure();
-
-    StagingTestBase.assertThrows("Should propagate the abort failure",
-        AWSClientIOException.class, "Fail on abort 5",
-        new Callable<String>() {
-          @Override
-          public String call() throws IOException {
-            jobCommitter.abortJob(job, JobStatus.State.KILLED);
-            return jobCommitter.toString() + " " + wrapperFS;
-          }
-        });
-
-//    ClientResults results = jobCommitter.getResults();
-    assertEquals("Should not have committed any uploads",
-        0, results.getCommits().size());
-
-    assertEquals("Should have deleted no uploads",
-        0, results.getDeletes().size());
-
-    assertEquals("Should have aborted all uploads",
-        12, results.getAborts().size());
-
-    Set<String> uploadIds =
-        getCommittedIds(results.getCommits());
-    uploadIds.addAll(getAbortedIds(results.getAborts()));
-
-    assertEquals("Should have committed or aborted all uploads",
-        uploads, uploadIds);
-
-    assertPathDoesNotExist(fs, "jobAttemptPath not deleted", jobAttemptPath);
-
-  }
-
-  @Test
   public void testJobAbort() throws Exception {
     Path jobAttemptPath = jobCommitter.getJobAttemptPath(job);
     FileSystem fs = jobAttemptPath.getFileSystem(conf);

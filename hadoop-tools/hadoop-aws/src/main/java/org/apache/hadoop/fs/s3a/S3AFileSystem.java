@@ -2971,9 +2971,7 @@ public class S3AFileSystem extends FileSystem {
       if (!prefix.isEmpty()) {
         request.setPrefix(prefix);
       }
-      MultipartUploadListing l = s3.listMultipartUploads(
-          request);
-      return l.getMultipartUploads();
+      return s3.listMultipartUploads(request).getMultipartUploads();
     } catch (AmazonClientException e) {
       throw translateException("listMultipartUpoloads", prefix, e);
     }

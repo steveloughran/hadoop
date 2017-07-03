@@ -811,7 +811,9 @@ public final class S3ATestUtils {
     conf.setClass(S3_CLIENT_FACTORY_IMPL, InconsistentS3ClientFactory.class,
         S3ClientFactory.class);
     conf.set(FAIL_INJECT_INCONSISTENCY_KEY, DEFAULT_DELAY_KEY_SUBSTRING);
-    conf.setFloat(FAIL_INJECT_INCONSISTENCY_PROBABILITY, 1.0f);
     conf.setLong(FAIL_INJECT_INCONSISTENCY_MSEC, delay);
+    conf.setFloat(FAIL_INJECT_INCONSISTENCY_PROBABILITY, 0.0f);
+    conf.setFloat(FAIL_INJECT_THROTTLE_PROBABILITY, 0.0f);
+
   }
 }

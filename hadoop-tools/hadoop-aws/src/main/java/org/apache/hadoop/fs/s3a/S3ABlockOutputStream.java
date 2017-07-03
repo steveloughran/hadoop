@@ -644,24 +644,15 @@ class S3ABlockOutputStream extends OutputStream {
       int retryCount = 0;
       AmazonClientException lastException;
       fs.incrementStatistic(OBJECT_MULTIPART_UPLOAD_ABORTED);
-      String operation =
-          String.format("Aborting multi-part upload for '%s', id '%s",
-              writeOperationHelper, uploadId);
-      do {
-        try {
-          LOG.debug(operation);
-          writeOperationHelper.abortMultipartUpload(key, uploadId);
-          return;
-        } catch (AmazonClientException e) {
-          lastException = e;
-          statistics.exceptionInMultipartAbort();
-        }
-      } while (writeOperationHelper.shouldRetry(operation, lastException,
-          retryCount++));
-      // this point is only reached if the operation failed more than
-      // the allowed retry count
-      LOG.warn("Unable to abort multipart upload, you may need to purge  " +
-          "uploaded parts", lastException);
+      try {
+        writeOperationHelper.abortMultipartUpload(key, uploadId,
+            (e, r, i) -> statistics.exceptionInMultipartAbort());
+      } catch (IOException e) {
+        // this point is only reached if the operation failed more than
+        // the allowed retry count
+        LOG.warn("Unable to abort multipart upload,"
+            + " you may need to purge uploaded parts", e);
+      }
     }
 
   }

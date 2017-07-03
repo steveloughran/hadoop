@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
@@ -61,13 +62,24 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
+    // use the inconsistent client, but with delays set to a low value,
+    // throttling off except when enabled (because not all API calls do retries
+    // yet.
     conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.CLASSNAME);
+
+    // to address recurrent cache problems, disable it
     return conf;
   }
 
   @Override
+  public boolean useInconsistentClient() {
+    return true;
+  }
+
+  @Override
   public void setup() throws Exception {
+    FileSystem.closeAll();
     super.setup();
     verifyIsMagicCommitFS(getFileSystem());
   }
@@ -125,7 +137,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
   @Test
   public void testCreateAbortEmptyFile() throws Throwable {
-    describe("create then abort an empty file");
+    describe("create then abort an empty file; throttled");
     S3AFileSystem fs = getFileSystem();
     String filename = "empty-abort.txt";
     Path destFile = methodPath(filename);
@@ -138,9 +150,11 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
 
     CommitOperations actions = newActions();
     // abort,; rethrow on failure
-    LOG.info("First abort call");
+    setThrottling(1.0f, 2);
+    LOG.info("Abort call");
     actions.abortAllSinglePendingCommits(pendingDataPath.getParent(), true)
         .maybeRethrow();
+    resetFailures();
     assertPathDoesNotExist("pending file not deleted", pendingDataPath);
     assertPathDoesNotExist("dest file was created", destFile);
   }
@@ -211,7 +225,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path pendingChildPath = new Path(pendingBaseDir, child);
     Path expectedDestPath = new Path(destDir, child);
     createFile(getFileSystem(), pendingChildPath, true, DATASET);
-    commit("child.txt", pendingChildPath, expectedDestPath);
+    commit("child.txt", pendingChildPath, expectedDestPath, 0, 0);
   }
 
   private void createCommitAndVerify(String filename, byte[] data)
@@ -220,29 +234,42 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path destFile = methodPath(filename);
     Path pendingFilePath = makePending(destFile);
     createFile(fs, pendingFilePath, true, data);
-    commit(filename, destFile);
+    commit(filename, destFile, 0.5f, 0);
     verifyFileContents(fs, destFile, data);
   }
 
   /**
    * Commit the file, with before and after checks on the dest and pending
    * values.
+   * Failures can be set; they'll be reset after the commit.
    * @param filename filename of file
    * @param destFile destination path of file
+   * @param throttle probability of commit throttling
+   * @param failures failure limit
    * @throws Exception any failure of the operation
    */
-  private void commit(String filename, Path destFile) throws Exception {
-    commit(filename, makePending(destFile), destFile);
+  private void commit(String filename,
+      Path destFile,
+      float throttle,
+      int failures) throws Exception {
+    commit(filename, makePending(destFile), destFile, throttle, failures);
   }
 
   /**
    * Commit to a write to {@code pendingFilePath} which is expected to
    * be saved to {@code destFile}.
+   * Failures can be set; they'll be reset after the commit.
    * @param pendingFilePath path to write to
    * @param destFile destination to verify
+   * @param throttle probability of commit throttling
+   * @param failures failure limit
    */
-  private void commit(String filename, Path pendingFilePath, Path destFile)
+  private void commit(String filename,
+      Path pendingFilePath,
+      Path destFile,
+      float throttle, int failures)
       throws IOException {
+    resetFailures();
     assertPathDoesNotExist("pending file was created", pendingFilePath);
     assertPathDoesNotExist("dest file was created", destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
@@ -250,7 +277,9 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     SinglePendingCommit commit = SinglePendingCommit.load(getFileSystem(),
         pendingDataPath);
     CommitOperations actions = newActions();
+    setThrottling(throttle, failures);
     actions.commitOrFail(commit);
+    resetFailures();
     verifyCommitExists(commit);
   }
 
@@ -323,12 +352,18 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     CommitOperations actions = newActions();
     Path dest = methodPath("testUploadEmptyFile");
     S3AFileSystem fs = getFileSystem();
+    fs.delete(dest, false);
+    setThrottling(1.0f, 2);
+
     SinglePendingCommit pendingCommit =
         actions.uploadFileToPendingCommit(tempFile,
             dest, null,
             DEFAULT_MULTIPART_SIZE);
+    resetFailures();
     assertPathDoesNotExist("pending commit", dest);
+    setThrottling(1.0f, 2);
     actions.commitOrFail(pendingCommit);
+    resetFailures();
     FileStatus status = verifyPathExists(fs,
         "uploaded file commit", dest);
     assertEquals("File length in " + status, 0, status.getLen());
@@ -342,12 +377,16 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     CommitOperations actions = newActions();
     Path dest = methodPath("testUploadSmallFile");
     S3AFileSystem fs = getFileSystem();
+    setThrottling(1.0f, 2);
     SinglePendingCommit pendingCommit =
         actions.uploadFileToPendingCommit(tempFile,
             dest, null,
             DEFAULT_MULTIPART_SIZE);
+    resetFailures();
     assertPathDoesNotExist("pending commit", dest);
+    setThrottling(1.0f, 2);
     actions.commitOrFail(pendingCommit);
+    resetFailures();
     String s = readUTF8(fs, dest, -1);
     assertEquals(text, s);
   }
@@ -358,6 +397,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     tempFile.delete();
     CommitOperations actions = newActions();
     Path dest = methodPath("testUploadMissingile");
+    setThrottling(1.0f, 2);
     actions.uploadFileToPendingCommit(tempFile, dest, null,
         DEFAULT_MULTIPART_SIZE);
   }
@@ -370,7 +410,9 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     CommitOperations actions = newActions();
     SinglePendingCommit commit = new SinglePendingCommit();
     commit.setDestinationKey(fs.pathToKey(destFile));
+    setThrottling(1.0f, 2);
     actions.revertCommit(commit);
+    resetFailures();
     assertPathExists("parent of reverted commit", destFile.getParent());
   }
 
@@ -382,8 +424,21 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     CommitOperations actions = newActions();
     SinglePendingCommit commit = new SinglePendingCommit();
     commit.setDestinationKey(fs.pathToKey(destFile));
+    setThrottling(1.0f, 2);
     actions.revertCommit(commit);
     assertPathExists("parent of reverted (nonexistent) commit",
         destFile.getParent());
+  }
+
+  @Test
+  public void testFailuresInAbortListing() throws Throwable {
+    CommitOperations actions = newActions();
+    Path path = path("testFailuresInAbort");
+    getFileSystem().mkdirs(path);
+    setThrottling(0.5f);
+    LOG.info("Aborting");
+    actions.abortPendingUploadsUnderPath(path);
+    LOG.info("Abort completed");
+    resetFailures();
   }
 }
