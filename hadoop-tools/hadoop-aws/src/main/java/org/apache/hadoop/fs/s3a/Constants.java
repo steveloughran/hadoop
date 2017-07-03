@@ -441,6 +441,14 @@ public final class Constants {
   public static final String FAIL_INJECT_INCONSISTENCY_PROBABILITY =
       "fs.s3a.failinject.inconsistency.probability";
 
+  @InterfaceStability.Unstable
+  public static final String FAIL_INJECT_THROTTLE_PROBABILITY =
+      "fs.s3a.failinject.throttle.probability";
+
+  @InterfaceStability.Unstable
+  public static final String FAIL_INJECT_CLIENT_FACTORY =
+      "org.apache.hadoop.fs.s3a.InconsistentS3ClientFactory";
+
   public static final String RETRY_LIMIT = "fs.s3a.retry.limit";
   public static final int RETRY_LIMIT_DEFAULT = 4;
   public static final String RETRY_INTERVAL = "fs.s3a.retry.interval";

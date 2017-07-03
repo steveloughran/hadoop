@@ -33,12 +33,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.http.conn.ConnectTimeoutException;
+
 import static org.apache.hadoop.io.retry.RetryPolicies.*;
 
 import static org.apache.hadoop.fs.s3a.Constants.*;
 
 /**
- * The AWS client request retry policy.
+ * The S3A request retry policy.
  *
  * This uses the retry options in the configuration file to determine retry
  * count and delays for "normal" retries and separately, for throttling;
@@ -46,14 +48,16 @@ import static org.apache.hadoop.fs.s3a.Constants.*;
  *
  * Those exceptions considered unrecoverable (networking) are failed fast.
  *
- * For non-idempotent operations, only failures due to throttling are retried.
+ * For non-idempotent operations, only failures due to throttling or
+ * from failures which are known to only arise prior to talking to S3
+ * are retried.
  */
 public class S3ARetryPolicy implements RetryPolicy {
 
   private final RetryPolicy retryPolicy;
 
   /**
-   * Instantiate
+   * Instantiate.
    * @param conf configuration to read.
    */
   public S3ARetryPolicy(Configuration conf) {
@@ -67,7 +71,8 @@ public class S3ARetryPolicy implements RetryPolicy {
             TimeUnit.MILLISECONDS),
         TimeUnit.MILLISECONDS);
 
-    // which is wrapped by a rejection of all non-idempotent calls
+    // which is wrapped by a rejection of all non-idempotent calls except
+    // for specific failures.
     RetryPolicy maybeRetry = new IdempotencyRetryFilter(fixedRetries);
 
     // and a separate policy for throttle requests, which are considered
@@ -80,7 +85,11 @@ public class S3ARetryPolicy implements RetryPolicy {
             TimeUnit.MILLISECONDS),
         TimeUnit.MILLISECONDS);
 
+    // no retry on network and tangible API issues
     RetryPolicy fail = RetryPolicies.TRY_ONCE_THEN_FAIL;
+
+    // client connectivity: fixed retries without care for idempotency
+    RetryPolicy connectivityFailure = fixedRetries;
 
     // the policy map maps the exact classname; subclasses do not
     // inherit policies.
@@ -99,6 +108,9 @@ public class S3ARetryPolicy implements RetryPolicy {
 
     // throttled requests are can be retried, always
     policyMap.put(AWSServiceThrottledException.class, throttlePolicy);
+
+    // connectivity problems are retried without worrying about idempotency
+    policyMap.put(ConnectTimeoutException.class, connectivityFailure);
 
     // policy on a 400/bad request still ambiguous. Given it
     // comes and goes on test runs: try again

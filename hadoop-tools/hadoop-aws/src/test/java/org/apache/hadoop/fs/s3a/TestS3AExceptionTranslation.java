@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.http.conn.ConnectTimeoutException;
 
 import static org.apache.hadoop.fs.s3a.Constants.ENDPOINT;
 import static org.apache.hadoop.fs.s3a.Constants.RETRY_LIMIT_DEFAULT;
@@ -198,6 +199,14 @@ public class TestS3AExceptionTranslation {
         new ExecutionException(
             new AmazonClientException(
               new InterruptedIOException(""))));
+  }
+
+  @Test(expected = ConnectTimeoutException.class)
+  public void testExtractConnectTimeoutException() throws Throwable {
+    throw extractException("", "",
+        new ExecutionException(
+            new AmazonClientException(
+              new ConnectTimeoutException(""))));
   }
 
   @Test(expected = SocketTimeoutException.class)

@@ -36,6 +36,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3native.S3xLoginHelper;
 import org.apache.hadoop.security.ProviderUtils;
+import org.apache.http.conn.ConnectTimeoutException;
+import org.apache.http.conn.ConnectionPoolTimeoutException;
 
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -142,15 +144,10 @@ public final class S3AUtils {
       Exception innerCause = containsInterruptedException(exception);
       if (innerCause != null) {
         // interrupted IO, or a socket exception underneath that class
-        IOException ioe = innerCause instanceof SocketTimeoutException ?
-          new SocketTimeoutException(message)
-          : new InterruptedIOException(message);
-        ioe.initCause(exception);
-        return ioe;
+        return translateInterruptedException(exception, innerCause, message);
       }
       return new AWSClientIOException(message, exception);
     } else {
-
       IOException ioe;
       AmazonServiceException ase = (AmazonServiceException) exception;
       // this exception is non-null if the service exception is an s3 one
@@ -258,6 +255,33 @@ public final class S3AUtils {
     }
     // tail recurse
     return containsInterruptedException(thrown.getCause());
+  }
+
+  /**
+   * Handles translation of interrupted exception. This includes
+   * preserving the class of the fault for better retry logic
+   * @param exception outer exception
+   * @param innerCause inner cause (which is guaranteed to be some form
+   * of interrupted exception
+   * @param message message for the new exception.
+   * @return an IOE which can be rethrown
+   */
+  private static InterruptedIOException translateInterruptedException(
+      AmazonClientException exception,
+      final Exception innerCause,
+      String message) {
+    InterruptedIOException ioe;
+    if (innerCause instanceof SocketTimeoutException) {
+      ioe = new SocketTimeoutException(message);
+    } else if (innerCause instanceof ConnectTimeoutException) {
+      // any connection failure
+      ioe = new ConnectTimeoutException(message);
+    } else {
+      // any other exception
+      ioe = new InterruptedIOException(message);
+    }
+    ioe.initCause(exception);
+    return ioe;
   }
 
   /**
