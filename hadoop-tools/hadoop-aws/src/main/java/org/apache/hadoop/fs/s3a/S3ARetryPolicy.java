@@ -139,7 +139,7 @@ public class S3ARetryPolicy implements RetryPolicy {
 
     private final RetryPolicy next;
 
-    public IdempotencyRetryFilter(RetryPolicy next) {
+    IdempotencyRetryFilter(RetryPolicy next) {
       this.next = next;
     }
 

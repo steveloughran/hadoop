@@ -191,7 +191,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
       throws IOException {
     CommitOperations.MaybeIOE outcome = new CommitOperations.MaybeIOE();
     try (DurationInfo d =
-             new DurationInfo("Cleanup: aborting outstanding uploads for Job %s",
+             new DurationInfo("Cleanup: aborting pending uploads for Job %s",
                  jobIdString(context))) {
       if (getCommitOperations() != null) {
         Path pending = getJobAttemptPath(context);

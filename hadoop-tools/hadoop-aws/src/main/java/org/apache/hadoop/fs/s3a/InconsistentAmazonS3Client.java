@@ -106,7 +106,7 @@ public class InconsistentAmazonS3Client extends AmazonS3Client {
   private final AtomicLong failureCounter = new AtomicLong(0);
 
   /**
-   * limit for failures before operations succeed; if 0 then "no limit"
+   * limit for failures before operations succeed; if 0 then "no limit".
    */
   private int failureLimit = 0;
 
@@ -171,7 +171,7 @@ public class InconsistentAmazonS3Client extends AmazonS3Client {
         "Inconsistent S3 Client with"
             + " %s msec delay, substring %s, delay probability %s;"
             + " throttle probability %s"
-            + "; failure limit {}, failure count {}",
+            + "; failure limit %d, failure count %d",
         delayKeyMsec, delayKeySubstring, delayKeyProbability,
         throttleProbability, failureLimit, failureCounter.get());
   }
@@ -462,14 +462,13 @@ public class InconsistentAmazonS3Client extends AmazonS3Client {
     return super.initiateMultipartUpload(initiateMultipartUploadRequest);
   }
 
-
   @Override
-  public MultipartUploadListing listMultipartUploads(ListMultipartUploadsRequest listMultipartUploadsRequest)
+  public MultipartUploadListing listMultipartUploads(
+      ListMultipartUploadsRequest listMultipartUploadsRequest)
       throws SdkClientException, AmazonServiceException {
     maybeFail();
     return super.listMultipartUploads(listMultipartUploadsRequest);
   }
-
 
   public float getDelayKeyProbability() {
     return delayKeyProbability;

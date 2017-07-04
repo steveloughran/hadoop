@@ -122,13 +122,14 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
         Thread.sleep(2* inconsistentClient.getDelayKeyMsec());
       } catch (InterruptedException e) {
         throw (InterruptedIOException)
-            (new InterruptedIOException("waiting for consistency").initCause(e));
+            (new InterruptedIOException("while waiting for consistency: " + e)
+                .initCause(e));
       }
     }
   }
 
   /**
-   * Set the throttling factor on requests
+   * Set the throttling factor on requests.
    * @param p probability of a throttling occurring: 0-1.0
    */
   protected void setThrottling(float p) {
@@ -136,7 +137,7 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   }
 
   /**
-   * Set the throttling factor on requests
+   * Set the throttling factor on requests and number of calls to throttle.
    * @param p probability of a throttling occurring: 0-1.0
    * @param limit limit to number of calls which fail
    */

@@ -36,7 +36,6 @@ import org.junit.Test;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.http.conn.ConnectTimeoutException;
 
 import static org.apache.hadoop.fs.s3a.Constants.ENDPOINT;
@@ -85,12 +84,12 @@ public class TestS3AExceptionTranslation {
 
   @Test
   public void test401isNotPermittedFound() throws Exception {
-    verifyTranslated(401,AccessDeniedException.class);
+    verifyTranslated(401, AccessDeniedException.class);
   }
 
   @Test
   public void test403isNotPermittedFound() throws Exception {
-    verifyTranslated(403,AccessDeniedException.class);
+    verifyTranslated(403, AccessDeniedException.class);
   }
 
   @Test
@@ -283,7 +282,7 @@ public class TestS3AExceptionTranslation {
   }
 
   /**
-   * Non-idempotent operations fail on anything which isn't a throttle
+   * Non-idempotent operations fail on anything which isn't a throttle.
    * @throws Throwable
    */
   @Test(expected = AWSBadRequestException.class)

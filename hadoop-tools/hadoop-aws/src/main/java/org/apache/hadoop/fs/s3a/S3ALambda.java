@@ -142,8 +142,8 @@ public class S3ALambda {
       Operation<T> operation)
       throws IOException {
 
-      return retry(action, path, idempotent, operation, NO_OP);
-    }
+    return retry(action, path, idempotent, operation, NO_OP);
+  }
 
     /**
      * Execute a function with retry processing.
