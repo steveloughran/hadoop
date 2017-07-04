@@ -26,6 +26,11 @@ import com.amazonaws.AmazonServiceException;
 public class AWSServiceThrottledException extends AWSServiceIOException {
 
   /**
+   * HTTP status code which signals this failure mode was triggered: {@value}.
+   */
+  public static final int STATUS_CODE = 503;
+
+  /**
    * Instantiate.
    * @param operation operation which triggered this
    * @param cause the underlying cause
@@ -34,9 +39,4 @@ public class AWSServiceThrottledException extends AWSServiceIOException {
       AmazonServiceException cause) {
     super(operation, cause);
   }
-
-  /**
-   * HTTP status code which signals this failure mode was triggered: {@value}.
-   */
-  public static final int STATUS_CODE = 503;
 }

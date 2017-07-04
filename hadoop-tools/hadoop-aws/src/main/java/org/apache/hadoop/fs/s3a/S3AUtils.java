@@ -200,7 +200,7 @@ public final class S3AUtils {
         break;
 
       // throttling
-      case AWSServiceThrottledException.STATUS_CODE:
+      case 503:
         ioe = new AWSServiceThrottledException(message, ase);
         break;
 

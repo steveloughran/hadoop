@@ -307,7 +307,7 @@ public class TestS3AExceptionTranslation {
     lambda.retry("test", null, true,
       () -> {
         if (counter.incrementAndGet() < RETRY_LIMIT_DEFAULT) {
-          throw serviceException(400, "bad request");
+          throw serviceException(AWSBadRequestException.STATUS_CODE, "bad request");
         }
       });
   }

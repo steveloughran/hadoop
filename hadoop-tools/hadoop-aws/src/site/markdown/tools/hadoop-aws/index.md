@@ -1602,7 +1602,6 @@ The classpath must be set up for the process talking to S3: if this is code
 running in the Hadoop cluster, the JARs must be on that classpath. That
 includes `distcp`.
 
-
 ### `ClassNotFoundException: org.apache.hadoop.fs.s3a.S3AFileSystem`
 
 (or `org.apache.hadoop.fs.s3native.NativeS3FileSystem`).
@@ -2072,6 +2071,91 @@ Again, this is due to the fact that the data is cached locally until the
 if it is required that the data is persisted durably after every
 `flush()/hflush()` call. This includes resilient logging, HBase-style journalling
 and the like. The standard strategy here is to save to HDFS and then copy to S3.
+
+
+## Reducing failures by configuring S3A retry policy
+
+Some failing S3 requests can be retried.
+ 
+The S3A client can ba configured to rety those operations which are considered
+retriable. That can be  because they are idempotent, or 
+because there failure happened before the request was processed
+by S3.
+
+The number of retries and interval between each retry can be configured:
+
+```xml
+<property>
+  <name>fs.s3a.retry.limit</name>
+  <value>4</value>
+  <description>
+    Number of times to retry any repeatable S3 client request on failure,
+    excluding throttling requests.
+  </description>
+</property>
+
+<property>
+  <name>fs.s3a.retry.interval</name>
+  <value>500ms</value>
+  <description>
+    Interval between retry attempts.
+  </description>
+</property>
+```
+
+Not all failures are retried. Specifically excluded are those considered
+unrecoverable:
+
+* Low-level networking: `UnknownHostException`, `NoRouteToHostException`.
+* 302 redirects
+* Missing resources, 404/FileNotFoundException
+* HTTP 416 response/EOFException. This can surface if the length of a file changes
+  while another client is reading it.
+* Invalid S3 requests.
+
+In future, others may be added to this list.
+
+When one of these failures arises in the S3/S3A client, the retry mechanism
+is bypassed.
+
+### Throttling
+
+When many requests are made of a specific S3 bucket (or shard inside it), 
+S3 will respond with a 503 "throttled" response. 
+This reponse is ultimately transient, provided overall load decreases.
+Furthermore, because it is sent before any changes are made to the object store,
+is inherently idempotent. For this reason, the client will always attempt to
+retry throttled requests.
+
+The limit of the number of times a throttled request can be retried,
+and the proportional interval increase between attempts, can be configured
+independently of the other retry limits.
+
+```xml
+<property>
+  <name>fs.s3a.retry.throttle.limit</name>
+  <value>10</value>
+  <description>
+    Number of times to retry any throttled request.
+  </description>
+</property>
+
+<property>
+  <name>fs.s3a.retry.throttle.interval</name>
+  <value>1000ms</value>
+  <description>
+    Interval between retry attempts on throttled requests.
+  </description>
+</property>
+```
+
+If a client is failing due to `AWSServiceThrottledException` failures,
+increasing the interval and limit *may* address this. However, it 
+it is a sign of AWS services being overloaded by the sheer number of clients
+and rate of requests. Spreading data across different buckets, and/or using
+a more balanced directory structure may be beneficial.
+Consult [the AWS documentation](http://docs.aws.amazon.com/AmazonS3/latest/dev/request-rate-perf-considerations.html).
+
 
 
 ### S3 Server Side Encryption

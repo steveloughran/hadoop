@@ -25,6 +25,10 @@ import com.amazonaws.AmazonServiceException;
  * This is the general "bad parameters, headers, whatever" failure.
  */
 public class AWSBadRequestException extends AWSServiceIOException {
+  /**
+   * HTTP status code which signals this failure mode was triggered: {@value}.
+   */
+  public static final int STATUS_CODE = 400;
 
   /**
    * Instantiate.
