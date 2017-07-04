@@ -243,6 +243,10 @@ def commitTask(fs, jobAttemptPath, taskAttemptPath, dest):
 
 On a genuine fileystem this is an `O(1)` directory rename.
 
+On an object store with a mimiced rename, it is `O(data)` for the copy,
+along with overhead for listing and deleting all files (For S3, that's
+`(1 + files/500)` lists, and the same number of delete calls.
+
 
 #### Task Abort
 
@@ -253,7 +257,8 @@ def abortTask(fs, jobAttemptPath, taskAttemptPath, dest):
   fs.delete(taskAttemptPath, recursive=True)
 ```
 
-On a genuine fileystem this is an `O(1)` operation.
+On a genuine fileystem this is an `O(1)` operation. On an object store,
+proportional to the time to list and delete files, usually in batches.
 
 
 #### Job Commit
@@ -447,8 +452,6 @@ must be considered significantly misleading.
 
 Rename task attempt path to task committed path. 
 
-(On a genuine fileystem this is `O(1)`)
-
 ```python
 
 def needsTaskCommit(fs, jobAttemptPath, taskAttemptPath, dest):
@@ -460,10 +463,6 @@ def commitTask(fs, jobAttemptPath, taskAttemptPath, dest):
 
 ```
 
-Cost in a conventional filesystem: `O(files)`.
-
-Cost against an object store with mimiced rename, `O(data) + O(files)`.
-
 #### v2 Task Abort
 
 Delete task attempt path.
@@ -472,6 +471,8 @@ Delete task attempt path.
 def abortTask(fs, jobAttemptPath, taskAttemptPath, dest):
   fs.delete(taskAttemptPath, recursive=True)
 ```
+
+Cost: O(1) for normal filesystems, O(files) for object stores.
 
 
 #### v2 Job Commit
@@ -500,6 +501,8 @@ Delete all data under job attempt path.
 def abortJob(fs, jobAttemptDir, dest):
   fs.delete(jobAttemptDir, recursive=True)
 ```
+
+Cost: O(1) for normal filesystems, O(files) for object stores.
 
 #### v2 Task Recovery
 
