@@ -66,7 +66,6 @@ The duration of the commit will be the time needed to determine which commit ope
 to construct, and to execute them.
 
 
-
 ## Terminology
 
 * *Job*: a potentially parallelized query/operation to execute. The execution
@@ -156,14 +155,36 @@ isolate a task from the Job Driver, while the task retains access to S3.
 
 ## The `FileOutputCommitter`
 
-The standard commit protocols are implemented in `org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter`.
+The standard commit protocols are implemented in
+ `org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter`.
 
-These offer
+There are two algorithms, the "v1" designed to address failures and restarts
+of the MapReduce application master. The V2 algorithm cannot recover from failure
+except by re-executing the entire job. It does, however, commit all its work
+during task the task commit algorithm. When working with object stores which
+mimic `rename()` by copy and delete, it is more efficient due to the reduced
+number of listings, copies and deletes, and, because these are executed in
+task commits, eliminate the final `O(data)` pause at the end of all work.
+It is still highly inefficient, but the inefficiencies are less visible as
+large pauses in execution.
+
+
+Notes
+
+* The v1 algorithm was implemented to handle MapReduce AM restarts, it was
+ not used in Hadoop 1.x, whose JobTracker could not recover from failures.
+ Historically then, it is the "v2 algorithm"
+* Because the renames are considered to be fast, there is no logging
+of renames being in progress, or their duration.
+* Speculative execution is supported by having every task attempt write its
+uncommitted data to a task attempt directory. When a task is ready to commit,
+it must notify that job driver that it is ready to commit -the job driver
+will then commit or abort the task.
 
 ### Hadoop MR Commit algorithm "1"
 
 
-The "v1" MR commit algorithm is the default commit algorithm in Hadoop 2.x;
+The "v1" commit algorithm is the default commit algorithm in Hadoop 2.x;
 it was implemented as part of [MAPREDUCE-2702](https://issues.apache.org/jira/browse/MAPREDUCE-2702).
 
 This algorithm is designed to handle a failure and restart of the Job driver,
@@ -171,17 +192,329 @@ with the restarted job driver only rerunning the incomplete tasks; the
 output of the completed tasks is recovered for commitment when the restarted
 job completes.
 
+There is a cost: the time to commit by recursive listing all files in all
+committed task directories, and renaming this.
 
-### Hadoop MR Commit algorithm "2"
+As this is performed sequentially, time to commit is `O(files)`, which is
+generally `O(tasks)`.
 
 
-TBD
+
+```python
+#Job Attempt Path is `$dest/_temporary/$appAttemptId/`
+
+jobAttemptPath = '$dest/_temporary/$appAttemptId/'
+
+# Task Attempt Path is `$dest/_temporary/$appAttemptId/_temporary/$taskAttemptID`
+taskAttemptPath = '$dest/_temporary/$appAttemptId/_temporary/$taskAttemptID'
+
+#Task committed path is `$dest/_temporary/$appAttemptId/$taskAttemptID`
+taskCommittedPath = '$dest/_temporary/$appAttemptId/$taskAttemptID'
+```
+
+Tasks write in/under the task attempt path. 
+
+#### Job Setup
+
+```python
+fs.mkdir(jobAttemptPath)
+```
+
+#### Task Setup
+
+None: directories are created on demand.
 
 
+#### Task Commit
+
+Rename task attempt path to task committed path. 
+
+```python
+
+def needsTaskCommit(fs, jobAttemptPath, taskAttemptPath, dest):
+  return fs.exists(taskAttemptPath)
+
+
+def commitTask(fs, jobAttemptPath, taskAttemptPath, dest):
+  if fs.exists(taskAttemptPath) :
+    fs.delete(taskCommittedPath, recursive=True)
+    fs.rename(taskAttemptPath, taskCommittedPath)
+```
+
+On a genuine fileystem this is an `O(1)` directory rename.
+
+
+#### Task Abort
+
+Delete task attempt path.
+
+```python
+def abortTask(fs, jobAttemptPath, taskAttemptPath, dest):
+  fs.delete(taskAttemptPath, recursive=True)
+```
+
+On a genuine fileystem this is an `O(1)` operation.
+
+
+#### Job Commit
+
+Merge all files/directories in all task commited paths into final destination path.
+Optionally; create 0-byte `_SUCCESS` file in destination path.
+
+```python
+def commitJob(fs, jobAttemptDir, dest):
+  for committedTask in fs.listFiles(jobAttemptDir):
+    mergePathsV1(fs, committedTask, dest)
+  fs.touch("$dest/_SUCCESS")
+```
+
+(See below for details on `mergePaths()`)
+
+
+A failure during job abort cannot be recovered from except by re-executing
+the entire query:
+
+```python
+def isCommitJobRepeatable() :
+  return True
+```
+
+Accordingly, it is a failure point in the protocol. With a low number of files
+and fast rename/list algorithms, the window of vulnerability is low. At
+scale, the vulnerability increases. It could actually be reduced through
+parallel execution of the renaming of of committed tasks.
+
+
+#### Job Abort
+
+Delete all data under job attempt path.
+
+```python
+def abortJob(fs, jobAttemptDir, dest):
+  fs.delete(jobAttemptDir, recursive = True)
+```
+
+#### Job Cleanup
+
+```python
+def cleanupJob(fs, dest):
+  fs.delete('$dest/_temporary', recursive = True)
+```
+
+
+#### Job Recovery
+
+1. Data under task committed paths is retained
+1. All directories under `$dest/_temporary/$appAttemptId/_temporary/` are deleted.
+ 
+Uncommitted/unexecuted tasks are (re)executed.
+
+This significantly improves time to recover from Job driver (here MR AM) failure.
+The only lost work is that of all tasks in progress -those which had generated
+data but were not yet committed.
+
+Only the failure of the job driver requires a job restart, not an individual
+task. Therefore the probability of this happening is independent of the number
+of tasks executed in parallel, instead simply due to the duration of the query.
+
+The longer the task, the higher the risk of failure, the more value there is
+in recovering the work in progress.
+
+Fast queries not only have a lower risk of failure, they can recover from
+failure simply by rerunning the entire job. This is implicitly the strategy
+in Spark, which does not attempt to recover any in-progress jobs. The faster
+your queries, the simpler your recovery strategy needs to be.
+
+#### `mergePaths(FileSystem fs, FileStatus src, Path dest)` Algorithm
+
+`mergePaths()` is the core algorithm to merge data; it is somewhat confusing
+as the implementation mixes the strategies for both algorithms across
+two co-recursive routines, `mergePaths()` and `renameOrMerge()`.
+
+
+Here the two algorithms have been split, and one of the co-recursive methods
+inlined.
+
+```python
+def mergePathsV1(fs, src, dest) :
+  if fs.exists(dest) : 
+    toStat = fs.getFileStatus(dest)
+  else:
+    toStat = None
+  
+  if src.isFile :
+    if not toStat is None :
+      fs.delete(dest, recursive = True)
+    fs.rename(src.getPath, dest)
+  else :
+    # destination is directory, choose action on source type 
+    if src.isDirectory :
+      if not toStat is None :
+        if not toStat.isDirectory :
+          # Destination exists and is not a directory
+          fs.delete(dest)
+          fs.rename(src.getPath(), dest)
+        else :
+          # Destination exists and is a directory
+          # merge all children under destination directory
+          for child in fs.listStatus(src.getPath) :
+            mergePathsV1(fs, child, dest + child.getName)
+      else :
+        # destination does not exist
+        fs.rename(src.getPath(), dest)
+```
+
+### v2 commit algorithm
+
+
+The v2 algorithm directly commits task output into the destination directory.
+It is essentially a re-implementation of the Hadoop 1.x commit algorithm.
+
+1. During execution, intermediate data becomes visible.
+1. On a failure, all output must be deleted and the job restarted.
+
+It implements `mergePaths` differently, as shown below.
+
+```python
+def mergePathsV2(fs, src, dest) :
+  if fs.exists(dest) : 
+    toStat = fs.getFileStatus(dest)
+  else:
+    toStat = None
+  
+  if src.isFile :
+    if not toStat is None :
+      fs.delete(dest, recursive = True)
+    fs.rename(src.getPath, dest)
+  else :
+    # destination is directory, choose action on source type 
+    if src.isDirectory :
+      if not toStat is None :
+        if not toStat.isDirectory :
+          # Destination exists and is not a directory
+          fs.delete(dest)
+          fs.mkdirs(dest)                                    #
+          for child in fs.listStatus(src.getPath) :          # HERE
+            mergePathsV2(fs, child, dest + child.getName)    #
+
+        else :
+          # Destination exists and is a directory
+          # merge all children under destination directory
+          for child in fs.listStatus(src.getPath) :
+            mergePathsV2(fs, child, dest + child.getName)
+      else :
+        # destination does not exist
+        fs.mkdirs(dest)                                     #
+        for child in fs.listStatus(src.getPath) :           # HERE
+          mergePathsV2(fs, child, dest + child.getName)     #
+
+```
+
+Both recurse down any source directory tree, and commit single files
+by renaming the files.
+
+A a key difference is that the v1 algorithm commits a source directory to
+via a directory rename, which is traditionally an `O(1)` operation.
+
+In constrast, the v2 algorithm lists all direct children of a source directory
+and recursively calls `mergePath()` on them, ultimately renaming the individual
+files. As such, the number of renames it performa equals the number of source
+*files*, rather than the number of source *directories*; the number of directory
+listings being `O(depth(src))` , where `depth(path)` is a function returning the
+depth of directories under the given path.
+
+On a normal filesystem, the v2 merge algorithm is potentially more expensive
+than the v1 algorithm. However, as the merging only takes place in task commit,
+it is potentially less of a bottleneck in the entire execution process.
+
+On an objcct store, it is suboptimal not just from its expectation that `rename()`
+is an `O(1)` operation, but from its expectation that a recursive tree walk is
+an efficient way to enumerate and act on a tree of data. If the algorithm was
+switched to using `FileSystem.listFiles(path, recursive)` for a single call to
+enumerate all children under a path, then the listing operation would be significantly
+faster, at least on a deep or wide tree. However, for any realistic dataset,
+the size of the output files is likely to be the main cause of delays. That
+is, if the cost of `mergePathsV2` is `O(depth(src)) + O(data))`, then 
+generally the `O(data)` value will be more significant than the `depth(src)`.
+
+There is one key exception: tests which work on small amounts of data yet try
+to generate realistic output directory structures. In these tests the cost
+of listing directories and calling `getFileStatus()` could exceed that of the copy
+calls. This is why small-scale tests of the commit algorithms against object stores
+must be considered significantly misleading.
+
+#### v2 Task Commit
+
+Rename task attempt path to task committed path. 
+
+(On a genuine fileystem this is `O(1)`)
+
+```python
+
+def needsTaskCommit(fs, jobAttemptPath, taskAttemptPath, dest):
+  return fs.exists(taskAttemptPath)
+
+def commitTask(fs, jobAttemptPath, taskAttemptPath, dest):
+  if fs.exists(taskAttemptPath) :
+    mergePathsV2(fs. taskAttemptPath, dest)
+
+```
+
+Cost in a conventional filesystem: `O(files)`.
+
+Cost against an object store with mimiced rename, `O(data) + O(files)`.
+
+#### v2 Task Abort
+
+Delete task attempt path.
+
+```python
+def abortTask(fs, jobAttemptPath, taskAttemptPath, dest):
+  fs.delete(taskAttemptPath, recursive=True)
+```
+
+
+#### v2 Job Commit
+
+As all the task output is already completed, all that is needed is
+to touch the `_SUCCESS` marker.
+
+```python
+def commitJob(fs, jobAttemptDir, dest):
+  fs.touch("$dest/_SUCCESS")
+```
+Cost: `O(1)` 
+
+A failure during job abort is implicitly repeatable
+
+```python
+def isCommitJobRepeatable() :
+  return True
+```
+
+#### v2 Job Abort
+
+Delete all data under job attempt path.
+
+```python
+def abortJob(fs, jobAttemptDir, dest):
+  fs.delete(jobAttemptDir, recursive=True)
+```
+
+#### v2 Task Recovery
+
+As no data is written to the destination directory, a task can be cleaned up
+by deleting the task attempt directory.
+
+#### v2 Job Recovery
+
+Because the data has been renamed into the destination directory, it is nominally
+recoverable. However, this assumes that the number and name of generated
+files are constant on retried tasks.
 
 ### Hadoop MRv1 Protocol
 
-Adding support for the original Hadoop MRv1 Protocos would take a lot of effort.
+Adding support for the original Hadoop MRv1 Protocols would take a lot of effort.
 
 
 ### Requirements of an S3A Committer
