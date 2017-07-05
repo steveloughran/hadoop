@@ -1413,7 +1413,7 @@ avoid that potentially-inconsistent list.
 #### Spark, Parquet and the Spark SQL Commit mechanism
 
 Spark's `org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat`
-Parquet output format wants a subclass of`org.apache.parquet.hadoop.ParquetOutputCommitter`,
+Parquet output format wants a subclass of `org.apache.parquet.hadoop.ParquetOutputCommitter`,
 the option being defined by the classname in the configuration
 key `spark.sql.parquet.output.committer.class`;
 this is then patched in to the value `spark.sql.sources.outputCommitterClass`
