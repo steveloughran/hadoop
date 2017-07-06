@@ -266,8 +266,7 @@ public class WriteOperationHelper {
   /**
    * This completes a multipart upload to the destination key via
    * {@code finalizeMultipartUpload()}.
-   * Here retries are handled to avoid losing all data
-   * on a transient failure.
+   * Retries increment the {@code errorCount} counter.
    * @param uploadId multipart operation Id
    * @param partETags list of partial uploads
    * @param length length of the upload
