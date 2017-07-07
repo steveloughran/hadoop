@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +40,6 @@ import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
 import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.PathCommitException;
-import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -261,7 +261,7 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
   public void commitTask(TaskAttemptContext context) throws IOException {
     try (DurationInfo d = new DurationInfo("Commit task %s",
         context.getTaskAttemptID())) {
-      Pendingset commits = innerCommitTask(context);
+      PendingSet commits = innerCommitTask(context);
       LOG.info("Task {} committed {} files", context.getTaskAttemptID(),
           commits.size());
     } catch (IOException e) {
@@ -284,28 +284,28 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
    * @return the summary file
    * @throws IOException exception
    */
-  private Pendingset innerCommitTask(
+  private PendingSet innerCommitTask(
       TaskAttemptContext context) throws IOException {
     Path taskAttemptPath = getTaskAttemptPath(context);
     // load in all pending commits.
     CommitOperations actions = getCommitOperations();
-    Pair<Pendingset, List<Pair<LocatedFileStatus, IOException>>>
+    Pair<PendingSet, List<Pair<LocatedFileStatus, IOException>>>
         loaded = actions.loadSinglePendingCommits(
             taskAttemptPath, true);
-    Pendingset pendingset = loaded._1();
+    PendingSet pendingSet = loaded._1();
     List<Pair<LocatedFileStatus, IOException>> failures = loaded._2();
     if (!failures.isEmpty()) {
       // At least one file failed to load
       // revert all which did; report failure with first exception
       LOG.error("At least one commit file could not be read: failing");
-      abortPendingUploads(context, pendingset.getCommits(),
+      abortPendingUploads(context, pendingSet.getCommits(),
           true);
       throw failures.get(0)._2();
     }
     // patch in IDs
     String jobId = String.valueOf(context.getJobID());
     String taskId = String.valueOf(context.getTaskAttemptID());
-    for (SinglePendingCommit commit : pendingset.getCommits()) {
+    for (SinglePendingCommit commit : pendingSet.getCommits()) {
       commit.setJobId(jobId);
       commit.setTaskId(taskId);
     }
@@ -317,15 +317,15 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
         CommitConstants.PENDINGSET_SUFFIX);
     LOG.info("Saving work of {} to {}", taskAttemptID, taskOutcomePath);
     try {
-      pendingset.save(getDestFS(), taskOutcomePath, false);
+      pendingSet.save(getDestFS(), taskOutcomePath, false);
     } catch (IOException e) {
       LOG.warn("Failed to save task commit data to {} ",
           taskOutcomePath, e);
-      abortPendingUploads(context, pendingset.getCommits(),
+      abortPendingUploads(context, pendingSet.getCommits(),
           true);
       throw e;
     }
-    return pendingset;
+    return pendingSet;
   }
 
   /**

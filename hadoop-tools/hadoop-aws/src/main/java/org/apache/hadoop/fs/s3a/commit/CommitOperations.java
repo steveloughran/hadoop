@@ -30,6 +30,7 @@ import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +44,6 @@ import org.apache.hadoop.fs.s3a.S3AInstrumentation;
 import org.apache.hadoop.fs.s3a.S3ALambda;
 import org.apache.hadoop.fs.s3a.S3ARetryPolicy;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
-import org.apache.hadoop.fs.s3a.commit.files.Pendingset;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.fs.s3a.commit.files.SuccessData;
 
@@ -199,14 +199,14 @@ public class CommitOperations {
    * not load/validate.
    * @throws IOException on a failure to list the files.
    */
-  public Pair<Pendingset,
+  public Pair<PendingSet,
       List<Pair<LocatedFileStatus, IOException>>>
       loadSinglePendingCommits(Path pendingDir, boolean recursive)
       throws IOException {
 
     List<LocatedFileStatus> statusList = locateAllSinglePendingCommits(
         pendingDir, recursive);
-    Pendingset commits = new Pendingset(
+    PendingSet commits = new PendingSet(
         statusList.size());
     List<Pair<LocatedFileStatus, IOException>> failures = new ArrayList<>(1);
     for (LocatedFileStatus status : statusList) {

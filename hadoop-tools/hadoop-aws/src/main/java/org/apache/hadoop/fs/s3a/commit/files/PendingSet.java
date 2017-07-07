@@ -47,8 +47,8 @@ import static org.apache.hadoop.fs.s3a.commit.ValidationFailure.verify;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class Pendingset extends PersistentCommitData {
-  private static final Logger LOG = LoggerFactory.getLogger(Pendingset.class);
+public class PendingSet extends PersistentCommitData {
+  private static final Logger LOG = LoggerFactory.getLogger(PendingSet.class);
 
   /**
    * Supported version value: {@value}.
@@ -76,12 +76,12 @@ public class Pendingset extends PersistentCommitData {
    */
   private Map<String, String> extraData = new HashMap<>(0);
 
-  public Pendingset() {
+  public PendingSet() {
     this(0);
   }
 
 
-  public Pendingset(int size) {
+  public PendingSet(int size) {
     commits = new ArrayList<>(size);
   }
 
@@ -89,8 +89,8 @@ public class Pendingset extends PersistentCommitData {
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  public static JsonSerialization<Pendingset> serializer() {
-    return new JsonSerialization<>(Pendingset.class, false, true);
+  public static JsonSerialization<PendingSet> serializer() {
+    return new JsonSerialization<>(PendingSet.class, false, true);
   }
 
   /**
@@ -101,10 +101,10 @@ public class Pendingset extends PersistentCommitData {
    * @throws IOException IO failure
    * @throws ValidationFailure if the data is invalid
    */
-  public static Pendingset load(FileSystem fs, Path path)
+  public static PendingSet load(FileSystem fs, Path path)
       throws IOException {
     LOG.debug("Reading pending commits in file {}", path);
-    Pendingset instance = serializer().load(fs, path);
+    PendingSet instance = serializer().load(fs, path);
     instance.validate();
     return instance;
   }

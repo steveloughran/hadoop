@@ -951,9 +951,9 @@ to the job attempt.
 1. The task commit operation lists all `.pending` files in its attempt directory.
 1. The contents are loaded into a list of single pending uploads.
 1. These are merged into to a single `Pendingset` structure.
-1. Which is saved to a `.pendingset` file in the job attempt directory.
+1. Which is saved to a `.pendingSet` file in the job attempt directory.
 1. Finally, the task attempt directory is deleted. In the example, this
-would be to `/results/latest/__magic/job400_1/task_01_01.pendingset`; 
+would be to `/results/latest/__magic/job400_1/task_01_01.pendingSet`;
 
 
 A failure to load any of the single pending upload files (i.e. the file
@@ -961,13 +961,13 @@ could not load or was considered invalid, the task is considered to
 have failed. All successfully loaded pending commits will be aborted, then
 the failure reported.
 
-Similarly, a failure to save the `.pendingset` file will trigger an
+Similarly, a failure to save the `.pendingSet` file will trigger an
 abort of all its pending uploads.
 
 
 #### Job Commit
 
-The job committer loads all `.pendingset` files in its job attempt directory.
+The job committer loads all `.pendingSet` files in its job attempt directory.
 
 A failure to load any of these files is considered a job failure; all
 pendingsets which could be loaded will be aborted.
@@ -1024,10 +1024,10 @@ This leaves things in an inderminate state.
 
 Pending uploads will remain, but no changes will be visible. 
 
-If the `.pendingset` file has been saved to the job attempt directory, the
+If the `.pendingSet` file has been saved to the job attempt directory, the
 task has effectively committed, it has just failed to report to the
 controller. This will cause complications during job commit, as there
-may be two task pendingset committing the same files, or committing
+may be two task pendingSet committing the same files, or committing
 files with 
 
 *Proposed*: track task ID in pendingsets, recognise duplicates on load
@@ -1102,12 +1102,12 @@ multipart request and the final put. This could perhaps be simplified by always
 requesting a multipart ID on stream creation.
 
 The time to commit each task is `O(files)`: all `.pending` files in and under the task attempt
-directory will be listed, their contents read and then an aggregate `.pendingset`
+directory will be listed, their contents read and then an aggregate `.pendingSet`
 file PUT to the job attempt directory. The `.pending` files are then deleted.
 
 The time to commit a job will be `O(files/threads)`
 
-Every `.pendingset` file in the job attempt directory must be loaded, and a PUT
+Every `.pendingSet` file in the job attempt directory must be loaded, and a PUT
 request issued for every incomplete upload listed in the files.
 
 Note that it is the bulk listing of all children which is where full consistency
