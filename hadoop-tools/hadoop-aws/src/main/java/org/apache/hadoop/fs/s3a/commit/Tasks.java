@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.s3a.commit;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -28,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,8 +152,8 @@ public final class Tasks {
 
     private <E extends Exception> boolean runSingleThreaded(Task<I, E> task)
         throws E {
-      List<I> succeeded = Lists.newArrayList();
-      List<Exception> exceptions = Lists.newArrayList();
+      List<I> succeeded = new ArrayList();
+      List<Exception> exceptions = new ArrayList();
 
       Iterator<I> iterator = items.iterator();
       boolean threw = true;
@@ -238,7 +238,7 @@ public final class Tasks {
       final AtomicBoolean abortFailed = new AtomicBoolean(false);
       final AtomicBoolean revertFailed = new AtomicBoolean(false);
 
-      List<Future<?>> futures = Lists.newArrayList();
+      List<Future<?>> futures = new ArrayList();
 
       for (final I item : items) {
         // submit a task for each item that will either run or abort the task
