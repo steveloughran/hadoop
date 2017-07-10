@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.s3a.commit;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -77,27 +78,13 @@ public final class CommitUtils {
    * @throws IllegalArgumentException if the path is invalid -relative, empty...
    */
   public static List<String> splitPathToElements(Path path) {
-    String uriPath = path.toUri().getPath();
-    checkArgument(!uriPath.isEmpty(), "empty path");
-    checkArgument(uriPath.charAt(0) == '/', "path is relative");
-    if ("/".equals(uriPath)) {
-      // special case: empty list
-      return new ArrayList<>(0);
+    checkArgument(!path.equals(""), "empty path");
+    checkArgument(path.isAbsolute(), "path is relative");
+    if ("/".equals(path.toString())) {
+      return Collections.emptyList();
     }
-    List<String> elements = new ArrayList<>();
-    int len = uriPath.length();
-    int firstElementChar = 1;
-    int endOfElement = uriPath.indexOf('/', firstElementChar);
-    while (endOfElement > 0) {
-      elements.add(uriPath.substring(firstElementChar, endOfElement));
-      firstElementChar = endOfElement + 1;
-      endOfElement = firstElementChar == len ? -1
-          : uriPath.indexOf('/', firstElementChar);
-    }
-    // expect a possible child element here
-    if (firstElementChar != len) {
-      elements.add(uriPath.substring(firstElementChar));
-    }
+    List<String> elements = Arrays.asList(path.toString()
+        .substring(1).split("/"));
     return elements;
   }
 
