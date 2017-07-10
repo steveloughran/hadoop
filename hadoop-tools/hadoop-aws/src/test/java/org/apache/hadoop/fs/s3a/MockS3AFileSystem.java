@@ -30,6 +30,7 @@ import com.amazonaws.services.s3.model.MultipartUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -38,7 +39,6 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.staging.StagingTestBase;
 import org.apache.hadoop.util.Progressable;
 

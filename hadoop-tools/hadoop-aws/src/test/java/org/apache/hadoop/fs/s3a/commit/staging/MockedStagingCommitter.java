@@ -98,12 +98,12 @@ class MockedStagingCommitter extends StagingCommitter {
 
   public ClientResults getResults() throws IOException {
     MockS3AFileSystem mockFS = (MockS3AFileSystem)getDestS3AFS();
-    return mockFS.getOutcome()._1();
+    return mockFS.getOutcome().getKey();
   }
 
   public ClientErrors getErrors() throws IOException {
     MockS3AFileSystem mockFS = (MockS3AFileSystem) getDestS3AFS();
-    return mockFS.getOutcome()._2();
+    return mockFS.getOutcome().getValue();
   }
 
   @Override

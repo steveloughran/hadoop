@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileStatus;
@@ -38,7 +39,6 @@ import org.apache.hadoop.fs.s3a.commit.CommitOperations;
 import org.apache.hadoop.fs.s3a.commit.CommitConstants;
 import org.apache.hadoop.fs.s3a.commit.CommitUtils;
 import org.apache.hadoop.fs.s3a.commit.DurationInfo;
-import org.apache.hadoop.fs.s3a.commit.Pair;
 import org.apache.hadoop.fs.s3a.commit.PathCommitException;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -292,15 +292,15 @@ public class MagicS3GuardCommitter extends AbstractS3GuardCommitter {
     Pair<PendingSet, List<Pair<LocatedFileStatus, IOException>>>
         loaded = actions.loadSinglePendingCommits(
             taskAttemptPath, true);
-    PendingSet pendingSet = loaded._1();
-    List<Pair<LocatedFileStatus, IOException>> failures = loaded._2();
+    PendingSet pendingSet = loaded.getKey();
+    List<Pair<LocatedFileStatus, IOException>> failures = loaded.getValue();
     if (!failures.isEmpty()) {
       // At least one file failed to load
       // revert all which did; report failure with first exception
       LOG.error("At least one commit file could not be read: failing");
       abortPendingUploads(context, pendingSet.getCommits(),
           true);
-      throw failures.get(0)._2();
+      throw failures.get(0).getValue();
     }
     // patch in IDs
     String jobId = String.valueOf(context.getJobID());

@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -214,7 +215,7 @@ public class CommitOperations {
         commits.add(SinglePendingCommit.load(fs, status.getPath()));
       } catch (IOException e) {
         LOG.warn("Failed to load commit file {}", status.getPath(), e);
-        failures.add(new Pair<>(status, e));
+        failures.add(Pair.of(status, e));
       }
     }
     return Pair.of(commits, failures);

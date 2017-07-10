@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.s3a.commit.files.PendingSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -113,7 +114,8 @@ public class ITestS3AHugePendingCommits extends AbstractSTestS3AHugeFiles {
     Preconditions.checkArgument(jobDir != null, "null pendingDir");
     Pair<PendingSet, List<Pair<LocatedFileStatus, IOException>>>
         results = actions.loadSinglePendingCommits(jobDir, false);
-    for (SinglePendingCommit singlePendingCommit : results._1().getCommits()) {
+    for (SinglePendingCommit singlePendingCommit :
+        results.getKey().getCommits()) {
       actions.commitOrFail(singlePendingCommit);
     }
     timer.end("time to commit %s", pendingDataFile);
