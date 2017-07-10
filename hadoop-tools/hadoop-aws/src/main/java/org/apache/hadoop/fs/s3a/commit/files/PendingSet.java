@@ -74,7 +74,7 @@ public class PendingSet extends PersistentCommitData {
   /**
    * Any custom extra data committer subclasses may choose to add.
    */
-  private Map<String, String> extraData = new HashMap<>(0);
+  private final Map<String, String> extraData = new HashMap<>(0);
 
   public PendingSet() {
     this(0);
@@ -189,16 +189,5 @@ public class PendingSet extends PersistentCommitData {
 
   public void setCommits(List<SinglePendingCommit> commits) {
     this.commits = commits;
-  }
-
-  /**
-   * @return any custom extra data committer subclasses may choose to add.
-   */
-  public Map<String, String> getExtraData() {
-    return extraData;
-  }
-
-  public void setExtraData(Map<String, String> extraData) {
-    this.extraData = extraData;
   }
 }
