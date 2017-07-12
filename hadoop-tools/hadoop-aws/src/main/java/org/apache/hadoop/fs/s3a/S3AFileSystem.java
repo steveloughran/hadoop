@@ -1313,6 +1313,7 @@ public class S3AFileSystem extends FileSystem {
       ObjectMetadata metadata,
       InputStream inputStream) {
     Preconditions.checkNotNull(inputStream);
+    Preconditions.checkArgument(StringUtils.isNotEmpty(key), "Null/empty key");
     PutObjectRequest putObjectRequest = new PutObjectRequest(bucket, key,
         inputStream, metadata);
     setOptionalPutRequestParameters(putObjectRequest);

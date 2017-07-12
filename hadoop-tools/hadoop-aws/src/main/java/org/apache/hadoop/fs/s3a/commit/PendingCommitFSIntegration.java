@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3a.commit.magic.MagicCommitTracker;
 
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 
@@ -88,7 +89,9 @@ public class PendingCommitFSIntegration {
       String pendingKey = key + CommitConstants.PENDING_SUFFIX;
       tracker = new MagicCommitTracker(path,
           owner.getBucket(),
-          destKey, pendingKey,
+          key,
+          destKey,
+          pendingKey,
           owner.createWriteOperationHelper(pendingKey));
     } else {
       // standard multipart tracking

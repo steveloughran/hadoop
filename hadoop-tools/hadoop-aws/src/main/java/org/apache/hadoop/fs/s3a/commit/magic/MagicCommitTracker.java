@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.s3a.commit;
+package org.apache.hadoop.fs.s3a.commit.magic;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -32,16 +32,18 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.WriteOperationHelper;
+import org.apache.hadoop.fs.s3a.commit.DefaultPutTracker;
 import org.apache.hadoop.fs.s3a.commit.files.SinglePendingCommit;
 
 /**
- * Put tracker for pending commits.
+ * Put tracker for Magic commits.
  */
 @InterfaceAudience.Private
 public class MagicCommitTracker extends DefaultPutTracker {
   public static final Logger LOG = LoggerFactory.getLogger(
       MagicCommitTracker.class);
 
+  private final String originalDestKey;
   private final String pendingPartKey;
   private final Path path;
   private final WriteOperationHelper writer;
@@ -51,18 +53,21 @@ public class MagicCommitTracker extends DefaultPutTracker {
    * Pending commit tracker.
    * @param path path nominally being written to
    * @param bucket dest bucket
+   * @param originalDestKey the original key, in the magic directory.
    * @param destKey key for the destination
    * @param pendingPartKey key of the pending part
    * @param writer writer instance to use for operations
    */
   public MagicCommitTracker(Path path,
       String bucket,
+      String originalDestKey,
       String destKey,
       String pendingPartKey,
       WriteOperationHelper writer) {
     super(destKey);
     this.bucket = bucket;
     this.path = path;
+    this.originalDestKey = originalDestKey;
     this.pendingPartKey = pendingPartKey;
     this.writer = writer;
   }
@@ -114,6 +119,13 @@ public class MagicCommitTracker extends DefaultPutTracker {
     PutObjectRequest put = writer.newPutRequest(
         new ByteArrayInputStream(bytes), bytes.length);
     writer.uploadObject(put);
+
+    // now put a 0-byte file with the name of the original under-magic path
+    byte[] EMPTY = new byte[0];
+    PutObjectRequest originalDestPut = writer.createPutObjectRequest(
+        originalDestKey,
+        new ByteArrayInputStream(EMPTY), 0);
+    writer.uploadObject(originalDestPut);
     return false;
   }
 
