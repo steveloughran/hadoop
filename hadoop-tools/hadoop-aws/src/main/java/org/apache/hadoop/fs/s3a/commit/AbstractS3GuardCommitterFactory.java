@@ -50,7 +50,8 @@ public abstract class AbstractS3GuardCommitterFactory
       outputCommitter = createTaskCommitter((S3AFileSystem)fs,
           outputPath, context);
     } else {
-      outputCommitter = super.createOutputCommitter(outputPath, context);
+      throw new PathCommitException(outputPath,
+          "Filesystem not supported by this committer");
     }
     LOG.info("Using Commmitter {} for {}",
         outputCommitter,

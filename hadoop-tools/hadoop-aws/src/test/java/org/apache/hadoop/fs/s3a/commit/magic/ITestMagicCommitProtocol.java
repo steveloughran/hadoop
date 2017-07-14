@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.s3a.commit.magic;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.s3a.commit.AbstractITCommitProtocol;
@@ -29,7 +30,6 @@ import org.apache.hadoop.fs.s3a.commit.FaultInjectionImpl;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import java.io.IOException;
 
@@ -58,7 +58,7 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    conf.set(S3A_COMMITTER_FACTORY_KEY,
         MagicS3GuardCommitterFactory.CLASSNAME);
     return conf;
   }
@@ -98,13 +98,14 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
   protected void validateTaskAttemptPathDuringWrite(Path p) throws IOException {
     String pathStr = p.toString();
     assertTrue("not magic " + pathStr,
-        pathStr.contains(CommitConstants.MAGIC_DIR_NAME));
+        pathStr.contains(MAGIC_DIR_NAME));
     assertPathDoesNotExist("task attempt visible", p);
   }
 
   protected void validateTaskAttemptPathAfterWrite(Path p) throws IOException {
-    assertPathDoesNotExist("task attempt visible", p);
-    Path pendingFile = new Path(p.toString() + CommitConstants.PENDING_SUFFIX);
+    FileStatus st = getFileSystem().getFileStatus(p);
+    assertEquals("file length in " + st, 0, st.getLen());
+    Path pendingFile = new Path(p.toString() + PENDING_SUFFIX);
     assertPathExists("pending file", pendingFile);
   }
 
@@ -115,11 +116,12 @@ public class ITestMagicCommitProtocol extends AbstractITCommitProtocol {
 
   private static final class CommitterWithFailedThenSucceed extends
       MagicS3GuardCommitter implements FaultInjection {
-    private final FaultInjectionImpl injection = new FaultInjectionImpl(true);
+    private final FaultInjectionImpl injection;
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
       super(outputPath, context);
+      injection = new FaultInjectionImpl(outputPath, context, true);
     }
 
     @Override

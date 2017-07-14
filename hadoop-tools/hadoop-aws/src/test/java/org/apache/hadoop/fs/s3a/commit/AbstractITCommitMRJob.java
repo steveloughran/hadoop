@@ -165,7 +165,7 @@ public abstract class AbstractITCommitMRJob extends AbstractCommitITest {
     jobConf.setBoolean(FS_S3A_COMMITTER_STAGING_UNIQUE_FILENAMES,
         uniqueFilenames);
 
-    jobConf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    jobConf.set(S3A_COMMITTER_FACTORY_KEY,
         committerFactoryClassname());
     // pass down the scale test flag
     jobConf.setBoolean(KEY_SCALE_TESTS_ENABLED, scaleTest);

@@ -76,11 +76,12 @@ public class ITestPartitionedCommitProtocol extends ITestStagingCommitProtocol {
    */
   private static final class CommitterWithFailedThenSucceed extends
       DirectoryStagingCommitter implements FaultInjection {
-    private final FaultInjectionImpl injection = new FaultInjectionImpl(true);
+    private final FaultInjectionImpl injection;
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
       super(outputPath, context);
+      injection = new FaultInjectionImpl(outputPath, context, true);
     }
 
     @Override

@@ -39,15 +39,13 @@ public final class FaultInjectionImpl extends PathOutputCommitter implements
   private Set<Faults> faults;
   private boolean resetOnFailure;
 
-  public FaultInjectionImpl(Faults... failures) {
-    this(true, failures);
-  }
-
-  public FaultInjectionImpl(boolean resetOnFailure, Faults... failures) {
+  public FaultInjectionImpl(Path outputPath,
+      JobContext context,
+      boolean resetOnFailure,
+      Faults... faults) throws IOException {
+    super(outputPath, context);
+    setFaults(faults);
     this.resetOnFailure = resetOnFailure;
-    setFaults(failures);
-    faults = new HashSet<>(failures.length);
-    Collections.addAll(faults, failures);
   }
 
   @Override

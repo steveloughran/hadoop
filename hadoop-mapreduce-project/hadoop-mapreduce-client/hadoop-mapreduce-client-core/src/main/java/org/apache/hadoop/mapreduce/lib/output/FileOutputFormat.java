@@ -334,6 +334,7 @@ public abstract class FileOutputFormat<K, V> extends OutputFormat<K, V> {
     if (committer == null) {
       Path output = getOutputPath(context);
       committer = PathOutputCommitterFactory.getOutputCommitterFactory(
+          output,
           context.getConfiguration()).createOutputCommitter(output, context);
     }
     return committer;

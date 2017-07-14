@@ -110,6 +110,7 @@ public abstract class AbstractS3GuardCommitter extends PathOutputCommitter {
       String role,
       Path outputPath,
       JobContext context) throws IOException {
+    super(outputPath, context);
     Preconditions.checkArgument(outputPath != null, "null output path");
     Preconditions.checkArgument(context != null, "null job context");
     this.jobContext = context;

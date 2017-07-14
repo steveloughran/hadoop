@@ -1446,7 +1446,7 @@ public abstract class AbstractITCommitProtocol extends AbstractCommitITest {
   @Test
   public void testOutputFormatIntegration() throws Throwable {
     Configuration conf = getConfiguration();
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    conf.set(S3A_COMMITTER_FACTORY_KEY,
         getCommitterFactoryName());
     Job job = newJob();
     job.setOutputFormatClass(LoggingTextOutputFormat.class);

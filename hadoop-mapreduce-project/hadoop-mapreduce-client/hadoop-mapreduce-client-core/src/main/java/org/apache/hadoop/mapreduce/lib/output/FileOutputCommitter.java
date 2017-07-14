@@ -116,6 +116,7 @@ public class FileOutputCommitter extends PathOutputCommitter {
   @Private
   public FileOutputCommitter(Path outputPath, 
                              JobContext context) throws IOException {
+    super(outputPath, context);
     Configuration conf = context.getConfiguration();
     algorithmVersion =
         conf.getInt(FILEOUTPUTCOMMITTER_ALGORITHM_VERSION,

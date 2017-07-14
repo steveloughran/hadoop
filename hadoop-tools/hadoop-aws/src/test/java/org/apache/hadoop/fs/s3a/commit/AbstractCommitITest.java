@@ -77,7 +77,6 @@ public abstract class AbstractCommitITest extends AbstractS3ATestBase {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-//    conf.setBoolean("fs.s3a.impl.disable.cache", true);
     conf.setBoolean(MAGIC_COMMITTER_ENABLED, true);
     conf.setLong(MIN_MULTIPART_THRESHOLD, MULTIPART_MIN_SIZE);
     conf.setInt(MULTIPART_SIZE, MULTIPART_MIN_SIZE);

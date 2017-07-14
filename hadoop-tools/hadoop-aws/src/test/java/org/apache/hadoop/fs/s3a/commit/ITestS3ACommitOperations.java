@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitter;
 import org.apache.hadoop.fs.s3a.commit.magic.MagicS3GuardCommitterFactory;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
@@ -49,6 +50,7 @@ import static org.apache.hadoop.fs.s3a.S3ATestUtils.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 import static org.apache.hadoop.fs.s3a.commit.CommitUtils.*;
 import static org.apache.hadoop.fs.s3a.Constants.*;
+import static org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory.*;
 
 /**
  * Test the low-level binding of the S3A FS to the magic commit mechanism,
@@ -59,6 +61,8 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   private static final Logger LOG =
       LoggerFactory.getLogger(ITestS3ACommitOperations.class);
   private static final byte[] DATASET = dataset(1000, 'a', 32);
+  private static final String S3A_FACTORY_KEY = String.format(
+      OUTPUTCOMMITTER_FACTORY_SCHEME_PATTERN, "s3a");
 
   @Override
   protected Configuration createConfiguration() {
@@ -66,7 +70,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     // use the inconsistent client, but with delays set to a low value,
     // throttling off except when enabled (because not all API calls do retries
     // yet.
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    conf.set(S3A_COMMITTER_FACTORY_KEY,
         MagicS3GuardCommitterFactory.CLASSNAME);
 
     // to address recurrent cache problems, disable it
@@ -144,8 +148,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     Path destFile = methodPath(filename);
     Path pendingFilePath = makePending(destFile);
     touch(fs, pendingFilePath);
-    assertPathDoesNotExist("pending file was created", pendingFilePath);
-    assertPathDoesNotExist("dest file was created", destFile);
+    validatePendingAndFinalPaths(pendingFilePath, destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
 
@@ -201,17 +204,34 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
   }
 
   @Test
-  public void testCommitterFactory() throws Throwable {
+  public void testCommitterFactoryDefault() throws Throwable {
     Configuration conf = new Configuration();
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    Path dest = methodPath();
+    conf.set(OUTPUTCOMMITTER_FACTORY_CLASS,
         MagicS3GuardCommitterFactory.CLASSNAME);
     PathOutputCommitterFactory factory
-        = PathOutputCommitterFactory.getOutputCommitterFactory(conf);
+        = getOutputCommitterFactory(dest, conf);
     PathOutputCommitter committer = factory.createOutputCommitter(
-        path("testFactory"),
+        methodPath(),
         new TaskAttemptContextImpl(getConfiguration(),
             new TaskAttemptID(new TaskID(), 1)));
     MagicS3GuardCommitter s3a = (MagicS3GuardCommitter) committer;
+  }
+
+  @Test
+  public void testCommitterFactorySchema() throws Throwable {
+    Configuration conf = new Configuration();
+    Path dest = methodPath();
+
+    conf.set(S3A_FACTORY_KEY,
+        MagicS3GuardCommitterFactory.CLASSNAME);
+    PathOutputCommitterFactory factory
+        = getOutputCommitterFactory(dest, conf);
+    MagicS3GuardCommitter s3a = (MagicS3GuardCommitter)
+        factory.createOutputCommitter(
+            methodPath(),
+            new TaskAttemptContextImpl(getConfiguration(),
+            new TaskAttemptID(new TaskID(), 1)));
   }
 
   @Test
@@ -271,8 +291,7 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
       float throttle, int failures)
       throws IOException {
     resetFailures();
-    assertPathDoesNotExist("pending file was created", pendingFilePath);
-    assertPathDoesNotExist("dest file was created", destFile);
+    validatePendingAndFinalPaths(pendingFilePath, destFile);
     Path pendingDataPath = validatePendingCommitData(filename,
         pendingFilePath);
     SinglePendingCommit commit = SinglePendingCommit.load(getFileSystem(),
@@ -282,6 +301,12 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
     actions.commitOrFail(commit);
     resetFailures();
     verifyCommitExists(commit);
+  }
+
+  private void validatePendingAndFinalPaths(Path pendingFilePath, Path destFile)
+      throws IOException {
+//    assertPathDoesNotExist("pending file was created", pendingFilePath);
+    assertPathDoesNotExist("dest file was created", destFile);
   }
 
   /**
@@ -344,7 +369,16 @@ public class ITestS3ACommitOperations extends AbstractCommitITest {
    * @throws IOException failure to create/parse the path.
    */
   private Path methodPath(String filename) throws IOException {
-    return new Path(path(getMethodName()), filename);
+    return new Path(methodPath(), filename);
+  }
+
+  /**
+   * Get a unique path for a method
+   * @return a path
+   * @throws IOException
+   */
+  protected Path methodPath() throws IOException {
+    return path(getMethodName());
   }
 
   @Test

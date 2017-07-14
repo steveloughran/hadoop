@@ -21,7 +21,9 @@ package org.apache.hadoop.mapreduce.lib.output;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 import java.io.IOException;
 
@@ -29,10 +31,39 @@ import java.io.IOException;
  * A committer which somehow commits data written to a working directory
  * to the final directory during the commit process. The reference
  * implementation of this is the {@link FileOutputCommitter}.
+ *
+ * There are two constructors, both of which are no-ops. They exist to guarantee
+ * that implementation subclasses have these constructors, so that code
+ * dynamically instantiating a committer can initialise it.
+ * Put differently: unless subclasses implement empty constructors, they
+ * can be confident that they have always been initiated, no matter how
+ * they are constructed.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public abstract class PathOutputCommitter extends OutputCommitter {
+
+  /**
+   * Constructor for a task attempt.
+   * Subclasses should provide a public constructor with this signature.
+   * @param outputPath output path: may be null
+   * @param context task context
+   * @throws IOException IO problem
+   */
+  public PathOutputCommitter(Path outputPath,
+      TaskAttemptContext context) throws IOException {
+  }
+
+  /**
+   * Constructor for a job attempt.
+   * Subclasses should provide a public constructor with this signature.
+   * @param outputPath output path: may be null
+   * @param context task context
+   * @throws IOException IO problem
+   */
+  public PathOutputCommitter(Path outputPath,
+      JobContext context) throws IOException {
+  }
 
   /**
    * Get the directory that the task should write results into.

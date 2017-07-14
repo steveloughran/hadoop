@@ -37,9 +37,9 @@ import org.apache.hadoop.fs.s3a.commit.staging.StagingCommitter;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory;
 
 import static org.apache.hadoop.fs.s3a.Constants.S3_CLIENT_FACTORY_IMPL;
+import static org.apache.hadoop.fs.s3a.commit.CommitConstants.*;
 
 /** Test the staging committer's handling of the base protocol operations. */
 public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
@@ -52,8 +52,8 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   @Override
   protected Configuration createConfiguration() {
     Configuration conf = super.createConfiguration();
-    conf.setInt(CommitConstants.FS_S3A_COMMITTER_THREADS, 1);
-    conf.set(PathOutputCommitterFactory.OUTPUTCOMMITTER_FACTORY_CLASS,
+    conf.setInt(FS_S3A_COMMITTER_THREADS, 1);
+    conf.set(S3A_COMMITTER_FACTORY_KEY,
         getCommitterFactoryName());
     // switch to the inconsistent filesystem
     conf.setClass(S3_CLIENT_FACTORY_IMPL, InconsistentS3ClientFactory.class,
@@ -134,13 +134,13 @@ public class ITestStagingCommitProtocol extends AbstractITCommitProtocol {
   private static final class CommitterWithFailedThenSucceed extends
       StagingCommitter implements FaultInjection {
 
-    private final FaultInjectionImpl injection = new FaultInjectionImpl(true);
+    private final FaultInjectionImpl injection;
 
     CommitterWithFailedThenSucceed(Path outputPath,
         JobContext context) throws IOException {
       super(outputPath, context);
+      injection = new FaultInjectionImpl(outputPath, context, true);
     }
-
     @Override
     public void setupJob(JobContext context) throws IOException {
       injection.setupJob(context);

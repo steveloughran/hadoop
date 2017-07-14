@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapreduce.lib.output;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +41,28 @@ public class PathOutputCommitterFactory extends Configured {
       LoggerFactory.getLogger(PathOutputCommitterFactory.class);
 
   /**
-   * Name of the configuration option used to configure the output committer.
+   * Name of the configuration option used to configure the
+   * output committer factory to use unless there is a specific
+   * one for a schema
    */
   public static final String OUTPUTCOMMITTER_FACTORY_CLASS =
       "mapreduce.pathoutputcommitter.factory.class";
 
   /**
+   * Scheme prefix for per-filesystem scheme committers.
+   */
+  public static final String OUTPUTCOMMITTER_FACTORY_SCHEME =
+      "mapreduce.pathoutputcommitter.factory.scheme";
+
+  /**
+   * String format pattern for per-filesystem scheme committers.
+   */
+  public static final String OUTPUTCOMMITTER_FACTORY_SCHEME_PATTERN =
+      OUTPUTCOMMITTER_FACTORY_SCHEME + ".%s";
+
+  /**
    * Default committer factory name: {@value}.
    */
-
   public static final String OUTPUTCOMMITTER_FACTORY_DEFAULT =
       "org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory";
 
@@ -61,7 +75,7 @@ public class PathOutputCommitterFactory extends Configured {
    */
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
-    return new FileOutputCommitter(outputPath, context);
+    return createDefaultCommitter(outputPath, context);
   }
 
   /**
@@ -89,21 +103,39 @@ public class PathOutputCommitterFactory extends Configured {
    */
   protected final PathOutputCommitter createDefaultCommitter(Path outputPath,
       JobContext context) throws IOException {
-    LOG.debug("Creating file output committer for path {}", outputPath);
+    LOG.debug("Creating FileOutputCommitter for path {}", outputPath);
     return new FileOutputCommitter(outputPath, context);
   }
 
   /**
    * Get the committer factory for a configuration.
+   * @param outputPath the job's output path. If null, it means that the
+   * schema is unknown and a per-schema factory cannot be determined.
    * @param conf configuration
    * @return an instantiated committer factory
    */
   public static PathOutputCommitterFactory getOutputCommitterFactory(
+      Path outputPath,
       Configuration conf) {
-    Class<? extends PathOutputCommitterFactory> factory =
-        conf.getClass(OUTPUTCOMMITTER_FACTORY_CLASS,
-            PathOutputCommitterFactory.class,
-            PathOutputCommitterFactory.class);
+    String keyName = OUTPUTCOMMITTER_FACTORY_CLASS;
+    if (outputPath != null) {
+      String scheme = outputPath.toUri().getScheme();
+      String schemeKey = String.format(OUTPUTCOMMITTER_FACTORY_SCHEME_PATTERN,
+          scheme);
+
+      String factoryClass = conf.getTrimmed(schemeKey);
+      if (factoryClass != null) {
+        LOG.debug("Using scheme-specific committer factory key {}: {}",
+            schemeKey, factoryClass);
+        keyName = schemeKey;
+      }
+    } else {
+      LOG.warn("Unknown commit destination; cannot choose per-scheme committer");
+    }
+    Class<? extends PathOutputCommitterFactory> factory
+        = conf.getClass(keyName,
+        PathOutputCommitterFactory.class,
+        PathOutputCommitterFactory.class);
     LOG.debug("Using OutputCommitter factory class {}", factory);
     return ReflectionUtils.newInstance(factory, conf);
   }
