@@ -635,9 +635,6 @@ of the upload, which make this algorithm viable.
 
 ## The Netfix "Staging" committer
 
-This committer was donated to the ASF by Ryan Blue of netflix
-e name of this committer is
-
 Ryan Blue, of Netflix, has submitted an alternate committer, one which has a
 number of appealing features
 
@@ -870,7 +867,7 @@ Development on this committer was developed before Netflix donated their committ
 
 Work has since focused on the staging committer, certainly for an initial release.
 Ignoring the changes to the output stream and "magic" path handling, the
-actual committer code is now every common: 
+actual committer code is now refactored to have a lot of code in common. 
 
 By making changes to the `S3AFileSystem` and the `S3ABlockOutputStream`, this committer
 manages to postpone the completion of writes of all files written to special
@@ -885,7 +882,7 @@ writes are instantiated.
 
 This algorithm uses a modified `S3ABlockOutputStream`  Output stream, which, rather
 than commit any active multipart upload in the final `close()` operation,
-it insteads save enough information into the S3 repository for an independent
+it instead saves enough information into the S3 repository for an independent
 process to be able to complete or abort the upload.
 
 Originally, in `OutputStream.close()`, it chose whether to perform a single PUT or to
