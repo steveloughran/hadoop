@@ -88,7 +88,7 @@ Get the status of a path
             stat.length = len(FS.Files[p])
             stat.isdir = False
             stat.blockSize > 0
-        elif isDir(FS, p) :
+        elif isDirectory(FS, p) :
             stat.length = 0
             stat.isdir = True
         elif isSymlink(FS, p) :
@@ -207,7 +207,7 @@ Path `path` must exist:
     elif isFile(FS, path) and not filter.accept(P) :
       result = []
 
-    elif isDir(FS, path):
+    elif isDirectory(FS, path):
       result = [
         getFileStatus(c) for c in children(FS, path) if filter.accepts(c)
       ]
@@ -394,7 +394,7 @@ The operation generates a set of results, `resultset`, equal to the result of
     elif isFile(FS, path) and not filter.accept(path) :
       resultset = []
 
-    elif isDir(FS, path) :
+    elif isDirectory(FS, path) :
       resultset = [
         getLocatedFileStatus(FS, c)
          for c in children(FS, path) where filter.accept(c)
@@ -481,7 +481,7 @@ Where
       def blocks(FS, p, s, s +  l)  = a list of the blocks containing data(FS, path)[s:s+l]
 
 
-Note that that as `length(FS, f) ` is defined as `0` if `isDir(FS, f)`, the result
+Note that that as `length(FS, f) ` is defined as `0` if `isDirectory(FS, f)`, the result
 of `getFileBlockLocations()` on a directory is `[]`
 
 
@@ -594,7 +594,7 @@ Create a directory and all its parents.
 
 The path must either be a directory or not exist
  
-     if exists(FS, p) and not isDir(FS, p) :
+     if exists(FS, p) and not isDirectory(FS, p) :
          raise [ParentNotDirectoryException, FileAlreadyExistsException, IOException]
 
 No ancestor may be a file
@@ -639,7 +639,7 @@ The file must not exist for a no-overwrite create:
 
 Writing to or overwriting a directory must fail.
 
-    if isDir(FS, p) : raise {FileAlreadyExistsException, FileNotFoundException, IOException}
+    if isDirectory(FS, p) : raise {FileAlreadyExistsException, FileNotFoundException, IOException}
 
 No ancestor may be a file
 
@@ -1028,7 +1028,7 @@ directories, which will always remain (see below for special coverage of root di
 
 A directory with children and `recursive == False` cannot be deleted
 
-    if isDir(FS, p) and not recursive and (children(FS, p) != {}) : raise IOException
+    if isDirectory(FS, p) and not recursive and (children(FS, p) != {}) : raise IOException
 
 (HDFS raises `PathIsNotEmptyDirectoryException` here.)
 
@@ -1078,7 +1078,7 @@ return value from overreacting.
 Deleting an empty directory that is not root will remove the path from the FS and
 return true.
 
-    if isDir(FS, p) and not isRoot(p) and children(FS, p) == {} :
+    if isDirectory(FS, p) and not isRoot(p) and children(FS, p) == {} :
         FS' = (FS.Directories - [p], FS.Files, FS.Symlinks)
         result = True
 
@@ -1092,7 +1092,7 @@ can generally have three outcomes:
 the correct permissions to delete everything,
 they are free to do so (resulting in an empty filesystem).
 
-        if isDir(FS, p) and isRoot(p) and recursive :
+        if isDirectory(FS, p) and isRoot(p) and recursive :
             FS' = ({["/"]}, {}, {}, {})
             result = True
 
@@ -1100,7 +1100,7 @@ they are free to do so (resulting in an empty filesystem).
 filesystem must be taken offline and reformatted if an empty
 filesystem is desired.
 
-        if isDir(FS, p) and isRoot(p) and recursive :
+        if isDirectory(FS, p) and isRoot(p) and recursive :
             FS' = FS
             result = False
 
@@ -1137,11 +1137,11 @@ adverse consequences of the simpler permissions models of stores.
 Deleting a non-root path with children `recursive==true`
 removes the path and all descendants
 
-    if isDir(FS, p) and not isRoot(p) and recursive :
+    if isDirectory(FS, p) and not isRoot(p) and recursive :
         FS' where:
-            not isDir(FS', p)
+            not isDirectory(FS', p)
             and forall d in descendants(FS, p):
-                not isDir(FS', d)
+                not isDirectory(FS', d)
                 not isFile(FS', d)
                 not isSymlink(FS', d)
         result = True
@@ -1164,178 +1164,7 @@ deletion, preventing the stores' use as drop-in replacements for HDFS.
 
 ### `boolean rename(Path src, Path d)`
 
-In terms of its specification, `rename()` is one of the most complex operations within a filesystem.
-
-In terms of its implementation, it is the one with the most ambiguity regarding when to return false
-versus raising an exception.
-
-Rename includes the calculation of the destination path.
-If the destination exists and is a directory, the final destination
-of the rename becomes the destination + the filename of the source path.
-
-    let dest = if (isDir(FS, d) and d != src) :
-            d + [filename(src)]
-        else :
-            d
-
-#### Preconditions
-
-All checks on the destination path MUST take place after the final `dest` path
-has been calculated.
-
-Source `src` must exist:
-
-    exists(FS, src) else raise FileNotFoundException
-
-`dest` cannot be a descendant of `src`:
-
-    if isDescendant(FS, src, dest) : raise IOException
-
-This implicitly covers the special case of `isRoot(FS, src)`.
-
-`dest` must be root, or have a parent that exists:
-
-    isRoot(FS, dest) or exists(FS, parent(dest)) else raise IOException
-
-The parent path of a destination must not be a file:
-
-    if isFile(FS, parent(dest)) : raise IOException
-
-This implicitly covers all the ancestors of the parent.
-
-There must not be an existing file at the end of the destination path:
-
-    if isFile(FS, dest) : raise FileAlreadyExistsException, IOException
-
-
-#### Postconditions
-
-
-##### Renaming a directory onto itself
-
-Renaming a directory onto itself is no-op; return value is not specified.
-
-In POSIX the result is `False`;  in HDFS the result is `True`.
-
-    if isDir(FS, src) and src == dest :
-        FS' = FS
-        result = (undefined)
-
-
-##### Renaming a file to self
-
-Renaming a file to itself is a no-op; the result is `True`.
-
-     if isFile(FS, src) and src == dest :
-         FS' = FS
-         result = True
-
-
-##### Renaming a file onto a nonexistent path
-
-Renaming a file where the destination is a directory moves the file as a child
- of the destination directory, retaining the filename element of the source path.
-
-    if isFile(FS, src) and src != dest:
-        FS' where:
-            not exists(FS', src)
-            and exists(FS', dest)
-            and data(FS', dest) == data (FS, dest)
-        result = True
-
-
-
-##### Renaming a directory onto a directory
-
-If `src` is a directory then all its children will then exist under `dest`, while the path
-`src` and its descendants will no longer exist. The names of the paths under
-`dest` will match those under `src`, as will the contents:
-
-    if isDir(FS, src) and isDir(FS, dest) and src != dest :
-        FS' where:
-            not exists(FS', src)
-            and dest in FS'.Directories
-            and forall c in descendants(FS, src) :
-                not exists(FS', c))
-            and forall c in descendants(FS, src) where isDir(FS, c):
-                isDir(FS', dest + childElements(src, c)
-            and forall c in descendants(FS, src) where not isDir(FS, c):
-                    data(FS', dest + childElements(s, c)) == data(FS, c)
-        result = True
-
-##### Renaming into a path where the parent path does not exist
-
-      not exists(FS, parent(dest))
-
-There is no consistent behavior here.
-
-*HDFS*
-
-The outcome is no change to FileSystem state, with a return value of false.
-
-    FS' = FS; result = False
-
-*Local Filesystem*
-
-The outcome is as a normal rename, with the additional (implicit) feature
-that the parent directories of the destination also exist.
-
-    exists(FS', parent(dest))
-
-*S3A FileSystem*
-
-The outcome is as a normal rename, with the additional (implicit) feature that
-the parent directories of the destination then exist:
-`exists(FS', parent(dest))`
-
-There is a check for and rejection if the `parent(dest)` is a file, but
-no checks for any other ancestors.
-
-*Other Filesystems (including Swift) *
-
-Other filesystems strictly reject the operation, raising a `FileNotFoundException`
-
-##### Concurrency requirements
-
-* The core operation of `rename()`&mdash;moving one entry in the filesystem to
-another&mdash;MUST be atomic. Some applications rely on this as a way to coordinate access to data.
-
-* Some FileSystem implementations perform checks on the destination
-FileSystem before and after the rename. One example of this is `ChecksumFileSystem`, which
-provides checksummed access to local data. The entire sequence MAY NOT be atomic.
-
-##### Implementation Notes
-
-**Files open for reading, writing or appending**
-
-The behavior of `rename()` on an open file is unspecified: whether it is
-allowed, what happens to later attempts to read from or write to the open stream
-
-**Renaming a directory onto itself**
-
-The return code of renaming a directory onto itself is unspecified.
-
-**Destination exists and is a file**
-
-Renaming a file atop an existing file is specified as failing, raising an exception.
-
-* Local FileSystem : the rename succeeds; the destination file is replaced by the source file.
-
-* HDFS : The rename fails, no exception is raised. Instead the method call simply returns false.
-
-**Missing source file**
-
-If the source file `src` does not exist,  `FileNotFoundException` should be raised.
-
-HDFS fails without raising an exception; `rename()` merely returns false.
-
-    FS' = FS
-    result = false
-
-The behavior of HDFS here should not be considered a feature to replicate.
-`FileContext` explicitly changed the behavior to raise an exception, and the retrofitting of that action
-to the `DFSFileSystem` implementation is an ongoing matter for debate.
-
+See  [Renaming File and Directories](renaming.html).
 
 ### `void concat(Path p, Path sources[])`
 
@@ -1393,7 +1222,7 @@ Implementations without a compliant call SHOULD throw `UnsupportedOperationExcep
 
     if not exists(FS, p) : raise FileNotFoundException
 
-    if isDir(FS, p) : raise [FileNotFoundException, IOException]
+    if isDirectory(FS, p) : raise [FileNotFoundException, IOException]
 
     if newLength < 0 || newLength > len(FS.Files[p]) : raise HadoopIllegalArgumentException
 
