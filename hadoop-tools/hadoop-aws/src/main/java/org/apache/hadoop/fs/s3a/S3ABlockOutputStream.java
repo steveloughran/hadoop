@@ -393,6 +393,7 @@ class S3ABlockOutputStream extends OutputStream implements
    */
   @Override
   public void close() throws IOException {
+    boolean alreadyClosed;
     acquireLock(false);
     try {
       synchronized (this) {
@@ -401,14 +402,27 @@ class S3ABlockOutputStream extends OutputStream implements
         // because the whole close() method is called, calling it on a stream
         // which has just been closed isn't going to block it for the duration
         // of the entire upload.
-        if (!stateModel.enterClosedState()) {
-          // already closed
-          LOG.debug("Ignoring close() as stream is not open");
-          return;
-        }
+        alreadyClosed = !stateModel.enterClosedState();
       }
     } finally {
       releaseLock();
+    }
+    if (alreadyClosed) {
+      // already closed or in error state.
+      if (stateModel.isInState(StreamStateModel.State.Error)) {
+        // error state.
+        if (multiPartUpload != null) {
+          // attempt to abort any ongoing MPU.
+          multiPartUpload.abort();
+        }
+        // Log the operation as failing and rethrow.
+        IOException ioe = stateModel.getException();
+        writeOperationHelper.writeFailed(ioe);
+        throw ioe;
+      } else {
+        LOG.debug("Ignoring close() as stream is not open");
+        return;
+      }
     }
     S3ADataBlocks.DataBlock block = getActiveBlock();
     boolean hasBlock = hasActiveBlock();
@@ -461,9 +475,9 @@ class S3ABlockOutputStream extends OutputStream implements
       if (multiPartUpload != null) {
         multiPartUpload.abort();
       }
-      enterErrorState(ioe);
-      writeOperationHelper.writeFailed(ioe);
-      throw ioe;
+      final IOException ex = enterErrorState(ioe);
+      writeOperationHelper.writeFailed(ex);
+      throw ex;
     } finally {
       cleanupWithLogger(LOG, block, blockFactory);
       LOG.debug("Statistics: {}", statistics);
