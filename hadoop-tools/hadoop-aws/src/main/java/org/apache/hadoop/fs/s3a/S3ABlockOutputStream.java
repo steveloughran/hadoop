@@ -34,6 +34,7 @@ import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.UploadPartRequest;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -54,6 +55,7 @@ import org.apache.hadoop.util.Progressable;
 import static org.apache.hadoop.fs.s3a.S3AUtils.*;
 import static org.apache.hadoop.fs.s3a.Statistic.*;
 import static org.apache.hadoop.io.IOUtils.cleanupWithLogger;
+import static org.apache.hadoop.io.IOUtils.wrapException;
 
 /**
  * Upload files/parts directly via different buffering mechanisms:
@@ -292,7 +294,8 @@ class S3ABlockOutputStream extends OutputStream implements
    * @return The stream state
    * @throws IOException if the checkOpen operation raises an exception.
    */
-  private synchronized StreamStateModel.State acquireLock(final boolean checkOpen)
+  @VisibleForTesting
+  synchronized StreamStateModel.State acquireLock(final boolean checkOpen)
       throws IOException {
     stateModel.acquireLock(checkOpen);
     return stateModel.getState();
@@ -418,7 +421,11 @@ class S3ABlockOutputStream extends OutputStream implements
         // Log the operation as failing and rethrow.
         IOException ioe = stateModel.getException();
         writeOperationHelper.writeFailed(ioe);
-        throw ioe;
+        // Problems surface in try-with-resources clauses if
+        // the exception thrown in a close == the one already thrown
+        // -so we wrap any exception with a new one.
+        // See HADOOP-16785
+        throw wrapException(key, ioe.getMessage(), ioe);
       } else {
         LOG.debug("Ignoring close() as stream is not open");
         return;

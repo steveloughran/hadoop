@@ -229,7 +229,7 @@ public class StreamStateModel {
   }
 
   /**
-   * Get any exception. Non-null iff the model is in the error state.
+   * Get any exception. Non-null if the model is in the error state.
    * @return any exception set on a transition to the error state.
    */
   public synchronized IOException getException() {

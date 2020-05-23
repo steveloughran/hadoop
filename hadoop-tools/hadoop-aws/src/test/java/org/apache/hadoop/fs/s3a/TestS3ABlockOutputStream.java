@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
-import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -60,7 +60,9 @@ public class TestS3ABlockOutputStream extends AbstractS3AMockTest {
 
   @Test
   public void testFlushNoOpWhenStreamClosed() throws Exception {
-    doThrow(new IOException()).when(stream).checkOpen();
+    doThrow(new IOException("test failed"))
+        .when(stream)
+        .acquireLock(anyBoolean());
 
     stream.flush();
   }

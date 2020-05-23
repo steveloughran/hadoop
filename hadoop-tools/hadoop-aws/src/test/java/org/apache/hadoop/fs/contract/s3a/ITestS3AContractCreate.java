@@ -18,11 +18,18 @@
 
 package org.apache.hadoop.fs.contract.s3a;
 
+import java.io.IOException;
+
+import org.junit.Test;
+
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.contract.AbstractContractCreateTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
+import static org.apache.hadoop.fs.FSExceptionMessages.STREAM_IS_CLOSED;
 import static org.apache.hadoop.fs.s3a.S3ATestUtils.maybeEnableS3Guard;
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
  * S3A contract tests creating files.
@@ -45,5 +52,23 @@ public class ITestS3AContractCreate extends AbstractContractCreateTest {
   protected AbstractFSContract createContract(Configuration conf) {
     return new S3AContract(conf);
   }
+
+  /**
+   * Attempts to write to the azure stream after it is closed will raise
+   * an IOException.
+   */
+  @Test
+  public void testWriteAfterClose() throws Throwable {
+    FSDataOutputStream out = getFileSystem().create(methodPath());
+    out.close();
+    intercept(IOException.class, STREAM_IS_CLOSED,
+        () -> out.write('a'));
+    intercept(IOException.class, STREAM_IS_CLOSED,
+        () -> out.write(new byte[]{'a'}));
+    out.hsync();
+    out.flush();
+    out.close();
+  }
+
 
 }
