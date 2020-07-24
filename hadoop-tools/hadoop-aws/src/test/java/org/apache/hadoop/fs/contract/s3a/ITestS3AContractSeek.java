@@ -217,7 +217,8 @@ public class ITestS3AContractSeek extends AbstractContractSeekTest {
   public void testReadPolicyInFS() throws Throwable {
     describe("Verify the read policy is being consistently set");
     S3AFileSystem fs = getFileSystem();
-    assertEquals(S3AInputPolicy.getPolicy(seekPolicy), fs.getInputPolicy());
+    assertEquals(S3AInputPolicy.getPolicy(seekPolicy, S3AInputPolicy.Normal),
+        fs.getInputPolicy());
   }
 
   /**

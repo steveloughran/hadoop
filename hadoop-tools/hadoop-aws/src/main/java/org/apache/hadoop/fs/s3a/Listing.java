@@ -61,7 +61,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.StringJoiner;
 
-import static org.apache.hadoop.fs.impl.FutureIOSupport.awaitFuture;
 import static org.apache.hadoop.fs.s3a.Constants.S3N_FOLDER_SUFFIX;
 import static org.apache.hadoop.fs.s3a.S3AUtils.ACCEPT_ALL;
 import static org.apache.hadoop.fs.s3a.S3AUtils.createFileStatus;
@@ -76,6 +75,7 @@ import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatist
 import static org.apache.hadoop.util.functional.RemoteIterators.filteringRemoteIterator;
 import static org.apache.hadoop.util.functional.RemoteIterators.remoteIteratorFromArray;
 import static org.apache.hadoop.util.functional.RemoteIterators.remoteIteratorFromSingleton;
+import static org.apache.hadoop.util.functional.FutureIO.awaitFuture;
 
 /**
  * Place for the S3A listing classes; keeps all the small classes under control.

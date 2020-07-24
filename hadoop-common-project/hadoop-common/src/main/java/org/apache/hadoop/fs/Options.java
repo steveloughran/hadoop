@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.fs;
 
+import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -517,5 +521,113 @@ public final class Options {
   public enum ChecksumCombineMode {
     MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
     COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
+
+  /**
+   * The standard {@code openFile()} options.
+   */
+  @InterfaceAudience.Public
+  @InterfaceStability.Evolving
+  public static final class OpenFileOptions {
+
+    private OpenFileOptions() {
+    }
+
+    /**
+     * Prefix for all standard filesystem options: {@value}.
+     */
+    public static final String FILESYSTEM_OPTION = "fs.option.";
+
+    /**
+     * Prefix for all openFile options: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE =
+        FILESYSTEM_OPTION + "openfile.";
+
+    /**
+     * OpenFile option for file length: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_LENGTH =
+        FS_OPTION_OPENFILE + "length";
+
+    /**
+     * OpenFile option for split start: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_SPLIT_START =
+        FS_OPTION_OPENFILE + "split.start";
+
+    /**
+     * OpenFile option for split end: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_SPLIT_END =
+        FS_OPTION_OPENFILE + "split.end";
+
+    /**
+     * OpenFile option for buffer size: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_BUFFER_SIZE =
+        FS_OPTION_OPENFILE + "buffer.size";
+
+    /**
+     * OpenFile option for read policies: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY =
+        FS_OPTION_OPENFILE + "read.policy";
+
+    /**
+     * Read policy for adaptive IO: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_ADAPTIVE =
+        "adaptive";
+
+    /**
+     * Read policy for ORC files: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_ORC =
+        "orc";
+
+    /**
+     * Read policy 'normal' -up to implementation: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_NORMAL =
+        "normal";
+
+    /**
+     * Read policy for parquet files: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_PARQUET =
+        "parquet";
+
+    /**
+     * Read policy for random: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_RANDOM =
+        "random";
+
+    /**
+     * Read policy for sequential IO: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_SEQUENTIAL =
+        "sequential";
+
+    /**
+     * Read policy for vectored IO: {@value}.
+     */
+    public static final String FS_OPTION_OPENFILE_READ_POLICY_VECTORED =
+        "vectored";
+
+    /**
+     * Set of standard options which openFile implementations
+     * MUST recognize, even if they ignore the actual values.
+     */
+    public static final Set<String> FS_OPTION_OPENFILE_STANDARD_OPTIONS =
+        Collections.unmodifiableSet(Stream.of(
+            FS_OPTION_OPENFILE_BUFFER_SIZE,
+            FS_OPTION_OPENFILE_READ_POLICY,
+            FS_OPTION_OPENFILE_LENGTH,
+            FS_OPTION_OPENFILE_SPLIT_START,
+            FS_OPTION_OPENFILE_SPLIT_END)
+            .collect(Collectors.toSet()));
+
   }
 }

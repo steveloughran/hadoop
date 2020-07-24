@@ -89,6 +89,7 @@ import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTest
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.fs.Options.OpenFileOptions.FS_OPTION_OPENFILE_BUFFER_SIZE;
 import static org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkArgument;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.*;
 import static org.apache.hadoop.fs.impl.PathCapabilitiesSupport.validatePathCapabilityArgs;
@@ -4617,7 +4618,7 @@ public abstract class FileSystem extends Configured
       final OpenFileParameters parameters) throws IOException {
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
         parameters.getMandatoryKeys(),
-        Collections.emptySet(),
+        Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS,
         "for " + path);
     return LambdaUtils.eval(
         new CompletableFuture<>(), () ->
@@ -4645,7 +4646,7 @@ public abstract class FileSystem extends Configured
       final OpenFileParameters parameters) throws IOException {
     AbstractFSBuilderImpl.rejectUnknownMandatoryKeys(
         parameters.getMandatoryKeys(),
-        Collections.emptySet(), "");
+        Options.OpenFileOptions.FS_OPTION_OPENFILE_STANDARD_OPTIONS, "");
     CompletableFuture<FSDataInputStream> result = new CompletableFuture<>();
     try {
       result.complete(open(pathHandle, parameters.getBufferSize()));
@@ -4752,9 +4753,13 @@ public abstract class FileSystem extends Configured
       Optional<Path> optionalPath = getOptionalPath();
       OpenFileParameters parameters = new OpenFileParameters()
           .withMandatoryKeys(getMandatoryKeys())
+          .withOptionalKeys(getOptionalKeys())
           .withOptions(getOptions())
-          .withBufferSize(getBufferSize())
           .withStatus(super.getStatus());  // explicit to avoid IDE warnings
+      // buffer size can be configured
+      parameters.withBufferSize(
+          getOptions().getInt(FS_OPTION_OPENFILE_BUFFER_SIZE,
+              getBufferSize()));
       if(optionalPath.isPresent()) {
         return getFS().openFileWithOptions(optionalPath.get(),
             parameters);
