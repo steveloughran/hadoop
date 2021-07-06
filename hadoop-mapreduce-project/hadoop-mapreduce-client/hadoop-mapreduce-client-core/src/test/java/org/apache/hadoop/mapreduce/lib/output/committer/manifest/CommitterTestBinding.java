@@ -110,12 +110,13 @@ class CommitterTestBinding implements
    * @param outputPath output path in destFS.
    * @return a committer for the active task.
    */
-  ManifestCommitter.ManifestCommitterConfig createCommitterConfig(
+  ManifestCommitterConfig createCommitterConfig(
       Path outputPath) {
-    return new ManifestCommitter.ManifestCommitterConfig(outputPath,
+    return new ManifestCommitterConfig(outputPath,
         TASK_COMMITTER,
         taskAttemptContext,
-        iostatistics);
+        iostatistics,
+        null);
   }
 
   /**

@@ -59,16 +59,19 @@ public class ManifestCommitterStatisticNames {
   public static final String COMMITTER_COMMIT_JOB =
       "committer_commit_job";
 
-
-
+  /** Directory creation {@value}. */
   public static final String OP_CREATE_DIRECTORIES = "op_create_directories";
 
+  /** Creating a single directory {@value}. */
   public static final String OP_CREATE_ONE_DIRECTORY =
       "op_create_one_directory";
 
-  /** {@value}. */
+  /** Directory scan {@value}. */
   public static final String OP_DIRECTORY_SCAN = "op_directory_scan";
 
+  /**
+   * Overall job commit {@value}.
+   */
   public static final String OP_STAGE_JOB_COMMIT = "op_job_commit";
 
   /**
@@ -85,59 +88,86 @@ public class ManifestCommitterStatisticNames {
   public static final String OP_LOAD_ALL_MANIFESTS = "op_load_all_manifests";
 
   /**
-   * Load a task manifest.
+   * Load a task manifest: {@value}.
    */
   public static final String OP_LOAD_MANIFEST = "op_load_manifest";
 
-  /** {@value}. */
+  /** Rename a file: {@value}. */
   public static final String OP_RENAME_FILE = OP_RENAME;
 
   /**
-   * Save a task manifest.
+   * Save a task manifest: {@value}.
    */
   public static final String OP_SAVE_TASK_MANIFEST =
       "op_save_task_manifest";
 
   /**
-   * Task abort.
+   * Task abort: {@value}.
    */
   public static final String OP_STAGE_TASK_ABORT_TASK = "op_task_stage_abort_task";
 
   /**
-   * Job cleanup.
+   * Job abort: {@value}.
+   */
+  public static final String OP_STAGE_JOB_ABORT = "op_job_stage_abort";
+
+  /**
+   * Job cleanup: {@value}.
    */
   public static final String OP_STAGE_JOB_CLEANUP = "op_job_stage_cleanup";
 
   /**
-   * Rename files stage duration.
+   * Rename files stage duration: {@value}.
    */
   public static final String OP_STAGE_JOB_RENAME_FILES =
       "op_job_stage_rename_files";
 
   /**
-   * Prepare Directories Stage.
+   * Prepare Directories Stage: {@value}.
    */
   public static final String OP_STAGE_JOB_CREATE_TARGET_DIRS =
       "op_job_stage_create_target_dirs";
 
+  /**
+   * Load Manifest Stage: {@value}.
+   */
   public static final String OP_STAGE_JOB_LOAD_MANIFESTS =
       "op_job_stage_load_manifests";
 
+  /**
+   * Job Setup Stage: {@value}.
+   */
+
   public static final String OP_STAGE_JOB_SETUP = "op_job_stage_setup";
 
+  /**
+   * Job saving _SUCCESS marker Stage: {@value}.
+   */
   public static final String OP_STAGE_JOB_SAVE_SUCCESS =
       "op_job_stage_save_success_marker";
 
+  /**
+   * Task saving manifest file Stage: {@value}.
+   */
   public static final String OP_STAGE_TASK_SAVE_MANIFEST =
       "op_task_stage_save_manifest";
 
+  /**
+   * Task Setup Stage: {@value}.
+   */
   public static final String OP_STAGE_TASK_SETUP = "op_task_stage_setup";
 
+  /**
+   * Output Validation (within job commit) Stage: {@value}.
+   */
   public static final String OP_STAGE_JOB_VALIDATE_OUTPUT =
       "op_job_stage_optional_validate_output";
 
+  /**
+   * Task Commit Stage: {@value}.
+   */
   public static final String OP_STAGE_TASK_COMMIT = "op_stage_task_commit";
 
-  /** {@value}. */
+  /** Task Scan directory Stage: {@value}. */
   public static final String OP_STAGE_TASK_SCAN_DIRECTORY = "op_stage_task_scan_directory";
 }

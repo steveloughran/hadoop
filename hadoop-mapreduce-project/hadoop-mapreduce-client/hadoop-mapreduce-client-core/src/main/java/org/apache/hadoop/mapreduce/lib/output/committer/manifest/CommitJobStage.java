@@ -43,8 +43,8 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
  */
 public class CommitJobStage extends
     AbstractJobCommitStage<
-        Pair<Boolean, Boolean>,
-        ManifestSuccessData> {
+        Boolean,
+        CommitJobStage.Result> {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       CommitJobStage.class);
@@ -54,11 +54,10 @@ public class CommitJobStage extends
   }
 
   @Override
-  protected ManifestSuccessData executeStage(
-      final Pair<Boolean, Boolean> arguments) throws IOException {
+  protected CommitJobStage.Result executeStage(
+      final Boolean arguments) throws IOException {
 
-    boolean saveMarker = arguments.getLeft();
-    boolean validate = arguments.getRight();
+    boolean saveMarker = arguments;
 
     // load the manifests
     Pair<LoadManifestsStage.SummaryInfo, List<TaskManifest>> pair
@@ -91,24 +90,39 @@ public class CommitJobStage extends
     // commit all the tasks.
     // The success data includes a snapshot of the IO Statistics
     // and hence all aggregate stats from the tasks.
-    ManifestSuccessData jobSuccessData;
-    jobSuccessData = new RenameFilesStage(getStageConfig()).apply(manifests);
-    LOG.debug("_SUCCESS file summary {}", jobSuccessData.toJson());
+    ManifestSuccessData successData;
+    successData = new RenameFilesStage(getStageConfig()).apply(manifests);
+    LOG.debug("_SUCCESS file summary {}", successData.toJson());
 
     // save the _SUCCESS if the option is enabled.
     if (saveMarker) {
       Path succesPath = new SaveSuccessFileStage(getStageConfig())
-          .apply(jobSuccessData);
+          .apply(successData);
       LOG.debug("Saving _SUCCESS file to {}", succesPath);
     }
 
-    if (validate) {
-      LOG.info("Validating output.");
-      new ValidateRenamedFilesStage(getStageConfig())
-          .apply(manifests);
-    }
-
-    return jobSuccessData;
+    return new CommitJobStage.Result(successData, manifests);
   }
 
+  /**
+   * Result of the stage.
+   */
+  public static final class Result {
+    final ManifestSuccessData jobSuccessData;
+    final List<TaskManifest> manifests;
+
+    public Result(ManifestSuccessData jobSuccessData,
+        List<TaskManifest> manifests) {
+      this.jobSuccessData = jobSuccessData;
+      this.manifests = manifests;
+    }
+
+    public ManifestSuccessData getJobSuccessData() {
+      return jobSuccessData;
+    }
+
+    public List<TaskManifest> getManifests() {
+      return manifests;
+    }
+  }
 }

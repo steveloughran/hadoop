@@ -404,7 +404,7 @@ public class TestJobThroughManifestCommitter
   public void test_0410_commitJob() throws Throwable {
     describe("Commit the job");
     CommitJobStage stage = new CommitJobStage(jobStageConfig);
-    stage.apply(Pair.of(true, true));
+    stage.apply(true);
   }
 
   /**
@@ -465,14 +465,14 @@ public class TestJobThroughManifestCommitter
     entry.setDest(newName);
 
     // validation will now fail
-    intercept(FileNotFoundException.class, ".missing", () ->
+    intercept(OutputValidationException.class, ".missing", () ->
         new ValidateRenamedFilesStage(jobStageConfig)
             .apply(manifests));
 
     // restore the name, but change the size
     entry.setDest(oldName);
     entry.setSize(128_000_000);
-    intercept(PathIOException.class, () ->
+    intercept(OutputValidationException.class, () ->
         new ValidateRenamedFilesStage(jobStageConfig)
             .apply(manifests));
   }

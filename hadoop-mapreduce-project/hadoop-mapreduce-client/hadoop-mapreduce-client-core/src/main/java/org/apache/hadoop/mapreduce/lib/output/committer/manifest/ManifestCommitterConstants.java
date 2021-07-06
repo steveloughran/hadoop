@@ -200,7 +200,7 @@ public final class ManifestCommitterConstants {
   /**
    * Default value:  {@value }.
    */
-  public static final int OPT_IO_PROCESSORS_DEFAULT = 32;
+  public static final int OPT_IO_PROCESSORS_DEFAULT = 64;
 
   /**
    * Should the output be validated?
@@ -241,6 +241,14 @@ public final class ManifestCommitterConstants {
    */
   public static final boolean OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS_DEFAULT =
       true;
+
+  /**
+   * Directory for saving job summary reports.
+   * These are the _SUCCESS files, but are saved even on
+   * job failures.
+   */
+  public static final String OPT_SUMMARY_REPORT_DIR =
+      OPT_PREFIX + "summary.report.directory";
 
   /**
    * Name of the factory: {@value}.

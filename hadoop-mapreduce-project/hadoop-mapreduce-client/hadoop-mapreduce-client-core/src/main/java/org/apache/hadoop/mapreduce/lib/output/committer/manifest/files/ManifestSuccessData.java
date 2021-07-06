@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
@@ -92,6 +93,13 @@ public class ManifestSuccessData
   /** Timestamp of creation. */
   private long timestamp;
 
+  /**
+   * Did this succeed?
+   * It is implicitly true in a _SUCCESS file, but if the file
+   * is also saved to a log dir, then it depends on the outcome
+   */
+  private boolean success = true;
+
   /** Timestamp as date string; no expectation of parseability. */
   private String date;
 
@@ -140,6 +148,16 @@ public class ManifestSuccessData
    */
   @JsonProperty("iostatistics")
   private IOStatisticsSnapshot iostatistics = new IOStatisticsSnapshot();
+
+  /**
+   * State (committed, aborted).
+   */
+  private String state;
+
+  /**
+   * Stage: last stage executed.
+   */
+  private String stage;
 
   @Override
   public void validate() throws IOException {
@@ -386,5 +404,41 @@ public class ManifestSuccessData
 
   public void setIOStatistics(final IOStatisticsSnapshot ioStatistics) {
     this.iostatistics = ioStatistics;
+  }
+
+  public boolean isSuccess() {
+    return success;
+  }
+
+  public void setSuccess(boolean success) {
+    this.success = success;
+  }
+
+  public String getState() {
+    return state;
+  }
+
+  public void setState(String state) {
+    this.state = state;
+  }
+
+  public String getStage() {
+    return stage;
+  }
+
+  public void setStage(String stage) {
+    this.stage = stage;
+  }
+
+  /**
+   * Note a failure by setting success flag to false,
+   * then add the exception to the diagnostics.
+   * @param t throwable
+   */
+  public void jobFailure(Throwable t) {
+    setSuccess(false);
+    String stacktrace = ExceptionUtils.getStackTrace(t);
+    diagnostics.put("exception", t.toString());
+    diagnostics.put("stacktrace", stacktrace);
   }
 }

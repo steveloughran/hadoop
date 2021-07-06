@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.IOException;
+import java.time.ZonedDateTime;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -27,7 +30,10 @@ import org.apache.hadoop.fs.statistics.impl.IOStatisticsStoreBuilder;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.MRJobConfig;
+import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.fs.statistics.impl.IOStatisticsBinding.iostatisticsStore;
 import static org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter.PENDING_DIR_NAME;
@@ -37,7 +43,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_ATTEMPT_DIR_FORMAT_STR;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_DIR_FORMAT_STR;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_ID_SOURCE_MAPREDUCE;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_CLASSNAME;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_SUFFIX;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.PRINCIPAL;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SPARK_WRITE_UUID;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.TMP_SUFFIX;
 
@@ -169,6 +177,34 @@ public final class ManifestCommitterSupport {
         stageConfig.getTaskAttemptDir()
             .toUri().toString());
     return manifest;
+  }
+
+  /**
+   * Create success/outcome data.
+   * @param stageConfig configuration.
+   * @return a _SUCCESS object with some diagnostics.
+   */
+  public static ManifestSuccessData createManifestOutcome(
+      StageConfig stageConfig) {
+    final ManifestSuccessData outcome = new ManifestSuccessData();
+    outcome.setJobId(stageConfig.getJobId());
+    outcome.setJobIdSource(stageConfig.getJobIdSource());
+    outcome.setCommitter(MANIFEST_COMMITTER_CLASSNAME);
+    // real timestamp
+    outcome.setTimestamp(System.currentTimeMillis());
+    final ZonedDateTime now = ZonedDateTime.now();
+    outcome.setDate(now.toString());
+    outcome.setHostname(NetUtils.getLocalHostname());
+    // add some extra diagnostics which can still be parsed by older
+    // builds of test applications.
+    // Audit Spain information can go in here too, in future.
+    try {
+      outcome.addDiagnostic(PRINCIPAL,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+    } catch (IOException ignored) {
+      // don't know who we are? exclude from the diagnostics.
+    }
+    return outcome;
   }
 
 

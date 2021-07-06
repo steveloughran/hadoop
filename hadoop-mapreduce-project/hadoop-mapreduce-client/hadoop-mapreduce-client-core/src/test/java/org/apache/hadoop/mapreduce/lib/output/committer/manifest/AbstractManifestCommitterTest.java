@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,11 +55,13 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStat
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 import static org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
 import static org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory.COMMITTER_FACTORY_CLASS;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitter.ManifestCommitterConfig.createCloseableTaskSubmitter;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConfig.createCloseableTaskSubmitter;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_ID_SOURCE_MAPREDUCE;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_FACTORY;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_SUMMARY_REPORT_DIR;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_VALIDATE_OUTPUT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createIOStatisticsStore;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.getProjectBuildDir;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.validateSuccessFile;
 import static org.apache.hadoop.util.functional.FutureIO.awaitFuture;
 
@@ -149,6 +152,7 @@ public abstract class AbstractManifestCommitterTest
    * Progress counter used in all stage configs.
    */
   private final ProgressCounter progressCounter = new ProgressCounter();
+  private File reportDir;
 
   /**
    * Get the contract configuration.
@@ -197,10 +201,27 @@ public abstract class AbstractManifestCommitterTest
   }
 
   @Override
+  protected Configuration createConfiguration() {
+    Configuration conf = super.createConfiguration();
+    return conf;
+  }
+
+  @Override
   public void setup() throws Exception {
+    // superclass setup includes creating a filesystem instance
+    // for the target store.
     super.setup();
+
+    // set the manifest committer to a localfs path for reports across
+    // all threads.
+    reportDir = new File(getProjectBuildDir(), "reports");
+    reportDir.mkdirs();
+
+    // stage statistics
     setStageStatistics(createIOStatisticsStore().build());
+    // thread pool for task submission.
     setSubmitter(createCloseableTaskSubmitter(POOL_SIZE, TASK_IDS.getJobId()));
+    // store operations for the target filesystem.
     storeOperations = new StoreOperationsThroughFileSystem(getFileSystem());
   }
 
@@ -208,10 +229,10 @@ public abstract class AbstractManifestCommitterTest
   @Override
   public void teardown() throws Exception {
     Thread.currentThread().setName("teardown");
-    storeOperations = null;
 
+    IOUtils.cleanupWithLogger(LOG, storeOperations, getSubmitter());
+    storeOperations = null;
     super.teardown();
-    IOUtils.closeStream(getSubmitter());
     FILESYSTEM_IOSTATS.aggregate(retrieveIOStatistics(getFileSystem()));
     FILESYSTEM_IOSTATS.aggregate(getStageStatistics());
   }
@@ -459,6 +480,10 @@ public abstract class AbstractManifestCommitterTest
     conf.setBoolean(SUCCESSFUL_JOB_OUTPUT_DIR_MARKER, true);
     // and validate the output, for extra rigorousness
     conf.setBoolean(OPT_VALIDATE_OUTPUT, true);
+
+    // and bind the report dir
+    conf.set(OPT_SUMMARY_REPORT_DIR, reportDir.toURI().toString());
+
   }
 
   /**

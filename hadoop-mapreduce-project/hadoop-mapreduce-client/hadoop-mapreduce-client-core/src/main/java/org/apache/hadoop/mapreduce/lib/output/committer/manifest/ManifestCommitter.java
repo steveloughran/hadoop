@@ -19,12 +19,10 @@
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
 import java.io.IOException;
-import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -33,29 +31,19 @@ import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.lib.output.PathOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.util.Progressable;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.logIOStatisticsAtDebug;
-import static org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter.SUCCESSFUL_JOB_OUTPUT_DIR_MARKER;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.CleanupJobStage.cleanupStageOptionsFromConfig;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_SUFFIX;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_IO_PROCESSORS;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_IO_PROCESSORS_DEFAULT;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_VALIDATE_OUTPUT;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_VALIDATE_OUTPUT_DEFAULT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_SUMMARY_REPORT_DIR;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.buildJobUUID;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_ABORT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createIOStatisticsStore;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.getAppAttemptId;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createManifestOutcome;
 
 /**
  * This is the Intermediate-Manifest committer.
@@ -97,7 +85,12 @@ public class ManifestCommitter extends PathOutputCommitter implements
    *  The job Manifest Success data; only valid after a job successfully
    *  commits.
    */
-  private ManifestSuccessData jobSuccessData;
+  private ManifestSuccessData successData;
+
+  /**
+   * The active stage; is updated by a callback from within the stages.
+   */
+  private String activeStage;
 
   /**
    * The task manifest of the task commit.
@@ -118,10 +111,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
     destinationDir = resolveDestinationDirectory(outputPath,
         context.getConfiguration());
     iostatistics = createIOStatisticsStore().build();
-    baseConfig = new ManifestCommitterConfig(destinationDir,
-        TASK_COMMITTER,
-        context,
-        iostatistics);
+    baseConfig = createCommitterConfig(true, context);
     taskAttemptDir = baseConfig.getTaskAttemptDir();
   }
 
@@ -137,7 +127,8 @@ public class ManifestCommitter extends PathOutputCommitter implements
         getOutputPath(),
         isTask ? TASK_COMMITTER : JOB_COMMITTER,
         context,
-        iostatistics);
+        iostatistics,
+        this::enterStage);
   }
 
   /**
@@ -266,6 +257,20 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
+   * Get the manifest success data for this job; creating on demand if needed.
+   * @param committerConfig source config.
+   * @return the current {@link #successData} value; never null.
+   */
+  private ManifestSuccessData maybeCreateJobSuccessData(
+      ManifestCommitterConfig committerConfig) {
+    if (successData == null) {
+      successData = createManifestOutcome(
+          committerConfig.createJobStageConfig());
+    }
+    return successData;
+  }
+
+  /**
    * This is the big job commit stage.
    * Load the manifests, prepare the destination, rename
    * the files then cleanup the job directory.
@@ -278,36 +283,79 @@ public class ManifestCommitter extends PathOutputCommitter implements
     ManifestCommitterConfig committerConfig = createCommitterConfig(false,
         jobContext);
 
+    maybeCreateJobSuccessData(committerConfig);
     try (CloseableTaskSubmitter ioProcs =
-             committerConfig.createSubmitter()) {
+             committerConfig.createSubmitter();
+         StoreOperations storeOperations = createStoreOperations()) {
       // the stage config will be shared across all stages.
       StageConfig stageConfig = committerConfig.createJobStageConfig()
-          .withOperations(createStoreOperations())
+          .withOperations(storeOperations)
           .withIOProcessors(ioProcs)
           .build();
 
-      // load the manifests
-      jobSuccessData = new CommitJobStage(stageConfig)
-          .apply(Pair.of(committerConfig.getCreateJobMarker(),
-              committerConfig.getValidateOutput()));
+      // commit the the manifests
+      CommitJobStage.Result result = new CommitJobStage(stageConfig)
+          .apply(committerConfig.getCreateJobMarker());
+      successData = result.getJobSuccessData();
 
       // clean up job attempt dir if not disabled
       // note: it's a no-op if the options don't say "enabled"
       new CleanupJobStage(stageConfig).apply(
           cleanupStageOptionsFromConfig(
               jobContext.getConfiguration()));
+
+      // and then, after everything else: validate.
+
+      if (committerConfig.getValidateOutput()) {
+        LOG.info("Validating output.");
+        new ValidateRenamedFilesStage(stageConfig)
+            .apply(result.getManifests());
+      }
+    } catch (IOException e){
+      // failure.
+      successData.jobFailure(e);
+      throw e;
     } finally {
+      maybeSaveSummary(committerConfig,
+          successData,
+          true);
       // print job commit stats
       LOG.info("Job Commit statistics {}",
           ioStatisticsToPrettyString(iostatistics));
     }
   }
 
+  /**
+   * Abort the job.
+   * Invokes {@link #cleanupJob(JobContext)} operation then
+   * saves the (ongoing) job success data if reporting is enabled.
+   * @param jobContext Context of the job whose output is being written.
+   * @param state final runstate of the job
+   * @throws IOException
+   */
   @Override
   public void abortJob(final JobContext jobContext,
       final JobStatus.State state)
       throws IOException {
-    cleanupJob(jobContext);
+    ManifestCommitterConfig committerConfig = createCommitterConfig(false,
+        jobContext);
+    maybeCreateJobSuccessData(committerConfig);
+
+    try {
+      cleanupJob(jobContext);
+    } catch (IOException e) {
+      // failure.
+      successData.jobFailure(e);
+    } finally {
+      successData.setSuccess(false);
+      successData.setStage(OP_STAGE_JOB_ABORT);
+      maybeSaveSummary(committerConfig,
+          successData,
+          true);
+    }
+    // print job stats
+    LOG.info("Job Abort statistics {}",
+        ioStatisticsToPrettyString(iostatistics));
   }
 
   /**
@@ -359,6 +407,14 @@ public class ManifestCommitter extends PathOutputCommitter implements
     return taskAttemptDir;
   }
 
+  /**
+   * Callback on stage entry.
+   * @param stage new stage
+   */
+  public void enterStage(String stage) {
+    activeStage = stage;
+  }
+
   String getJobUniqueId() {
     return baseConfig.getJobUniqueId();
   }
@@ -371,8 +427,8 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * Get the manifest Success data; only valid after a job.
    * @return the job _SUCCESS data, or null.
    */
-  ManifestSuccessData getJobSuccessData() {
-    return jobSuccessData;
+  ManifestSuccessData getSuccessData() {
+    return successData;
   }
 
   /**
@@ -451,260 +507,40 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * The configuration for the committer as built up from the job configuration
-   * and data passed down from the committer factory.
-   * Isolated for ease of dev/test
+   * Save a summary to the report dir if the config option
+   * is set.
+   * @param operations store operations to use.
+   * @param config configuration to use.
+   * @param summary summary file.
+   * @param quiet should exceptions be swallowed.
+   * @return the path of a file, if successfully saved
+   * @throws IOException if a failure occured and quiet==false
    */
-  static final class ManifestCommitterConfig {
-
-    /**
-     * Final destination of work.
-     * This is <i>unqualified</i>.
-     */
-    private final Path destinationDir;
-
-    /**
-     * Role: used in log/text messages.
-     */
-    private final String role;
-
-    /**
-     * This is the directory for all intermediate work: where the output
-     * format will write data.
-     */
-    private final Path taskAttemptDir;
-
-    /** Configuration of the job. */
-    private final Configuration conf;
-
-    /** The job context. For a task, this can be cast to a TaskContext. */
-    private final JobContext jobContext;
-
-    /** Should a job marker be created? */
-    private final boolean createJobMarker;
-
-    /**
-     * Job ID Or UUID -without any attempt suffix.
-     * This is expected/required to be unique, though
-     * Spark has had "issues" there until recently
-     * with lack of uniqueness of generated MR Job IDs.
-     */
-    private final String jobUniqueId;
-
-    /**
-     * Where did the job Unique ID come from?
-     */
-    private final String jobUniqueIdSource;
-
-    /**
-     * Number of this attempt; starts at zero.
-     */
-    private final int jobAttemptNumber;
-
-    /**
-     * Job ID + AttemptID.
-     */
-    private final String jobAttemptId;
-
-    /**
-     * Task ID: used as the filename of the manifest.
-     */
-    private final String taskId;
-
-    /**
-     * Task attempt ID. Determines the working
-     * directory for task attempts to write data into,
-     * and for the task committer to scan.
-     */
-    private final String taskAttemptId;
-
-    /** Any progressable for progress callbacks. */
-    private final Progressable progressable;
-
-    /**
-     * IOStatistics to update.
-     */
-    private final IOStatisticsStore iostatistics;
-
-    /** Should the output be validated after the commit? */
-    private final boolean validateOutput;
-
-    private final ManifestCommitterSupport.AttemptDirectories dirs;
-
-    /**
-     * Constructor.
-     * @param outputPath destination path of the job.
-     * @param role role for log messages.
-     * @param context job/task context
-     * @param iostatistics IO Statistics
-     */
-    ManifestCommitterConfig(
-        final Path outputPath,
-        final String role,
-        final JobContext context,
-        final IOStatisticsStore iostatistics) {
-      this.role = role;
-      this.jobContext = context;
-      this.conf = context.getConfiguration();
-      this.destinationDir = outputPath;
-      this.iostatistics = iostatistics;
-      this.createJobMarker = conf.getBoolean(
-          SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
-          DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER);
-      this.validateOutput = conf.getBoolean(
-          OPT_VALIDATE_OUTPUT,
-          OPT_VALIDATE_OUTPUT_DEFAULT);
-      Pair<String, String> pair = buildJobUUID(conf, context.getJobID());
-      this.jobUniqueId = pair.getLeft();
-      this.jobUniqueIdSource = pair.getRight();
-      this.jobAttemptNumber = getAppAttemptId(context);
-      this.jobAttemptId = this.jobUniqueId + "_" + jobAttemptNumber;
-
-      // build directories
-      this.dirs = new ManifestCommitterSupport.AttemptDirectories(outputPath,
-          this.jobUniqueId, jobAttemptNumber);
-
-      // if constructed with a task attempt, build the task ID and path.
-      if (context instanceof TaskAttemptContext) {
-        // it's a task
-        final TaskAttemptContext tac = (TaskAttemptContext) context;
-        TaskAttemptID taskAttempt = Objects.requireNonNull(
-            tac.getTaskAttemptID());
-        taskAttemptId = taskAttempt.toString();
-        taskId = taskAttempt.getTaskID().toString();
-        // Task attempt dir; must be different across instances
-        taskAttemptDir = dirs.getTaskAttemptPath(taskAttemptId);
-        // the context is also the progress callback.
-        progressable = tac;
-
+  private Path maybeSaveSummary(
+      ManifestCommitterConfig config,
+      ManifestSuccessData summary,
+      boolean quiet) throws IOException {
+    Configuration conf = config.getConf();
+    String reportDir = conf.getTrimmed(OPT_SUMMARY_REPORT_DIR, "");
+    if (reportDir.isEmpty()) {
+      return null;
+    }
+    Path reportDirPath = new Path(reportDir);
+    Path path = new Path(reportDirPath,
+        String.format("summary-%s.json",
+            config.getJobUniqueId()));
+    try (StoreOperations operations =
+             new StoreOperationsThroughFileSystem(path.getFileSystem(conf))) {
+      operations.save(summary, path, true);
+      LOG.info("Job summary saved to {}", path);
+      return path;
+    } catch (IOException e) {
+      LOG.debug("Failed to save summary to {}", path, e);
+      if (quiet) {
+        return null;
       } else {
-        // it's a job
-        taskId = "";
-        taskAttemptId = "";
-        taskAttemptDir = null;
-        progressable = null;
+        throw e;
       }
     }
-
-    /**
-     * Get the destination filesystem.
-     * @return destination FS.
-     * @throws IOException Problems binding to the destination FS.
-     */
-    FileSystem getDestinationFileSystem() throws IOException {
-      return FileSystem.get(destinationDir.toUri(), conf);
-    }
-
-    /**
-     * Create the job stage config from the committer
-     * configuration.
-     * This does not bind the store operations
-     * or processors.
-     * @return a stage config with configuration options passed in.
-     */
-    StageConfig createJobStageConfig() {
-      StageConfig stageConfig = new StageConfig();
-      stageConfig
-          .withIOStatistics(iostatistics)
-          .withJobDirectories(dirs)
-          .withJobId(jobUniqueId)
-          .withJobIdSource(jobUniqueIdSource)
-          .withJobAttemptNumber(jobAttemptNumber)
-          .withTaskAttemptDir(taskAttemptDir)
-          .withTaskAttemptId(taskAttemptId)
-          .withTaskId(taskId)
-          .withProgressable(progressable);
-
-      return stageConfig;
-    }
-
-    Path getDestinationDir() {
-      return destinationDir;
-    }
-
-    String getRole() {
-      return role;
-    }
-
-    Path getTaskAttemptDir() {
-      return taskAttemptDir;
-    }
-
-    Path getJobAttemptDir() {
-      return dirs.getJobAttemptDir();
-    }
-
-    Configuration getConf() {
-      return conf;
-    }
-
-    JobContext getJobContext() {
-      return jobContext;
-    }
-
-    boolean getCreateJobMarker() {
-      return createJobMarker;
-    }
-
-    String getJobAttemptId() {
-      return jobAttemptId;
-    }
-
-    String getTaskAttemptId() {
-      return taskAttemptId;
-    }
-
-    String getTaskId() {
-      return taskId;
-    }
-
-    String getJobUniqueId() {
-      return jobUniqueId;
-    }
-
-    boolean getValidateOutput() {
-      return validateOutput;
-    }
-
-    /**
-     * Create a new thread pool from the
-     * {@link ManifestCommitterConstants#OPT_IO_PROCESSORS}
-     * settings.
-     * @return a new thread pool.
-     */
-    CloseableTaskSubmitter createSubmitter() {
-      return createSubmitter(
-          OPT_IO_PROCESSORS, OPT_IO_PROCESSORS_DEFAULT);
-    }
-
-    /**
-     * Create a new thread pool.
-     * This must be shut down.
-     * @param key config key with pool size.
-     * @param defVal default value.
-     * @return a new thread pool.
-     */
-    CloseableTaskSubmitter createSubmitter(String key, int defVal) {
-      int numThreads = conf.getInt(key, defVal);
-      if (numThreads <= 0) {
-        // ignore the setting if it is too invalid.
-        numThreads = defVal;
-      }
-      return createCloseableTaskSubmitter(numThreads, getJobAttemptId());
-    }
-
-    @VisibleForTesting
-    static CloseableTaskSubmitter createCloseableTaskSubmitter(
-        final int numThreads,
-        final String jobAttemptId) {
-      return new CloseableTaskSubmitter(
-          HadoopExecutors.newFixedThreadPool(numThreads,
-              new ThreadFactoryBuilder()
-                  .setDaemon(true)
-                  .setNameFormat("manifest-committer-" + jobAttemptId + "-%d")
-                  .build()));
-    }
-
   }
-
 }

@@ -28,6 +28,7 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestS
 
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.TMP_SUFFIX;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_SAVE_SUCCESS;
 
 /**
@@ -55,6 +56,8 @@ public class SaveSuccessFileStage extends
     Path successTempFile = new Path(jobAttemptDir, SUCCESS_MARKER + TMP_SUFFIX);
     LOG.debug("Saving _SUCCESS file to {} via {}", successFile,
         successTempFile);
+    // set it to the job commit stage, always.
+    successData.setStage(OP_STAGE_JOB_COMMIT);
     save(successData, successTempFile, successFile);
     return successFile;
   }

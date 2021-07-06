@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,7 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.FileOrDir
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData;
 import org.apache.hadoop.util.functional.RemoteIterators;
 
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +51,15 @@ public class ManifestCommitterTestSupport {
   private static final Logger LOG = LoggerFactory.getLogger(
       ManifestCommitterTestSupport.class);
 
+  private static final DateTimeFormatter FORMATTER =
+      DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+  /**
+   * Build directory property.
+   */
+  public static final String PROJECT_BUILD_DIRECTORY_PROPERTY
+      = "project.build.directory";
+
   /**
    * Create a random Job ID using the fork ID as part of the number if
    * set in the current process.
@@ -56,15 +69,25 @@ public class ManifestCommitterTestSupport {
     String testUniqueForkId = System.getProperty("test.unique.fork.id", "0001");
     int l = testUniqueForkId.length();
     String trailingDigits = testUniqueForkId.substring(l - 4, l);
+    int digitValue;
     try {
-      int digitValue = Integer.valueOf(trailingDigits);
-      return String.format("202170712%04d_%04d",
-          (long) (Math.random() * 1000),
-          digitValue);
+      digitValue = Integer.valueOf(trailingDigits);
     } catch (NumberFormatException e) {
-      throw new RuntimeException("Failed to parse " + trailingDigits
-          +" check the maven forkID settings", e);
+      digitValue = 0;
     }
+
+    return String.format("%s%04d_%04d",
+        FORMATTER.format(LocalDateTime.now()),
+        (long) (Math.random() * 1000),
+        digitValue);
+  }
+
+  public static File getProjectBuildDir() {
+    String propval = System.getProperty(PROJECT_BUILD_DIRECTORY_PROPERTY);
+    if (StringUtils.isEmpty(propval)) {
+      propval = "target";
+    }
+    return new File(propval).getAbsoluteFile();
   }
 
   /**
@@ -110,14 +133,13 @@ public class ManifestCommitterTestSupport {
     assertThat(successData.getFilenames())
         .describedAs("Files committed in " + commitDetails)
         .hasSizeGreaterThanOrEqualTo(minimumFileCount);
-    if (StringUtils.isNotEmpty(jobId)) {
+    if (isNotEmpty(jobId)) {
       assertThat(successData.getJobId())
           .describedAs("JobID in " + commitDetails)
           .isEqualTo(jobId);
     }
     return successData;
   }
-
 
   /**
    * List a directory/directory tree.
@@ -164,7 +186,6 @@ public class ManifestCommitterTestSupport {
         .isEqualTo(l);
   }
 
-
   /**
    * Create a task attempt for a Job. This is based on the code
    * run in the MR AM, creating a task (0) for the job, then a task
@@ -186,7 +207,6 @@ public class ManifestCommitterTestSupport {
         TypeConverter.fromYarn(attemptID));
   }
 */
-
 
   /**
    * Closeable which can be used to safely close writers in

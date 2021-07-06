@@ -38,6 +38,7 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.PRINCIPAL;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER_FILE_LIMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_RENAME_FILES;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createManifestOutcome;
 import static org.apache.hadoop.thirdparty.com.google.common.collect.Iterables.concat;
 
 /**
@@ -76,20 +77,7 @@ public class RenameFilesStage extends
     // set the list of files to be as big as the number of tasks.
     filesCommitted = new ArrayList<>(taskManifests.size());
 
-    final ManifestSuccessData success = new ManifestSuccessData();
-    success.setJobId(getJobId());
-    success.setJobIdSource(getStageConfig().getJobIdSource());
-    success.setCommitter(MANIFEST_COMMITTER_CLASSNAME);
-    // real timestamp
-    success.setTimestamp(System.currentTimeMillis());
-    final ZonedDateTime now = ZonedDateTime.now();
-    success.setDate(now.toString());
-    success.setHostname(NetUtils.getLocalHostname());
-    // add some extra diagnostics which can still be parsed by older
-    // builds of test applications.
-    // Audit Spain information can go in here too, in future.
-    success.addDiagnostic(PRINCIPAL,
-        UserGroupInformation.getCurrentUser().getShortUserName());
+    final ManifestSuccessData success = createManifestOutcome(getStageConfig());
 
     LOG.info("Executing Manifest Job Commit with manifests in {}",
         getJobAttemptDir());
@@ -119,10 +107,11 @@ public class RenameFilesStage extends
             .stream().map(FileOrDirEntry::getDest)
             .collect(Collectors.toList()));
 
-
     // save a snapshot of the IO Statistics
     success.setIOStatistics(snapshotIOStatistics(
         getIOStatistics()));
+    success.setSuccess(true);
+
     return success;
   }
 

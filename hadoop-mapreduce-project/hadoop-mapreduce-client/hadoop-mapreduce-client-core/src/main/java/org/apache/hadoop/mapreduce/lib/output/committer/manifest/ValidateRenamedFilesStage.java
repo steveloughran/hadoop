@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.FileOrDirEntry;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
@@ -41,6 +43,7 @@ import static org.apache.hadoop.thirdparty.com.google.common.collect.Iterables.c
  * Returns a list of all files committed.
  *
  * Its cost is one getFileStatus() call (parallelized) per file.
+ * Raises a {@link OutputValidationException} on a validation failure.
  */
 public class ValidateRenamedFilesStage extends
     AbstractJobCommitStage<List<TaskManifest>, List<FileOrDirEntry>> {
@@ -84,6 +87,12 @@ public class ValidateRenamedFilesStage extends
     return filesCommitted;
   }
 
+  /**
+   * Validate a file.
+   * @param entry entry to probe for
+   * @throws IOException IO problem.
+   * @throws OutputValidationException if the entry is not valid
+   */
   private void validateOneFile(FileOrDirEntry entry) throws IOException {
     if (halt.get()) {
       // told to stop
@@ -93,20 +102,28 @@ public class ValidateRenamedFilesStage extends
     progress();
     // look validate the file.
     // raising an FNFE if the file isn't there.
-    FileStatus st = getFileStatus(entry.getDestPath());
+    FileStatus st = null;
+    Path path = entry.getDestPath();
+    try {
+      st = getFileStatus(path);
 
-    // it must be a file
-    if (!st.isFile()) {
-      throw new PathIOException(st.getPath().toString(),
-          "Expected a file, found " + st);
-    }
-    // of the expected length
-    if (st.getLen() != entry.getSize()) {
-      throw new PathIOException(st.getPath().toString(),
-          String.format("Expected a file of length %s"
-                  + " but found a file of length %s",
-              entry.getSize(),
-              st.getLen()));
+      // it must be a file
+      if (!st.isFile()) {
+        throw new OutputValidationException(path,
+            "Expected a file, found " + st);
+      }
+      // of the expected length
+      if (st.getLen() != entry.getSize()) {
+        throw new OutputValidationException(path,
+            String.format("Expected a file of length %s"
+                    + " but found a file of length %s",
+                entry.getSize(),
+                st.getLen()));
+      }
+    } catch (FileNotFoundException e) {
+      // file didn't exist
+      throw new OutputValidationException(path,
+          "Expected a file, but it was not found", e);
     }
     synchronized (this) {
       filesCommitted.add(entry);

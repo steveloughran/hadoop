@@ -59,9 +59,8 @@ in the cluster FS. This may benefit azure, but will not benefit GCS.
 
 Suitably configured MR and Spark deployments will pick up the new committer.
 
-The committer can be used with any filesystem client which has a "real" file rename.
-
-
+The committer can be used with any filesystem client which has a "real" file rename where
+only one process may rename a file, and if it exists, then the caller is notified.
 
 
 
@@ -73,8 +72,7 @@ The full details are covered in [Manifest Committer Architecture](manifest_commi
 
 The hooks put in to support the S3A committers were designed to allow every
 filesystem schema to provide their own committer.
-See [Switching To an S3A Committer](../../hadoop-aws/tools/hadoop-aws/committers.htmml#Switching_to_an_S3A_Committer)
-https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/c
+See [Switching To an S3A Committer](../../hadoop-aws/tools/hadoop-aws/committers.html#Switching_to_an_S3A_Committer)
 
 A factory for the abfs schema would be defined in
 `mapreduce.outputcommitter.factory.scheme.abfs` ; and a similar one for `gcs`.
@@ -84,20 +82,44 @@ These can be done in
 `core-site.xml` or `spark-default`
 
 ```
-spark.sql.parquet.output.committer.class
-    org.apache.spark.internal.io.cloud.BindingParquetOutputCommitter
-spark.sql.sources.commitProtocolClass
-    org.apache.spark.internal.io.cloud.PathOutputCommitProtocol
+spark.sql.parquet.output.committer.class org.apache.spark.internal.io.cloud.BindingParquetOutputCommitter
+spark.sql.sources.commitProtocolClass org.apache.spark.internal.io.cloud.PathOutputCommitProtocol
 
 ```
 
 ## Verifying that the committer was used
 
-The new committer will write a JSON summary of the operation, including statistics, in the `_SUMMARY` file.
+The new committer will write a JSON summary of the operation, including statistics, in the `_SUCCESS` file.
 
 If this file exists and is zero bytes long: the classic `FileOutputCommitter` was used.
 
 If this file exists and is greater than zero bytes wrong, either the manifest committer was used,
 or in the case of S3A filesystems, one of the S3A committers. They all use the same JSON format.
 
+## Configuration options
 
+| Option | Meaning | Default Value |
+|--------|---------|---------------|
+| `mapreduce.manifest.committer.io.thread.count` | Thread count for parallel operations | `64` |
+| `mapreduce.manifest.committer.validate.output` | | `false` |
+| `mapreduce.manifest.committer.cleanup.move.to.trash` | | `false` |
+| `mapreduce.manifest.committer.cleanup.parallel.delete.attempt.directories` | | `true` |
+| `mapreduce.manifest.committer.summary.report.directory` | directory to save reports. | `""` |
+| `mapreduce.fileoutputcommitter.cleanup.skipped` | Skip cleanup of _temporary dirs| `false` |
+| `mapreduce.fileoutputcommitter.cleanup-failures.ignored` | | `false` |
+| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | | `true` |
+
+## Collecting Job Summaries into a report directory
+
+The committer can be configured to save the _SUCCESS summary files to a report directory,
+Irrespective of whether the job succeed or failed.
+
+`mapreduce.manifest.committer.summary.report.directory`
+
+If this is set to a path in the cluster FS/object store then after job commit
+succeeds/fails or after an abort() operation, a JSON file is created using the Job ID 
+in the filename.
+
+This allows for the statistics of jobs to be collected irrespective of their outcome,
+Whether or not saving the `_SUCCESS` marker is enabled, and without problems
+caused by a chain of queries overwriting the markers.

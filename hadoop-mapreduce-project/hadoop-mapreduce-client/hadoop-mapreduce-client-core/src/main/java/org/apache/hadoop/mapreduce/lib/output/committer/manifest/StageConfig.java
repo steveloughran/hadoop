@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.util.function.Consumer;
+
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
@@ -113,6 +115,11 @@ public class StageConfig {
    * Optional progress callback.
    */
   private Progressable progressable;
+
+  /**
+   * Callback when a stage is entered.
+   */
+  private Consumer<String> enterStageEventHandler;
 
   public StageConfig() {
   }
@@ -253,6 +260,24 @@ public class StageConfig {
     return this;
   }
 
+  /**
+   * Set handler for stage entry events..
+   * @param value new value
+   * @return the builder
+   */
+  public StageConfig withEnterStageEventHandler(Consumer<String> value) {
+    checkOpen();
+    enterStageEventHandler = value;
+    return this;
+  }
+
+  /**
+   * Handler for stage entry events.
+   * @return the handler.
+   */
+  public Consumer<String> getEnterStageEventHandler() {
+    return enterStageEventHandler;
+  }
 
   /**
    * IOStatistics to update.
@@ -401,5 +426,16 @@ public class StageConfig {
    */
   public Path getJobAttemptTaskSubDir() {
     return new Path(jobAttemptDir, PENDING_DIR_NAME);
+  }
+
+  /**
+   * Enter the stage; calls back to
+   * {@link #enterStageEventHandler} if non-null.
+   * @param stage stage entered
+   */
+  public void enterStage(String stage) {
+    if (enterStageEventHandler != null) {
+      enterStageEventHandler.accept(stage);
+    }
   }
 }

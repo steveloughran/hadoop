@@ -163,6 +163,7 @@ public abstract class AbstractJobCommitStage<IN, OUT>
   public final OUT apply(final IN arguments) throws IOException {
     executeOnlyOnce();
     progress();
+    getStageConfig().enterStage(stageStatisticName);
     try (DurationInfo ignored = new DurationInfo(LOG,
         false, "Executing stage %s", stageStatisticName)) {
       return trackDuration(getIOStatistics(), stageStatisticName, () ->
