@@ -39,7 +39,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.statistics.IOStatisticsSnapshot;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.util.JsonSerialization;
 
 /**
@@ -51,8 +50,7 @@ import org.apache.hadoop.util.JsonSerialization;
 @SuppressWarnings("unused")
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class TaskManifest extends AbstractManifestData<TaskManifest> implements
-    IOStatisticsSource {
+public class TaskManifest extends AbstractManifestData<TaskManifest> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TaskManifest.class);

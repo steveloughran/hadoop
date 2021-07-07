@@ -35,9 +35,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSnapshot;
-import org.apache.hadoop.fs.statistics.IOStatisticsSource;
+import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.util.JsonSerialization;
+
+import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 
 /**
  * Summary data saved into a {@code _SUCCESS} marker file.
@@ -60,8 +63,7 @@ import org.apache.hadoop.util.JsonSerialization;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public class ManifestSuccessData
-    extends AbstractManifestData<ManifestSuccessData>
-    implements IOStatisticsSource {
+    extends AbstractManifestData<ManifestSuccessData> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ManifestSuccessData.class);
@@ -278,7 +280,7 @@ public class ManifestSuccessData
    * Get a JSON serializer for this class.
    * @return a serializer.
    */
-  private static JsonSerialization<ManifestSuccessData> serializer() {
+  public static JsonSerialization<ManifestSuccessData> serializer() {
     return new JsonSerialization<>(ManifestSuccessData.class, false, true);
   }
 
@@ -376,7 +378,7 @@ public class ManifestSuccessData
    * @param key name
    * @param value value
    */
-  public void addDiagnostic(String key, String value) {
+  public void putDiagnostic(String key, String value) {
     diagnostics.put(key, value);
   }
 
@@ -406,7 +408,15 @@ public class ManifestSuccessData
     this.iostatistics = ioStatistics;
   }
 
-  public boolean isSuccess() {
+  /**
+   * Set the IOStatistics to a snapshot of the source.
+   * @param iostats. Statistics; may be null.
+   */
+  public void snapshotIOStatistics(IOStatistics iostats) {
+    setIOStatistics(IOStatisticsSupport.snapshotIOStatistics(iostats));
+  }
+
+  public boolean getSuccess() {
     return success;
   }
 
@@ -422,14 +432,6 @@ public class ManifestSuccessData
     this.state = state;
   }
 
-  public String getStage() {
-    return stage;
-  }
-
-  public void setStage(String stage) {
-    this.stage = stage;
-  }
-
   /**
    * Note a failure by setting success flag to false,
    * then add the exception to the diagnostics.
@@ -438,7 +440,7 @@ public class ManifestSuccessData
   public void jobFailure(Throwable t) {
     setSuccess(false);
     String stacktrace = ExceptionUtils.getStackTrace(t);
-    diagnostics.put("exception", t.toString());
-    diagnostics.put("stacktrace", stacktrace);
+    diagnostics.put(DiagnosticKeys.EXCEPTION, t.toString());
+    diagnostics.put(DiagnosticKeys.STACKTRACE, stacktrace);
   }
 }

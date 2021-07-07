@@ -19,7 +19,6 @@
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
 import java.io.IOException;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,19 +29,17 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.FileOrDirEntry;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_CLASSNAME;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.PRINCIPAL;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER_FILE_LIMIT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_RENAME_FILES;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createManifestOutcome;
 import static org.apache.hadoop.thirdparty.com.google.common.collect.Iterables.concat;
 
 /**
  * This stage renames all the files.
+ * It retuns a manifest success data file summarising the
+ * output, but does not add iostatistics to it.
  */
 public class RenameFilesStage extends
     AbstractJobCommitStage<List<TaskManifest>, ManifestSuccessData> {
@@ -50,11 +47,13 @@ public class RenameFilesStage extends
   private static final Logger LOG = LoggerFactory.getLogger(
       RenameFilesStage.class);
 
-
   /**
    * List of all files committed.
    */
   private List<FileOrDirEntry> filesCommitted = new ArrayList<>();
+
+  private int fileRenamedCount = 0;
+  private long totalFileSize = 0;
 
   public RenameFilesStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_RENAME_FILES, true);
@@ -77,7 +76,8 @@ public class RenameFilesStage extends
     // set the list of files to be as big as the number of tasks.
     filesCommitted = new ArrayList<>(taskManifests.size());
 
-    final ManifestSuccessData success = createManifestOutcome(getStageConfig());
+    final ManifestSuccessData success = createManifestOutcome(getStageConfig(),
+        OP_STAGE_JOB_COMMIT);
 
     LOG.info("Executing Manifest Job Commit with manifests in {}",
         getJobAttemptDir());
@@ -96,20 +96,17 @@ public class RenameFilesStage extends
         .stopOnFailure()
         .run(this::commitOneFile);
 
-    final int size = filesCommitted.size();
-    LOG.info("Files renamed: {}", size);
+    LOG.info("Files fileRenamedCount: {}. Total size {}",
+        fileRenamedCount, totalFileSize);
 
     // Add a subset of the destination files to the success file;
     // enough for simple testing
     success.getFilenames().addAll(
         filesCommitted
-            .subList(0, Math.min(size, SUCCESS_MARKER_FILE_LIMIT))
+            .subList(0, Math.min(fileRenamedCount, SUCCESS_MARKER_FILE_LIMIT))
             .stream().map(FileOrDirEntry::getDest)
             .collect(Collectors.toList()));
 
-    // save a snapshot of the IO Statistics
-    success.setIOStatistics(snapshotIOStatistics(
-        getIOStatistics()));
     success.setSuccess(true);
 
     return success;
@@ -127,9 +124,11 @@ public class RenameFilesStage extends
     // do the rename
     rename(entry.getSourcePath(), entry.getDestPath());
 
-    // update the list.
-    synchronized (filesCommitted) {
+    // update the list and IOStats
+    synchronized (this) {
       filesCommitted.add(entry);
+      fileRenamedCount++;
+      totalFileSize += entry.getSize();
     }
 
   }

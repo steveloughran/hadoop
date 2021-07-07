@@ -163,10 +163,11 @@ public abstract class AbstractJobCommitStage<IN, OUT>
   public final OUT apply(final IN arguments) throws IOException {
     executeOnlyOnce();
     progress();
-    getStageConfig().enterStage(stageStatisticName);
+    getStageConfig().enterStage(getStageName(arguments));
+    String statisticName = getStageStatisticName(arguments);
     try (DurationInfo ignored = new DurationInfo(LOG,
-        false, "Executing stage %s", stageStatisticName)) {
-      return trackDuration(getIOStatistics(), stageStatisticName, () ->
+        false, "Executing stage %s", statisticName)) {
+      return trackDuration(getIOStatistics(), statisticName, () ->
           executeStage(arguments));
     } finally {
       progress();
@@ -195,10 +196,21 @@ public abstract class AbstractJobCommitStage<IN, OUT>
 
   /**
    * The stage statistic name.
+   * @param arguments args to the invocation.
    * @return stage name.
    */
-  public String getStageStatisticName() {
+  protected String getStageStatisticName(IN arguments) {
     return stageStatisticName;
+  }
+
+  /**
+   * Stage name for reporting; defaults to
+   * call {@link #getStageStatisticName(IN)}.
+   * @param arguments args to the invocation.
+   * @return name used in updating reports.
+   */
+  protected String getStageName(IN arguments) {
+    return getStageStatisticName(arguments);
   }
 
   @Override
@@ -397,7 +409,7 @@ public abstract class AbstractJobCommitStage<IN, OUT>
   }
 
   /**
-   * Save a task manifest. This will be done by
+   * Save a task manifest or summary. This will be done by
    * writing to a temp path and then renaming.
    * If the destination path exists: Delete it.
    * @param manifestData the manifest/success file
@@ -405,7 +417,7 @@ public abstract class AbstractJobCommitStage<IN, OUT>
    * @param finalPath final path for rename.
    * @throws IOException failure to load/parse
    */
-  protected final void save(AbstractManifestData manifestData,
+  protected final <T extends AbstractManifestData> void save(T manifestData,
       final Path tempPath,
       final Path finalPath) throws IOException {
     LOG.trace("save('{}, {}, {}')", manifestData, tempPath, finalPath);
@@ -441,12 +453,12 @@ public abstract class AbstractJobCommitStage<IN, OUT>
         // rename failed, and the FS isn't telling us why.
         // lets see what happened.
         final FileStatus sourceStatus = getFileStatusOrNull(source);
-        final FileStatus deestStatus = getFileStatusOrNull(dest);
-        LOG.error("rename failure from {} to {}", sourceStatus, deestStatus);
+        final FileStatus destStatus = getFileStatusOrNull(dest);
+        LOG.error("rename failure from {} to {}", sourceStatus, destStatus);
         throw new PathIOException(source.toString(),
             "Failed to rename "
                 + source + " (" + sourceStatus + ")"
-                + " to " + dest + " (" + deestStatus + ")");
+                + " to " + dest + " (" + destStatus + ")");
       }
     });
 

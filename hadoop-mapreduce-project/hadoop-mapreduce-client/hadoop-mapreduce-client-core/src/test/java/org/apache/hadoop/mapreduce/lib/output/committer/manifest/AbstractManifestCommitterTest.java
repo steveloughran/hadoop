@@ -20,6 +20,7 @@ package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +50,6 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManif
 import org.apache.hadoop.util.DurationInfo;
 import org.apache.hadoop.util.Progressable;
 
-import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStatistics;
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
@@ -256,7 +256,7 @@ public abstract class AbstractManifestCommitterTest
   /**
    * @return IOStatistics for stage.
    */
-  protected IOStatisticsStore getStageStatistics() {
+  protected final IOStatisticsStore getStageStatistics() {
     return stageStatistics;
   }
 
@@ -264,14 +264,34 @@ public abstract class AbstractManifestCommitterTest
    * Set the statistics.
    * @param stageStatistics statistics.
    */
-  protected void setStageStatistics(IOStatisticsStore stageStatistics) {
+  protected final void setStageStatistics(IOStatisticsStore stageStatistics) {
     this.stageStatistics = stageStatistics;
   }
 
-
-  protected ProgressCounter getProgressCounter() {
+  /**
+   * Get the progress counter invoked during commit operations.
+   * @return progress counter.
+   */
+  protected final ProgressCounter getProgressCounter() {
     return progressCounter;
   }
+
+  /**
+   * Get the report directory.
+   * @return report directory.
+   */
+  public final File getReportDir() {
+    return reportDir;
+  }
+
+  /**
+   * Get the report directory as a URI.
+   * @return report directory.
+   */
+  public final URI getReportDirUri() {
+    return getReportDir().toURI();
+  }
+
 
   /**
    * Dump the filesystem statistics after the class.
@@ -295,7 +315,7 @@ public abstract class AbstractManifestCommitterTest
    * @return the list of paths
    * @throws IOException failure.
    */
-  public List<Path> createFiles(Path base,
+  public final List<Path> createFiles(Path base,
       String prefix,
       ExecutorService submit,
       int depth,
@@ -321,6 +341,8 @@ public abstract class AbstractManifestCommitterTest
       return result;
     }
   }
+
+  private final AtomicLong dataCounter = new AtomicLong();
 
   /**
    * Create the files; done in a treewalk and building up
@@ -359,7 +381,11 @@ public abstract class AbstractManifestCommitterTest
             String.format("%s-%04d", prefix,
                 CREATE_FILE_COUNTER.incrementAndGet()));
         Future<Path> f = submit.submit(() -> {
-          touch(getFileSystem(), file);
+          byte[] data = new byte[2];
+          long entry = dataCounter.incrementAndGet() & 0xffff;
+          data[0] = (byte)(entry & 0xff);
+          data[1] = (byte) ((entry & 0xff00) >> 8);
+          ContractTestUtils.createFile(getFileSystem(), file, true, data);
           return file;
         });
         futures.add(f);
@@ -482,7 +508,7 @@ public abstract class AbstractManifestCommitterTest
     conf.setBoolean(OPT_VALIDATE_OUTPUT, true);
 
     // and bind the report dir
-    conf.set(OPT_SUMMARY_REPORT_DIR, reportDir.toURI().toString());
+    conf.set(OPT_SUMMARY_REPORT_DIR, getReportDirUri().toString());
 
   }
 

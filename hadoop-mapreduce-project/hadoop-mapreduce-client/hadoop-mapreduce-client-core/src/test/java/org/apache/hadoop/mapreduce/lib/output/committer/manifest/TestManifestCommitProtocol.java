@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -70,28 +72,36 @@ import org.apache.hadoop.util.functional.RemoteIterators;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.listChildren;
-import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.assertThatStatisticCounter;
+import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.verifyStatisticCounterValue;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsSourceToString;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
 import static org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory.COMMITTER_FACTORY_CLASS;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_FACTORY;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SPARK_WRITE_UUID;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_BYTES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_FILES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_LOAD_MANIFEST;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_ABORT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createJobSummaryFilename;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.randomJobId;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.validateSuccessFile;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
- * This is a contract test for the commit protocol on a target filesystem. 
+ * This is a contract test for the commit protocol on a target filesystem.
+ * It is subclassed in the ABFS integration tests.
  */
-public abstract class AbstractManifestCommitProtocolTest
+public class TestManifestCommitProtocol
     extends AbstractManifestCommitterTest {
 
   private Path outDir;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractManifestCommitProtocolTest.class);
+      LoggerFactory.getLogger(TestManifestCommitProtocol.class);
 
   private static final String SUB_DIR = "SUB_DIR";
 
@@ -100,7 +110,9 @@ public abstract class AbstractManifestCommitProtocolTest
 
   private final String jobId;
 
-  // A random task attempt id for testing.
+  /**
+   * A random task attempt id for testing.
+   */
   private final String attempt0;
 
   private final TaskAttemptID taskAttempt0;
@@ -120,8 +132,12 @@ public abstract class AbstractManifestCommitProtocolTest
   /** A job to abort in test case teardown. */
   private List<JobData> abortInTeardown = new ArrayList<>(1);
 
-  private final StandardCommitterFactory
-      standardCommitterFactory = new StandardCommitterFactory();
+  /**
+   * Committer factory which calls back into
+   * {@link #createCommitter(Path, TaskAttemptContext)}.
+   */
+  private final LocalCommitterFactory
+      localCommitterFactory = new LocalCommitterFactory();
 
   private void cleanupDestDir() throws IOException {
     if (outDir != null) {
@@ -139,7 +155,7 @@ public abstract class AbstractManifestCommitProtocolTest
   /**
    * Constructor.
    */
-  protected AbstractManifestCommitProtocolTest() {
+  public TestManifestCommitProtocol() {
     ManifestCommitterTestSupport.JobAndTaskIDsForTests taskIDs
         = new ManifestCommitterTestSupport.JobAndTaskIDsForTests(2, 2);
     jobId = taskIDs.getJobId();
@@ -150,11 +166,12 @@ public abstract class AbstractManifestCommitProtocolTest
   }
 
   /**
-   * This must return the name of a suite which is unique to the non-abstract
-   * test.
+   * This must return the name of a suite which is unique to the test.
    * @return a string which must be unique and a valid path.
    */
-  protected abstract String suitename();
+  protected String suitename() {
+    return "TestManifestCommitProtocolLocalFS";
+  }
 
   /**
    * Get the log; can be overridden for test case log.
@@ -302,12 +319,12 @@ public abstract class AbstractManifestCommitProtocolTest
    * The normal committer creation factory, uses the abstract methods
    * in the class.
    */
-  public class StandardCommitterFactory implements CommitterFactory {
+  public class LocalCommitterFactory implements CommitterFactory {
 
     @Override
     public ManifestCommitter createCommitter(TaskAttemptContext context)
         throws IOException {
-      return AbstractManifestCommitProtocolTest.this
+      return TestManifestCommitProtocol.this
           .createCommitter(context);
     }
   }
@@ -446,6 +463,10 @@ public abstract class AbstractManifestCommitProtocolTest
       this.committer = committer;
       conf = job.getConfiguration();
     }
+
+    public String jobId() {
+      return committer.getJobUniqueId();
+    }
   }
 
   /**
@@ -493,7 +514,7 @@ public abstract class AbstractManifestCommitProtocolTest
    */
   protected JobData startJob(boolean writeText)
       throws IOException, InterruptedException {
-    return startJob(standardCommitterFactory, writeText);
+    return startJob(localCommitterFactory, writeText);
   }
 
   /**
@@ -732,13 +753,17 @@ public abstract class AbstractManifestCommitProtocolTest
    * @param expectSuccessMarker check the success marker?
    * @param expectedJobId job ID, verified if non-empty and success data loaded
    * @throws Exception failure.
+   * @return the success data
    */
-  private void validateContent(Path dir,
+  private ManifestSuccessData validateContent(Path dir,
       boolean expectSuccessMarker,
       String expectedJobId) throws Exception {
     lsR(getFileSystem(), dir, true);
+    ManifestSuccessData successData;
     if (expectSuccessMarker) {
-      ManifestSuccessData successData = verifySuccessMarker(dir, expectedJobId);
+      successData = verifySuccessMarker(dir, expectedJobId);
+    } else {
+      successData = null;
     }
     Path expectedFile = getPart0000(dir);
     log().debug("Validating content in {}", expectedFile);
@@ -752,6 +777,7 @@ public abstract class AbstractManifestCommitProtocolTest
     String output = readFile(expectedFile);
     assertEquals("Content of " + expectedFile,
         expectedOutput.toString(), output);
+    return successData;
   }
 
 
@@ -809,8 +835,7 @@ public abstract class AbstractManifestCommitProtocolTest
         " start job, task, write, commit task, commit job.\n" +
         "Verify:\n" +
         "* no files are visible after task commit\n" +
-        "* the expected file is visible after job commit\n" +
-        "* no outstanding MPUs after job commit");
+        "* the expected file is visible after job commit\n");
     JobData jobData = startJob(false);
     JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
@@ -833,9 +858,10 @@ public abstract class AbstractManifestCommitProtocolTest
         committer.getTaskAttemptCommittedManifest(), "committerTaskManifest");
     final String manifestJSON = taskManifest.toJson();
     LOG.info("Task manifest {}", manifestJSON);
+    int filesCreated = 1;
     Assertions.assertThat(taskManifest.getFilesToCommit())
         .describedAs("Files to commit in task manifest %s", manifestJSON)
-        .hasSize(1);
+        .hasSize(filesCreated);
     Assertions.assertThat(taskManifest.getDirectoriesToCreate())
         .describedAs("Directories to create in task manifest %s",
             manifestJSON)
@@ -858,9 +884,61 @@ public abstract class AbstractManifestCommitProtocolTest
 
     // validate output
     describe("4. Validating content");
-    validateContent(outDir, shouldExpectSuccessMarker(),
-        committer.getJobUniqueId());
+    String jobUniqueId = jobData.jobId();
+    ManifestSuccessData successData = validateContent(outDir,
+        true,
+        jobUniqueId);
+    // look in the SUMMARY
+    Assertions.assertThat(successData.getDiagnostics().get(STAGE))
+        .describedAs("Stage entry in SUCCESS")
+        .isEqualTo(OP_STAGE_JOB_COMMIT);
+    IOStatisticsSnapshot jobStats = successData.getIOStatistics();
+    // manifest
+    verifyStatisticCounterValue(jobStats,
+        OP_LOAD_MANIFEST, 1);
+    FileStatus st = getFileSystem().getFileStatus(getPart0000(outDir));
+    verifyStatisticCounterValue(jobStats,
+        COMMITTER_FILES_COMMITTED_COUNT, filesCreated);
+    verifyStatisticCounterValue(jobStats,
+        COMMITTER_BYTES_COMMITTED_COUNT, st.getLen());
 
+    // now load an examine the job report.
+    // this MUST contain all the stats of the summary, plus timings on job commit itself
+
+    ManifestSuccessData report = loadReport(jobUniqueId, true);
+    Map<String, String> diag = report.getDiagnostics();
+    Assertions.assertThat(diag.get(STAGE))
+        .describedAs("Stage entry in report")
+        .isEqualTo(OP_STAGE_JOB_COMMIT);
+    IOStatisticsSnapshot reportStats = report.getIOStatistics();
+    verifyStatisticCounterValue(reportStats,
+        OP_LOAD_MANIFEST, 1);
+    verifyStatisticCounterValue(reportStats,
+        OP_STAGE_JOB_COMMIT, 1);
+    verifyStatisticCounterValue(reportStats,
+        COMMITTER_FILES_COMMITTED_COUNT, filesCreated);
+    verifyStatisticCounterValue(reportStats,
+        COMMITTER_BYTES_COMMITTED_COUNT, st.getLen());
+
+  }
+
+  /**
+   * Load a summary from the report dir.
+   * @param jobUniqueId job ID
+   * @param expectSuccess is the job expected to have succeeded.
+   * @throws IOException failure to load
+   * @return the report
+   */
+  private ManifestSuccessData loadReport(String jobUniqueId,
+      boolean expectSuccess) throws IOException {
+    File file = new File(getReportDir(),
+        createJobSummaryFilename(jobUniqueId));
+    ManifestSuccessData report = ManifestSuccessData.serializer().load(file);
+    LOG.info("Report for job {}:\n{}", jobUniqueId, report.toJson());
+    Assertions.assertThat(report.getSuccess())
+        .describedAs("success flag in report")
+        .isEqualTo(expectSuccess);
+    return report;
   }
 
   @Test
@@ -915,7 +993,7 @@ public abstract class AbstractManifestCommitProtocolTest
     TaskAttemptContext tContext2 = new TaskAttemptContextImpl(
         conf2, ta2);
 
-    ManifestCommitter committer2 = standardCommitterFactory
+    ManifestCommitter committer2 = localCommitterFactory
         .createCommitter(tContext2);
     setupCommitter(committer2, tContext2);
 
@@ -1237,6 +1315,16 @@ public abstract class AbstractManifestCommitProtocolTest
     assertTaskAttemptPathDoesNotExist(committer, tContext);
     assertJobAttemptPathDoesNotExist(committer, jContext);
 
+    // verify a failure report
+    ManifestSuccessData report = loadReport(jobData.jobId(), false);
+    Map<String, String> diag = report.getDiagnostics();
+    Assertions.assertThat(diag.get(STAGE))
+        .describedAs("Stage entry in report")
+        .isEqualTo(OP_STAGE_JOB_ABORT);
+   IOStatisticsSnapshot reportStats = report.getIOStatistics();
+   verifyStatisticCounterValue(reportStats,
+       OP_STAGE_JOB_ABORT, 1);
+
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
 
@@ -1417,13 +1505,10 @@ public abstract class AbstractManifestCommitProtocolTest
     // at this point the committer tasks stats should be current.
     IOStatisticsSnapshot snapshot = new IOStatisticsSnapshot(
         committer.getIOStatistics());
-    String commitsCompleted = COMMITTER_TASKS_COMPLETED;
+    String commitsCompleted = COMMITTER_TASKS_COMPLETED_COUNT;
     LOG.info("after task commit {}", ioStatisticsToPrettyString(snapshot));
-/*
-    assertThatStatisticCounter(snapshot, commitsCompleted)
-        .describedAs("task commit count")
-        .isEqualTo(1L);
-*/
+    verifyStatisticCounterValue(snapshot,
+        commitsCompleted, 1);
     final TaskManifest manifest = loadManifest(
         committer.getTaskManifestPath(tContext));
     LOG.info("Manifest {}", manifest.toJson());
@@ -1441,9 +1526,8 @@ public abstract class AbstractManifestCommitProtocolTest
     // the task commit count should get through the job commit
     IOStatisticsSnapshot successStats = successData.getIOStatistics();
     LOG.info("loaded statistics {}", successStats);
-    assertThatStatisticCounter(successStats, commitsCompleted)
-        .describedAs("task commit count")
-        .isEqualTo(1L);
+    verifyStatisticCounterValue(successStats,
+        commitsCompleted, 1);
   }
 
   /**

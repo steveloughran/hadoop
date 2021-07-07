@@ -101,25 +101,29 @@ or in the case of S3A filesystems, one of the S3A committers. They all use the s
 | Option | Meaning | Default Value |
 |--------|---------|---------------|
 | `mapreduce.manifest.committer.io.thread.count` | Thread count for parallel operations | `64` |
-| `mapreduce.manifest.committer.validate.output` | | `false` |
-| `mapreduce.manifest.committer.cleanup.move.to.trash` | | `false` |
-| `mapreduce.manifest.committer.cleanup.parallel.delete.attempt.directories` | | `true` |
+| `mapreduce.manifest.committer.validate.output` | Perform output validation | `false` |
+| `mapreduce.manifest.committer.cleanup.move.to.trash` | Move the job attempt directory to `~/.trash` | `false` |
+| `mapreduce.manifest.committer.cleanup.parallel.delete.attempt.directories` | Delete task attempt directories in parallel | `true` |
 | `mapreduce.manifest.committer.summary.report.directory` | directory to save reports. | `""` |
 | `mapreduce.fileoutputcommitter.cleanup.skipped` | Skip cleanup of _temporary dirs| `false` |
-| `mapreduce.fileoutputcommitter.cleanup-failures.ignored` | | `false` |
-| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | | `true` |
+| `mapreduce.fileoutputcommitter.cleanup-failures.ignored` | Ignore errors during cleanup | `false` |
+| `mapreduce.fileoutputcommitter.marksuccessfuljobs` | Create a `_SUCCESS` marker file on successful completion. (and delete any existing one in job setup) | `true` |
 
 ## Collecting Job Summaries into a report directory
 
-The committer can be configured to save the _SUCCESS summary files to a report directory,
+The committer can be configured to save the `_SUCCESS` summary files to a report directory,
 Irrespective of whether the job succeed or failed.
 
 `mapreduce.manifest.committer.summary.report.directory`
 
 If this is set to a path in the cluster FS/object store then after job commit
-succeeds/fails or after an abort() operation, a JSON file is created using the Job ID 
+succeeds/fails or after an `abort()` operation, a JSON file is created using the Job ID 
 in the filename.
 
 This allows for the statistics of jobs to be collected irrespective of their outcome,
 Whether or not saving the `_SUCCESS` marker is enabled, and without problems
 caused by a chain of queries overwriting the markers.
+
+## Validating output
+
+The option `mapreduce.manifest.committer.validate.output` 

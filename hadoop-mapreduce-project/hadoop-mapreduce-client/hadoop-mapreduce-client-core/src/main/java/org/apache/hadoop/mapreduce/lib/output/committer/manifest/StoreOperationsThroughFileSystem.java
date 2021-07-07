@@ -88,7 +88,7 @@ public class StoreOperationsThroughFileSystem implements StoreOperations {
   }
 
   @Override
-  public void save(final AbstractManifestData manifestData,
+  public <T extends AbstractManifestData<T>> void save(T manifestData,
       final Path path, boolean overwrite) throws IOException {
     manifestData.save(fs, path, overwrite);
   }

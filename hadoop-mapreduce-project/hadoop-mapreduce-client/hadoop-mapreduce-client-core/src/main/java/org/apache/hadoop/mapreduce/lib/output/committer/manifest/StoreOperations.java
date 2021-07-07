@@ -102,7 +102,7 @@ public interface StoreOperations extends Closeable {
    * @param overwrite should create(overwrite=true) be used?
    * @throws IOException failure to load/parse
    */
-  void save(AbstractManifestData manifestData,
+  <T extends AbstractManifestData<T>> void save(T manifestData,
       Path path, boolean overwrite) throws IOException;
 
   /**

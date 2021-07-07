@@ -67,7 +67,7 @@ public class StubStoreOperations implements StoreOperations {
   }
 
   @Override
-  public void save(final AbstractManifestData manifestData,
+  public <T extends AbstractManifestData<T>> void save(T manifestData,
       final Path path,
       final boolean overwrite) throws IOException {
 

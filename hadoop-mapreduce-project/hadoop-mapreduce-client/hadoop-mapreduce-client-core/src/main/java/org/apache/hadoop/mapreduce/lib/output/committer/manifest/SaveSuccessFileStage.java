@@ -46,6 +46,17 @@ public class SaveSuccessFileStage extends
     super(false, stageConfig, OP_STAGE_JOB_SAVE_SUCCESS, false);
   }
 
+  /**
+   * Stage name is always job commit.
+   * @param arguments args to the invocation.
+   * @return stage name
+   */
+  @Override
+  protected String getStageName(ManifestSuccessData arguments) {
+    // set it to the job commit stage, always.
+    return OP_STAGE_JOB_COMMIT;
+  }
+
   @Override
   protected Path executeStage(final ManifestSuccessData successData)
       throws IOException {
@@ -56,8 +67,6 @@ public class SaveSuccessFileStage extends
     Path successTempFile = new Path(jobAttemptDir, SUCCESS_MARKER + TMP_SUFFIX);
     LOG.debug("Saving _SUCCESS file to {} via {}", successFile,
         successTempFile);
-    // set it to the job commit stage, always.
-    successData.setStage(OP_STAGE_JOB_COMMIT);
     save(successData, successTempFile, successFile);
     return successFile;
   }

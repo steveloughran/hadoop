@@ -19,6 +19,7 @@
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +41,13 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.logIOStatistic
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.CleanupJobStage.cleanupStageOptionsFromConfig;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_SUFFIX;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_SUMMARY_REPORT_DIR;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_FAILED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_CLEANUP;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_ABORT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createIOStatisticsStore;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createJobSummaryFilename;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createManifestOutcome;
 
 /**
@@ -85,7 +90,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
    *  The job Manifest Success data; only valid after a job successfully
    *  commits.
    */
-  private ManifestSuccessData successData;
+  private Optional<ManifestSuccessData> successData = Optional.empty();
 
   /**
    * The active stage; is updated by a callback from within the stages.
@@ -233,10 +238,15 @@ public class ManifestCommitter extends PathOutputCommitter implements
     StageConfig stageConfig = committerConfig.createJobStageConfig()
         .withOperations(createStoreOperations())
         .build();
-    taskAttemptCommittedManifest = new CommitTaskStage(stageConfig)
-        .apply("generate")
-        .getRight();
-    iostatistics.incrementCounter(COMMITTER_TASKS_COMPLETED, 1);
+    try {
+      taskAttemptCommittedManifest = new CommitTaskStage(stageConfig)
+          .apply("generate")
+          .getRight();
+      iostatistics.incrementCounter(COMMITTER_TASKS_COMPLETED_COUNT, 1);
+    } catch (IOException e) {
+      iostatistics.incrementCounter(COMMITTER_TASKS_FAILED_COUNT, 1);
+
+    }
     logCommitterStatisticsAtDebug();
   }
 
@@ -261,13 +271,14 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * @param committerConfig source config.
    * @return the current {@link #successData} value; never null.
    */
-  private ManifestSuccessData maybeCreateJobSuccessData(
+  private ManifestSuccessData getOrCreateSuccessData(
       ManifestCommitterConfig committerConfig) {
-    if (successData == null) {
-      successData = createManifestOutcome(
-          committerConfig.createJobStageConfig());
+    if (!successData.isPresent()) {
+      successData = Optional.of(
+          createManifestOutcome(
+              committerConfig.createJobStageConfig(), activeStage));
     }
-    return successData;
+    return successData.get();
   }
 
   /**
@@ -283,7 +294,12 @@ public class ManifestCommitter extends PathOutputCommitter implements
     ManifestCommitterConfig committerConfig = createCommitterConfig(false,
         jobContext);
 
-    maybeCreateJobSuccessData(committerConfig);
+    // create the initial success data.
+    // this is overwritten by that created during the operation sequence,
+    // but if the sequence fails before that happens, it
+    // will be saved to the report directory.
+    ManifestSuccessData marker = getOrCreateSuccessData(committerConfig);
+
     try (CloseableTaskSubmitter ioProcs =
              committerConfig.createSubmitter();
          StoreOperations storeOperations = createStoreOperations()) {
@@ -296,28 +312,32 @@ public class ManifestCommitter extends PathOutputCommitter implements
       // commit the the manifests
       CommitJobStage.Result result = new CommitJobStage(stageConfig)
           .apply(committerConfig.getCreateJobMarker());
-      successData = result.getJobSuccessData();
+      marker = result.getJobSuccessData();
+      successData = Optional.of(marker);
+      String stage = activeStage;
 
       // clean up job attempt dir if not disabled
       // note: it's a no-op if the options don't say "enabled"
       new CleanupJobStage(stageConfig).apply(
           cleanupStageOptionsFromConfig(
-              jobContext.getConfiguration()));
+              OP_STAGE_JOB_CLEANUP, jobContext.getConfiguration()));
 
       // and then, after everything else: validate.
 
       if (committerConfig.getValidateOutput()) {
+        // cache and restore the active stage field
         LOG.info("Validating output.");
         new ValidateRenamedFilesStage(stageConfig)
             .apply(result.getManifests());
       }
+      enterStage(stage);
     } catch (IOException e){
       // failure.
-      successData.jobFailure(e);
+      marker.jobFailure(e);
       throw e;
     } finally {
       maybeSaveSummary(committerConfig,
-          successData,
+          marker,
           true);
       // print job commit stats
       LOG.info("Job Commit statistics {}",
@@ -327,11 +347,12 @@ public class ManifestCommitter extends PathOutputCommitter implements
 
   /**
    * Abort the job.
-   * Invokes {@link #cleanupJob(JobContext)} operation then
-   * saves the (ongoing) job success data if reporting is enabled.
+   * Invokes
+   * {@link #executeCleanup(String, JobContext, ManifestCommitterConfig)}
+   * then saves the (ongoing) job report data if reporting is enabled.
    * @param jobContext Context of the job whose output is being written.
    * @param state final runstate of the job
-   * @throws IOException
+   * @throws IOException failure during cleanup; report failure are swallowed
    */
   @Override
   public void abortJob(final JobContext jobContext,
@@ -339,19 +360,17 @@ public class ManifestCommitter extends PathOutputCommitter implements
       throws IOException {
     ManifestCommitterConfig committerConfig = createCommitterConfig(false,
         jobContext);
-    maybeCreateJobSuccessData(committerConfig);
+    ManifestSuccessData report = getOrCreateSuccessData(
+        committerConfig);
 
     try {
-      cleanupJob(jobContext);
+      executeCleanup(OP_STAGE_JOB_ABORT, jobContext, committerConfig);
     } catch (IOException e) {
       // failure.
-      successData.jobFailure(e);
+      report.jobFailure(e);
     } finally {
-      successData.setSuccess(false);
-      successData.setStage(OP_STAGE_JOB_ABORT);
-      maybeSaveSummary(committerConfig,
-          successData,
-          true);
+      report.setSuccess(false);
+      maybeSaveSummary(committerConfig, report, true);
     }
     // print job stats
     LOG.info("Job Abort statistics {}",
@@ -369,17 +388,33 @@ public class ManifestCommitter extends PathOutputCommitter implements
   public void cleanupJob(final JobContext jobContext) throws IOException {
     ManifestCommitterConfig committerConfig = createCommitterConfig(false,
         jobContext);
+    executeCleanup(OP_STAGE_JOB_CLEANUP, jobContext, committerConfig);
+    logCommitterStatisticsAtDebug();
+  }
+
+  /**
+   * Perform the cleanup operation for job cleanup or abort.
+   * @param statisticName statistic/stage name
+   * @param jobContext job context
+   * @param committerConfig committer config
+   * @throws IOException failure
+   * @return the outcome
+   */
+  private CleanupJobStage.CleanupResult executeCleanup(
+      final String statisticName,
+      final JobContext jobContext,
+      final ManifestCommitterConfig committerConfig) throws IOException {
     try (CloseableTaskSubmitter ioProcs =
              committerConfig.createSubmitter()) {
 
-      new CleanupJobStage(committerConfig
+      return new CleanupJobStage(committerConfig
           .createJobStageConfig()
           .withOperations(createStoreOperations())
           .withIOProcessors(ioProcs).build())
           .apply(cleanupStageOptionsFromConfig(
+              statisticName,
               jobContext.getConfiguration()));
     }
-    logCommitterStatisticsAtDebug();
   }
 
   /**
@@ -413,6 +448,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
    */
   public void enterStage(String stage) {
     activeStage = stage;
+    successData.ifPresent(s -> s.putDiagnostic(STAGE, stage));
   }
 
   String getJobUniqueId() {
@@ -427,7 +463,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * Get the manifest Success data; only valid after a job.
    * @return the job _SUCCESS data, or null.
    */
-  ManifestSuccessData getSuccessData() {
+  Optional<ManifestSuccessData> getSuccessData() {
     return successData;
   }
 
@@ -509,7 +545,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
   /**
    * Save a summary to the report dir if the config option
    * is set.
-   * @param operations store operations to use.
+   * The IOStatistics of the summary will be updated to the latest
+   * snapshot of the committer's statistics, so the summary is up
+   * to date.
+   *
    * @param config configuration to use.
    * @param summary summary file.
    * @param quiet should exceptions be swallowed.
@@ -525,10 +564,12 @@ public class ManifestCommitter extends PathOutputCommitter implements
     if (reportDir.isEmpty()) {
       return null;
     }
+    // update to the latest statistics
+    summary.snapshotIOStatistics(getIOStatistics());
+
     Path reportDirPath = new Path(reportDir);
     Path path = new Path(reportDirPath,
-        String.format("summary-%s.json",
-            config.getJobUniqueId()));
+        createJobSummaryFilename(config.getJobUniqueId()));
     try (StoreOperations operations =
              new StoreOperationsThroughFileSystem(path.getFileSystem(conf))) {
       operations.save(summary, path, true);
@@ -542,5 +583,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
         throw e;
       }
     }
+  }
+
+  @Override
+  public IOStatisticsStore getIOStatistics() {
+    return iostatistics;
   }
 }

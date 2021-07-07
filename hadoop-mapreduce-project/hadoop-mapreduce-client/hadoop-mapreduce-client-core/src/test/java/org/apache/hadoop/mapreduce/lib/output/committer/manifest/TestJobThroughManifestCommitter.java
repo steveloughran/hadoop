@@ -32,19 +32,26 @@ import org.junit.runners.MethodSorters;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.PathIOException;
+import org.apache.hadoop.fs.statistics.IOStatisticsSnapshot;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.FileOrDirEntry;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.rm;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.verifyPathExists;
+import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.assertThatStatisticCounter;
+import static org.apache.hadoop.fs.statistics.IOStatisticAssertions.verifyStatisticCounterValue;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_ID_SOURCE_MAPREDUCE;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_CLASSNAME;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.PRINCIPAL;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_BYTES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_FILES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_CLEANUP;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.manifestPathForTask;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.PRINCIPAL;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
@@ -64,9 +71,11 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 public class TestJobThroughManifestCommitter
     extends AbstractManifestCommitterTest {
 
-  private ManifestCommitterSupport.AttemptDirectories dirs;
-
+  /** Destination directory. */
   private Path destDir;
+
+  /** directory names for the tests. */
+  private ManifestCommitterSupport.AttemptDirectories dirs;
 
   /**
    * To ensure that the local FS has a shared root path, this is static.
@@ -421,23 +430,6 @@ public class TestJobThroughManifestCommitter
     ManifestSuccessData successData = ManifestSuccessData.load(
         getFileSystem(),
         ta00Config.getJobSuccessMarkerPath());
-    String json = successData.toJson();
-    LOG.info("Success data is {}", json);
-    Assertions.assertThat(successData)
-        .describedAs("Manifest " + json)
-        .returns(NetUtils.getLocalHostname(),
-            ManifestSuccessData::getHostname)
-        .returns(MANIFEST_COMMITTER_CLASSNAME,
-            ManifestSuccessData::getCommitter)
-        .returns(jobId,
-            ManifestSuccessData::getJobId)
-        .returns(JOB_ID_SOURCE_MAPREDUCE,
-            ManifestSuccessData::getJobIdSource);
-    String userName = UserGroupInformation.getCurrentUser()
-        .getShortUserName();
-    Assertions.assertThat(successData.getDiagnostics())
-        .hasEntrySatisfying(PRINCIPAL, v ->
-            v.equals(userName));
 
     // load manifests stage will load all the task manifests again
     List<TaskManifest> manifests = new LoadManifestsStage(jobStageConfig)
@@ -478,21 +470,69 @@ public class TestJobThroughManifestCommitter
   }
 
   @Test
+  public void test_0430_validateStatistics() throws Throwable {
+    // load in the success data.
+    ManifestSuccessData successData = ManifestSuccessData.load(
+        getFileSystem(),
+        ta00Config.getJobSuccessMarkerPath());
+    String json = successData.toJson();
+    LOG.info("Success data is {}", json);
+    Assertions.assertThat(successData)
+        .describedAs("Manifest " + json)
+        .returns(NetUtils.getLocalHostname(),
+            ManifestSuccessData::getHostname)
+        .returns(MANIFEST_COMMITTER_CLASSNAME,
+            ManifestSuccessData::getCommitter)
+        .returns(jobId,
+            ManifestSuccessData::getJobId)
+        .returns(true,
+            ManifestSuccessData::getSuccess)
+        .returns(JOB_ID_SOURCE_MAPREDUCE,
+            ManifestSuccessData::getJobIdSource);
+    // diagnostics
+    Assertions.assertThat(successData.getDiagnostics())
+        .containsEntry(PRINCIPAL,
+            getCurrentUser().getShortUserName())
+        .containsEntry(STAGE, OP_STAGE_JOB_COMMIT);
+
+    // and stats
+    IOStatisticsSnapshot iostats = successData.getIOStatistics();
+
+    int files = successData.getFilenames().size();
+    verifyStatisticCounterValue(iostats,
+        OP_STAGE_JOB_COMMIT, 1);
+    assertThatStatisticCounter(iostats,
+        COMMITTER_FILES_COMMITTED_COUNT)
+        .isGreaterThanOrEqualTo(files);
+    Long totalFiles = iostats.counters().get(COMMITTER_FILES_COMMITTED_COUNT);
+    verifyStatisticCounterValue(iostats,
+        COMMITTER_BYTES_COMMITTED_COUNT, totalFiles * 2);
+
+  }
+
+  @Test
   public void test_0900_cleanupJob() throws Throwable {
     describe("Cleanup job");
+    CleanupJobStage.Options arguments = new CleanupJobStage.Options(
+        OP_STAGE_JOB_CLEANUP, true, true, false, false);
     CleanupJobStage.CleanupResult result = new CleanupJobStage(
-        jobStageConfig).apply(
-        new CleanupJobStage.Options(true, true, false, false));
+        jobStageConfig).apply(arguments);
+
+    // the first run will list the three task attempt dirs and delete each
+    // one before the toplevel dir.
     Assertions.assertThat(result)
         .matches(r -> !r.wasSkipped(), "was skipped")
         .matches(r -> !r.wasRenamed(), "was renamed")
         .extracting(CleanupJobStage.CleanupResult::getDeleteCalls)
-        .isEqualTo(1);
+        .isEqualTo(1 + 3);
     assertPathDoesNotExist("Job attempt dir", result.getDirectory());
 
     // not an error if we retry and the dir isn't there
-    new CleanupJobStage(jobStageConfig).apply(
-        new CleanupJobStage.Options(true, true, false, false));
+    result = new CleanupJobStage(jobStageConfig).apply(arguments);
+    // and a delete call on the root was still issued.
+    Assertions.assertThat(result)
+        .extracting(CleanupJobStage.CleanupResult::getDeleteCalls)
+        .isEqualTo(1);
   }
 
   @Test

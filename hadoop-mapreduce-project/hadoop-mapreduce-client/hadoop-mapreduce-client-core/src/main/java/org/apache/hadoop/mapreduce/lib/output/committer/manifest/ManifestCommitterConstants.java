@@ -27,16 +27,18 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_GET_FILE_ST
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_IS_DIRECTORY;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_LIST_STATUS;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_MKDIRS;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_BYTES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_FILES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_FAILED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_CREATE_DIRECTORIES;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_CREATE_ONE_DIRECTORY;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_DIRECTORY_SCAN;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_JOB_COMMITTED_BYTES;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_JOB_COMMITTED_FILES;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_LOAD_ALL_MANIFESTS;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_LOAD_MANIFEST;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_RENAME_FILE;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_SAVE_TASK_MANIFEST;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_ABORT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_CLEANUP;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_CREATE_TARGET_DIRS;
@@ -61,11 +63,24 @@ public final class ManifestCommitterConstants {
   private ManifestCommitterConstants() {
   }
 
+
   /**
    * Suffix to use in manifest files in the job attempt dir.
    * Value: {@value}.
    */
   public static final String MANIFEST_SUFFIX = "-manifest.json";
+
+  /**
+   * Prefix for summary files in the report dir. Call
+   */
+  public static final String SUMMARY_FILENAME_PREFIX = "summary-";
+
+  /**
+   * Format string used to build a summary file from a Job ID.
+   */
+  public static final String SUMMARY_FILENAME_FORMAT = SUMMARY_FILENAME_PREFIX +
+      "%s.json";
+
 
   /**
    * Suffix to use for temp files before renaming them.
@@ -103,6 +118,7 @@ public final class ManifestCommitterConstants {
   public static final String[] DURATION_STATISTICS = {
 
       /* Job stages. */
+      OP_STAGE_JOB_ABORT,
       OP_STAGE_JOB_CLEANUP,
       OP_STAGE_JOB_COMMIT,
       OP_STAGE_JOB_CREATE_TARGET_DIRS,
@@ -143,10 +159,10 @@ public final class ManifestCommitterConstants {
    * Counters.
    */
   public static final String[] COUNTER_STATISTICS = {
-      COMMITTER_TASKS_COMPLETED,
-
-      OP_JOB_COMMITTED_BYTES,
-      OP_JOB_COMMITTED_FILES
+      COMMITTER_BYTES_COMMITTED_COUNT,
+      COMMITTER_FILES_COMMITTED_COUNT,
+      COMMITTER_TASKS_COMPLETED_COUNT,
+      COMMITTER_TASKS_FAILED_COUNT
   };
 
   /**
@@ -255,12 +271,6 @@ public final class ManifestCommitterConstants {
    */
   public static final String MANIFEST_COMMITTER_FACTORY
       = "org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterFactory";
-
-
-  /**
-   * Attribute added to diagnostics in _SUCCESS file.
-   */
-  public static final String PRINCIPAL = "principal";
 
   /**
    * Error string from ABFS connector on timeout.

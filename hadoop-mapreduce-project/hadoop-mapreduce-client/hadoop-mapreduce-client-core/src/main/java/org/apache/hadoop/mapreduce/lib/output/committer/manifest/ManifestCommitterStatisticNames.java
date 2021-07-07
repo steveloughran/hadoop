@@ -26,18 +26,24 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_RENAME;
 
 /**
  * Statistic names for committers.
+ * Please keep in sync with org.apache.hadoop.fs.s3a.Statistic
+ * so that S3A and manifest committers are in sync.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public class ManifestCommitterStatisticNames {
 
   /** "Count of successful tasks:: {@value}. */
-  public static final String COMMITTER_TASKS_COMPLETED =
+  public static final String COMMITTER_TASKS_COMPLETED_COUNT =
       "committer_tasks_completed";
 
   /** Amount of data committed: {@value}. */
   public static final String COMMITTER_BYTES_COMMITTED_COUNT =
       "committer_bytes_committed";
+
+  /** Number of files committed: {@value}. */
+  public static final String COMMITTER_FILES_COMMITTED_COUNT =
+      "committer_files_committed";
 
   /** Count of failed tasks: {@value}. */
   public static final String COMMITTER_TASKS_FAILED_COUNT =
@@ -72,17 +78,7 @@ public class ManifestCommitterStatisticNames {
   /**
    * Overall job commit {@value}.
    */
-  public static final String OP_STAGE_JOB_COMMIT = "op_job_commit";
-
-  /**
-   * Counter of bytes committed in job.
-   */
-  public static final String OP_JOB_COMMITTED_BYTES = "op_job_committed_bytes";
-
-  /**
-   * Counter of files committed in job.
-   */
-  public static final String OP_JOB_COMMITTED_FILES = "op_job_committed_files";
+  public static final String OP_STAGE_JOB_COMMIT = COMMITTER_COMMIT_JOB;
 
   /** {@value}. */
   public static final String OP_LOAD_ALL_MANIFESTS = "op_load_all_manifests";
@@ -104,7 +100,8 @@ public class ManifestCommitterStatisticNames {
   /**
    * Task abort: {@value}.
    */
-  public static final String OP_STAGE_TASK_ABORT_TASK = "op_task_stage_abort_task";
+  public static final String OP_STAGE_TASK_ABORT_TASK
+      = "op_task_stage_abort_task";
 
   /**
    * Job abort: {@value}.
@@ -169,5 +166,6 @@ public class ManifestCommitterStatisticNames {
   public static final String OP_STAGE_TASK_COMMIT = "op_stage_task_commit";
 
   /** Task Scan directory Stage: {@value}. */
-  public static final String OP_STAGE_TASK_SCAN_DIRECTORY = "op_stage_task_scan_directory";
+  public static final String OP_STAGE_TASK_SCAN_DIRECTORY
+      = "op_stage_task_scan_directory";
 }

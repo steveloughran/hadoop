@@ -31,8 +31,8 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestS
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
 
 import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_JOB_COMMITTED_BYTES;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_JOB_COMMITTED_FILES;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_BYTES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_FILES_COMMITTED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 
 /**
@@ -75,14 +75,6 @@ public class CommitJobStage extends
     IOStatisticsStore iostats = getIOStatistics();
     iostats.aggregate(summary.getIOStatistics());
 
-    // update the counter of bytes committed and files.
-    iostats.incrementCounter(
-        OP_JOB_COMMITTED_FILES,
-        summary.getFileCount());
-    iostats.incrementCounter(
-        OP_JOB_COMMITTED_BYTES,
-        summary.getTotalFileSize());
-
     // prepare destination directories.
     List<Path> dirs = new PrepareDirectoriesStage(getStageConfig())
         .apply(manifests);
@@ -93,9 +85,20 @@ public class CommitJobStage extends
     ManifestSuccessData successData;
     successData = new RenameFilesStage(getStageConfig()).apply(manifests);
     LOG.debug("_SUCCESS file summary {}", successData.toJson());
-
+    // update the counter of bytes committed and files.
+    // use setCounter so as to ignore any values accumlated when
+    // aggregating tasks.
+    iostats.setCounter(
+        COMMITTER_FILES_COMMITTED_COUNT,
+        summary.getFileCount());
+    iostats.setCounter(
+        COMMITTER_BYTES_COMMITTED_COUNT,
+        summary.getTotalFileSize());
+    successData.snapshotIOStatistics(iostats);
     // save the _SUCCESS if the option is enabled.
     if (saveMarker) {
+      // save a snapshot of the IO Statistics
+
       Path succesPath = new SaveSuccessFileStage(getStageConfig())
           .apply(successData);
       LOG.debug("Saving _SUCCESS file to {}", succesPath);

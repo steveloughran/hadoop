@@ -21,6 +21,8 @@ package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,16 @@ public class CleanupJobStage extends
 
   public CleanupJobStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_CLEANUP, true);
+  }
+
+  /**
+   * Statistic name is extracted from the arguments.
+   * @param arguments args to the invocation.
+   * @return stage name.
+   */
+  @Override
+  protected String getStageStatisticName(Options arguments) {
+    return arguments.statisticName;
   }
 
   @Override
@@ -101,7 +113,7 @@ public class CleanupJobStage extends
           TaskPool.foreach(taskAttemptDirs)
               .executeWith(getIOProcessors())
               .stopOnFailure()
-              .run(status -> deleteDir(status.getPath(), false));
+              .run(status -> rmdir(status.getPath(), false));
         } catch (FileNotFoundException ignored) {
           // not a problem if there's no dir to list.
         } catch (IOException e) {
@@ -111,15 +123,30 @@ public class CleanupJobStage extends
         }
       }
       // And finish with the top-level deletion.
-      deleteDir(dir, options.suppressExceptions);
+      rmdir(dir, options.suppressExceptions);
     }
-    return new CleanupJobStage.CleanupResult(dir, false, wasRenamed, 1);
+    return new CleanupJobStage.CleanupResult(dir, false, wasRenamed,
+        deleteDirCount.get());
+  }
+
+  private AtomicInteger deleteDirCount = new AtomicInteger();
+
+  private void rmdir(final Path dir,
+      final Boolean suppressExceptions)
+      throws IOException {
+    deleteDirCount.incrementAndGet();
+    deleteDir(dir, suppressExceptions);
   }
 
   /**
    * Options to pass down to the cleanup stage.
    */
   public static class Options {
+
+    /**
+     * Statistic to update.
+     */
+    private final String statisticName;
 
     /** Delete is enabled? */
     private final boolean enabled;
@@ -134,10 +161,12 @@ public class CleanupJobStage extends
     private final boolean moveToTrash;
 
     public Options(
+        final String statisticName,
         final boolean enabled,
         final boolean deleteTaskAttemptDirsInParallel,
         final boolean suppressExceptions,
         final boolean moveToTrash) {
+      this.statisticName = statisticName;
       this.enabled = enabled;
       this.deleteTaskAttemptDirsInParallel = deleteTaskAttemptDirsInParallel;
       this.suppressExceptions = suppressExceptions;
@@ -160,11 +189,12 @@ public class CleanupJobStage extends
   /**
    * Build an options argument from a configuration, using the
    * settings from FileOutputCommitter and manifest committer.
+   * @param statisticName
    * @param conf configuration to use.
    * @return the options to process
    */
   public static CleanupJobStage.Options cleanupStageOptionsFromConfig(
-      Configuration conf) {
+      String statisticName, Configuration conf) {
 
     boolean enabled = !conf.getBoolean(FILEOUTPUTCOMMITTER_CLEANUP_SKIPPED,
         FILEOUTPUTCOMMITTER_CLEANUP_SKIPPED_DEFAULT);
@@ -178,6 +208,7 @@ public class CleanupJobStage extends
           OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS,
           OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS_DEFAULT);
     return new CleanupJobStage.Options(
+        statisticName,
         enabled,
         deleteTaskAttemptDirsInParallel,
         suppressExceptions,

@@ -45,9 +45,11 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.JOB_ID_SOURCE_MAPREDUCE;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_CLASSNAME;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_SUFFIX;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.PRINCIPAL;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.PRINCIPAL;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SPARK_WRITE_UUID;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUMMARY_FILENAME_FORMAT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.TMP_SUFFIX;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
 
 /**
  * Class for commit support util methods.
@@ -182,10 +184,11 @@ public final class ManifestCommitterSupport {
   /**
    * Create success/outcome data.
    * @param stageConfig configuration.
+   * @param stage
    * @return a _SUCCESS object with some diagnostics.
    */
   public static ManifestSuccessData createManifestOutcome(
-      StageConfig stageConfig) {
+      StageConfig stageConfig, String stage) {
     final ManifestSuccessData outcome = new ManifestSuccessData();
     outcome.setJobId(stageConfig.getJobId());
     outcome.setJobIdSource(stageConfig.getJobIdSource());
@@ -197,16 +200,25 @@ public final class ManifestCommitterSupport {
     outcome.setHostname(NetUtils.getLocalHostname());
     // add some extra diagnostics which can still be parsed by older
     // builds of test applications.
-    // Audit Spain information can go in here too, in future.
+    // Audit Span information can go in here too, in future.
     try {
-      outcome.addDiagnostic(PRINCIPAL,
+      outcome.putDiagnostic(PRINCIPAL,
           UserGroupInformation.getCurrentUser().getShortUserName());
     } catch (IOException ignored) {
       // don't know who we are? exclude from the diagnostics.
     }
+    outcome.putDiagnostic(STAGE, stage);
     return outcome;
   }
 
+  /**
+   * Create the filename for a report from the jobID
+   * @param jobId jobId
+   * @return filename for a report.
+   */
+  public static String createJobSummaryFilename(String jobId) {
+    return String.format(SUMMARY_FILENAME_FORMAT, jobId);
+  }
 
   /**
    * Logic to create directory names from job and attempt.

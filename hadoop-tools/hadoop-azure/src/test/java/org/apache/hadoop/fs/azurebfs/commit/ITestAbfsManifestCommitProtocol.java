@@ -22,13 +22,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.azurebfs.contract.ABFSContractTestBinding;
 import org.apache.hadoop.fs.azurebfs.contract.AbfsFileSystemContract;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
-import org.apache.hadoop.mapreduce.lib.output.committer.manifest.AbstractManifestCommitProtocolTest;
+import org.apache.hadoop.mapreduce.lib.output.committer.manifest.TestManifestCommitProtocol;
 
 /**
  * Test the Manifest protocol against ABFS.
  */
 public class ITestAbfsManifestCommitProtocol extends
-    AbstractManifestCommitProtocolTest {
+    TestManifestCommitProtocol {
 
   private final ABFSContractTestBinding binding;
 

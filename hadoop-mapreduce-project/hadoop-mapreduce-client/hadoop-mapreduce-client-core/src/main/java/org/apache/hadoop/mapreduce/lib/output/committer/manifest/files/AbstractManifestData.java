@@ -28,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.util.JsonSerialization;
 
 /**
@@ -37,7 +38,7 @@ import org.apache.hadoop.util.JsonSerialization;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public abstract class AbstractManifestData<T extends AbstractManifestData>
-    implements Serializable {
+    implements Serializable, IOStatisticsSource {
 
   /**
    * Supported version value: {@value}.
