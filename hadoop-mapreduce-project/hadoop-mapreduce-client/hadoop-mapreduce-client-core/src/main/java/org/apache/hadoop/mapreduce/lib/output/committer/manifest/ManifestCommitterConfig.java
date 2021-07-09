@@ -191,6 +191,22 @@ final class ManifestCommitterConfig {
     }
   }
 
+  @Override
+  public String toString() {
+    return "ManifestCommitterConfig{" +
+        "destinationDir=" + destinationDir +
+        ", role='" + role + '\'' +
+        ", taskAttemptDir=" + taskAttemptDir +
+        ", createJobMarker=" + createJobMarker +
+        ", jobUniqueId='" + jobUniqueId + '\'' +
+        ", jobUniqueIdSource='" + jobUniqueIdSource + '\'' +
+        ", jobAttemptNumber=" + jobAttemptNumber +
+        ", jobAttemptId='" + jobAttemptId + '\'' +
+        ", taskId='" + taskId + '\'' +
+        ", taskAttemptId='" + taskAttemptId + '\'' +
+        '}';
+  }
+
   /**
    * Get the destination filesystem.
    * @return destination FS.

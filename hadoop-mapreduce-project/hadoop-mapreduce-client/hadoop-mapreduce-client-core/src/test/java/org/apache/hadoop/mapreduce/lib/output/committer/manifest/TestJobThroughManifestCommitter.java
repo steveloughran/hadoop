@@ -513,7 +513,7 @@ public class TestJobThroughManifestCommitter
   @Test
   public void test_0900_cleanupJob() throws Throwable {
     describe("Cleanup job");
-    CleanupJobStage.Options arguments = new CleanupJobStage.Options(
+    CleanupJobStage.Arguments arguments = new CleanupJobStage.Arguments(
         OP_STAGE_JOB_CLEANUP, true, true, false, false);
     CleanupJobStage.CleanupResult result = new CleanupJobStage(
         jobStageConfig).apply(arguments);

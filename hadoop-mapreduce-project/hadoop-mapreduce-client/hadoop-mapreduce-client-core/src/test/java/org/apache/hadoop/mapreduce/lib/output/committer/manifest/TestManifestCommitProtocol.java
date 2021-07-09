@@ -620,7 +620,7 @@ public class TestManifestCommitProtocol
       JobContext jContext,
       TaskAttemptContext tContext) throws IOException {
     try (DurationInfo d = new DurationInfo(LOG,
-        "committing work", jContext.getJobID())) {
+        "committing Job %s", jContext.getJobID())) {
       describe("\ncommitting task");
       committer.commitTask(tContext);
       describe("\ncommitting job");
@@ -953,7 +953,8 @@ public class TestManifestCommitProtocol
     validateContent(outDir, shouldExpectSuccessMarker(),
         committer.getJobUniqueId());
 
-    // commit task to fail on retry
+    // commit task to fail on retry as task attempt dir doesn't exist
+    describe("Attempting second commit of the same task -expecting failure");
     expectFNFEonTaskCommit(committer, tContext);
   }
 
@@ -971,7 +972,6 @@ public class TestManifestCommitProtocol
     describe("Commit two task attempts;" +
         " expect the second attempt to succeed.");
     JobData jobData = startJob(false);
-    JobContext jContext = jobData.jContext;
     TaskAttemptContext tContext = jobData.tContext;
     ManifestCommitter committer = jobData.committer;
     // do commit

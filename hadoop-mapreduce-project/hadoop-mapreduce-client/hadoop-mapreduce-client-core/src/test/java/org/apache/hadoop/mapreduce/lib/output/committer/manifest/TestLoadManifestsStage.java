@@ -179,7 +179,7 @@ public class TestLoadManifestsStage extends AbstractManifestCommitterTest {
     // and skipping the rename stage (which is going to fail),
     // go straight to cleanup
     new CleanupJobStage(jobStageConfig).apply(
-        new CleanupJobStage.Options("", true, true, false, false));
+        new CleanupJobStage.Arguments("", true, true, false, false));
   }
 
   /**

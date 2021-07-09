@@ -152,6 +152,10 @@ public abstract class AbstractManifestCommitterTest
    * Progress counter used in all stage configs.
    */
   private final ProgressCounter progressCounter = new ProgressCounter();
+
+  /**
+   * Directory for job summary reports.
+   */
   private File reportDir;
 
   /**
@@ -235,6 +239,16 @@ public abstract class AbstractManifestCommitterTest
     super.teardown();
     FILESYSTEM_IOSTATS.aggregate(retrieveIOStatistics(getFileSystem()));
     FILESYSTEM_IOSTATS.aggregate(getStageStatistics());
+  }
+
+  /**
+   * Add a long delay so that you don't get timeouts when working
+   * with object stores or debugging.
+   * @return a longer timeout than the base classes.
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 600_000;
   }
 
   /**

@@ -50,7 +50,7 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
  */
 public class CleanupJobStage extends
     AbstractJobCommitStage<
-        CleanupJobStage.Options,
+        CleanupJobStage.Arguments,
         CleanupJobStage.CleanupResult> {
 
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -66,13 +66,13 @@ public class CleanupJobStage extends
    * @return stage name.
    */
   @Override
-  protected String getStageStatisticName(Options arguments) {
+  protected String getStageStatisticName(Arguments arguments) {
     return arguments.statisticName;
   }
 
   @Override
   protected CleanupJobStage.CleanupResult executeStage(
-      CleanupJobStage.Options options)
+      Arguments options)
       throws IOException {
     final Path dir = requireNonNull(getStageConfig().getOutputTempSubDir());
     LOG.info("Cleaup of directory {} with ", dir, options);
@@ -141,7 +141,7 @@ public class CleanupJobStage extends
   /**
    * Options to pass down to the cleanup stage.
    */
-  public static class Options {
+  public static class Arguments {
 
     /**
      * Statistic to update.
@@ -160,7 +160,7 @@ public class CleanupJobStage extends
     /** Rather than delete: move to trash? */
     private final boolean moveToTrash;
 
-    public Options(
+    public Arguments(
         final String statisticName,
         final boolean enabled,
         final boolean deleteTaskAttemptDirsInParallel,
@@ -175,14 +175,14 @@ public class CleanupJobStage extends
 
     @Override
     public String toString() {
-      final StringBuilder sb = new StringBuilder("Options{");
-      sb.append("enabled=").append(enabled);
-      sb.append(", deleteTaskAttemptDirsInParallel=")
-          .append(deleteTaskAttemptDirsInParallel);
-      sb.append(", suppressExceptions=").append(suppressExceptions);
-      sb.append(", moveToTrash=").append(moveToTrash);
-      sb.append('}');
-      return sb.toString();
+      return "Arguments{" +
+          "statisticName='" + statisticName + '\''
+          + ", enabled=" + enabled
+          + ", deleteTaskAttemptDirsInParallel="
+          + deleteTaskAttemptDirsInParallel
+          + ", suppressExceptions=" + suppressExceptions
+          + ", moveToTrash=" + moveToTrash
+          + '}';
     }
   }
 
@@ -193,7 +193,7 @@ public class CleanupJobStage extends
    * @param conf configuration to use.
    * @return the options to process
    */
-  public static CleanupJobStage.Options cleanupStageOptionsFromConfig(
+  public static Arguments cleanupStageOptionsFromConfig(
       String statisticName, Configuration conf) {
 
     boolean enabled = !conf.getBoolean(FILEOUTPUTCOMMITTER_CLEANUP_SKIPPED,
@@ -207,7 +207,7 @@ public class CleanupJobStage extends
     boolean deleteTaskAttemptDirsInParallel = conf.getBoolean(
         OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS,
         OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS_DEFAULT);
-    return new CleanupJobStage.Options(
+    return new Arguments(
         statisticName,
         enabled,
         deleteTaskAttemptDirsInParallel,
@@ -252,14 +252,12 @@ public class CleanupJobStage extends
 
     @Override
     public String toString() {
-      final StringBuilder sb = new StringBuilder(
-          "CleanupResult{");
-      sb.append("directory=").append(directory);
-      sb.append(", wasSkipped=").append(wasSkipped);
-      sb.append(", wasRenamed=").append(wasRenamed);
-      sb.append(", deleteCalls=").append(deleteCalls);
-      sb.append('}');
-      return sb.toString();
+      String sb = "CleanupResult{"
+          + "directory=" + directory
+          + ", wasSkipped=" + wasSkipped
+          + ", wasRenamed=" + wasRenamed
+          + ", deleteCalls=" + deleteCalls + '}';
+      return sb;
     }
   }
 }

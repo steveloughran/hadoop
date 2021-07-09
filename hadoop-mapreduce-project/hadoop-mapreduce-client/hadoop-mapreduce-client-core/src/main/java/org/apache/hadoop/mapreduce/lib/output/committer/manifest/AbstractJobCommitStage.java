@@ -163,12 +163,17 @@ public abstract class AbstractJobCommitStage<IN, OUT>
   public final OUT apply(final IN arguments) throws IOException {
     executeOnlyOnce();
     progress();
-    getStageConfig().enterStage(getStageName(arguments));
+    String stageName = getStageName(arguments);
+    getStageConfig().enterStage(stageName);
     String statisticName = getStageStatisticName(arguments);
     try (DurationInfo ignored = new DurationInfo(LOG,
         false, "Executing stage %s", statisticName)) {
       return trackDuration(getIOStatistics(), statisticName, () ->
           executeStage(arguments));
+    } catch (IOException e) {
+      LOG.error("Stage {} failed: {}", stageName, e.toString());
+      LOG.debug("Stage failure:", e);
+      throw e;
     } finally {
       progress();
     }

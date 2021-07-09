@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
@@ -36,6 +38,7 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestS
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest;
 
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToPrettyString;
+import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsToString;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.logIOStatisticsAtDebug;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.CleanupJobStage.cleanupStageOptionsFromConfig;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_SUFFIX;
@@ -244,7 +247,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
       iostatistics.incrementCounter(COMMITTER_TASKS_COMPLETED_COUNT, 1);
     } catch (IOException e) {
       iostatistics.incrementCounter(COMMITTER_TASKS_FAILED_COUNT, 1);
-
+      throw e;
     }
     logCommitterStatisticsAtDebug();
   }
@@ -342,7 +345,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
       maybeSaveSummary(committerConfig,
           marker,
           failure,
-          true);
+          true, true);
       // print job commit stats
       LOG.info("Job Commit statistics {}",
           ioStatisticsToPrettyString(iostatistics));
@@ -375,7 +378,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
       failure = e;
     } finally {
       report.setSuccess(false);
-      maybeSaveSummary(committerConfig, report, failure, true);
+      // job abort does not overwrite any existing report, so a job commit
+      // failure cause will be preserved.
+      maybeSaveSummary(committerConfig, report, failure, true, false);
     }
     // print job stats
     LOG.info("Job Abort statistics {}",
@@ -550,6 +555,16 @@ public class ManifestCommitter extends PathOutputCommitter implements
     logIOStatisticsAtDebug(LOG, "Committer Statistics", this);
   }
 
+  @Override
+  public String toString() {
+    final StringBuilder sb = new StringBuilder(
+        "ManifestCommitter{");
+    sb.append(baseConfig);
+    sb.append(", iostatistics=").append(ioStatisticsToString(iostatistics));
+    sb.append('}');
+    return sb.toString();
+  }
+
   /**
    * Save a summary to the report dir if the config option
    * is set.
@@ -563,6 +578,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * @param report summary file.
    * @param thrown any exception indicting failure.
    * @param quiet should exceptions be swallowed.
+   * @param overwrite should the existing file be overwritten
    * @return the path of a file, if successfully saved
    * @throws IOException if a failure occured and quiet==false
    */
@@ -570,7 +586,8 @@ public class ManifestCommitter extends PathOutputCommitter implements
       ManifestCommitterConfig config,
       ManifestSuccessData report,
       Throwable thrown,
-      boolean quiet) throws IOException {
+      boolean quiet,
+      boolean overwrite) throws IOException {
     Configuration conf = config.getConf();
     String reportDir = conf.getTrimmed(OPT_SUMMARY_REPORT_DIR, "");
     if (reportDir.isEmpty()) {
@@ -589,11 +606,24 @@ public class ManifestCommitter extends PathOutputCommitter implements
     report.putDiagnostic(STAGE, activeStage);
     try (StoreOperations operations =
              new StoreOperationsThroughFileSystem(path.getFileSystem(conf))) {
-      operations.save(report, path, true);
+      if (!overwrite) {
+        // check for file existence so there is no need to worry about
+        // precisely what exception is raised when overwrite=false and dest file
+        // exists
+        try {
+          FileStatus st = operations.getFileStatus(path);
+          // get here and the file exists
+          LOG.debug("Report already exists: {}", st);
+          return null;
+        } catch (FileNotFoundException ignored) {
+        }
+      }
+      operations.save(report, path, overwrite);
       LOG.info("Job summary saved to {}", path);
       return path;
     } catch (IOException e) {
       LOG.debug("Failed to save summary to {}", path, e);
+      
       if (quiet) {
         return null;
       } else {
