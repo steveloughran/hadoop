@@ -22,7 +22,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +71,8 @@ public class CleanupJobStage extends
   }
 
   @Override
-  protected CleanupJobStage.CleanupResult executeStage(CleanupJobStage.Options options)
+  protected CleanupJobStage.CleanupResult executeStage(
+      CleanupJobStage.Options options)
       throws IOException {
     final Path dir = requireNonNull(getStageConfig().getOutputTempSubDir());
     LOG.info("Cleaup of directory {} with ", dir, options);
@@ -92,7 +92,7 @@ public class CleanupJobStage extends
         LOG.warn("Rename to trash failed; trying to delete it instead.");
       }
     }
-    if (shouldDelete){
+    if (shouldDelete) {
       // to delete.
 
       LOG.info("Deleting job directory {}", dir);
@@ -198,15 +198,15 @@ public class CleanupJobStage extends
 
     boolean enabled = !conf.getBoolean(FILEOUTPUTCOMMITTER_CLEANUP_SKIPPED,
         FILEOUTPUTCOMMITTER_CLEANUP_SKIPPED_DEFAULT);
-      boolean suppressExceptions = conf.getBoolean(
-          FILEOUTPUTCOMMITTER_CLEANUP_FAILURES_IGNORED,
-          FILEOUTPUTCOMMITTER_CLEANUP_FAILURES_IGNORED_DEFAULT);
-      boolean moveToTrash = conf.getBoolean(
-          OPT_CLEANUP_MOVE_TO_TRASH,
-          OPT_CLEANUP_MOVE_TO_TRASH_DEFAULT);
-      boolean deleteTaskAttemptDirsInParallel = conf.getBoolean(
-          OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS,
-          OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS_DEFAULT);
+    boolean suppressExceptions = conf.getBoolean(
+        FILEOUTPUTCOMMITTER_CLEANUP_FAILURES_IGNORED,
+        FILEOUTPUTCOMMITTER_CLEANUP_FAILURES_IGNORED_DEFAULT);
+    boolean moveToTrash = conf.getBoolean(
+        OPT_CLEANUP_MOVE_TO_TRASH,
+        OPT_CLEANUP_MOVE_TO_TRASH_DEFAULT);
+    boolean deleteTaskAttemptDirsInParallel = conf.getBoolean(
+        OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS,
+        OPT_CLEANUP_PARALLEL_ATTEMPT_DIRS_DEFAULT);
     return new CleanupJobStage.Options(
         statisticName,
         enabled,
@@ -216,7 +216,7 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Result of the cleanup
+   * Result of the cleanup.
    */
   public static class CleanupResult {
     private final Path directory;

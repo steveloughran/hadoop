@@ -80,7 +80,7 @@ public class TestJobThroughManifestCommitter
   /**
    * To ensure that the local FS has a shared root path, this is static.
    */
-  private static Path SHARED_TEST_ROOT = null;
+  private static Path sharedTestRoot = null;
 
   /**
    * Job ID.
@@ -141,7 +141,7 @@ public class TestJobThroughManifestCommitter
     taskAttempt11 = TASK_IDS.getTaskAttempt(TASK1, TA1);
     setSharedPath(path("TestJobThroughManifestCommitter"));
     // add a dir with a space in.
-    destDir = new Path(SHARED_TEST_ROOT, "out put");
+    destDir = new Path(sharedTestRoot, "out put");
     jobId = TASK_IDS.getJobId();
     // then the specific path underneath that for the attempt.
     dirs = new ManifestCommitterSupport.AttemptDirectories(destDir,
@@ -169,7 +169,7 @@ public class TestJobThroughManifestCommitter
    * Invoke this to clean up the test directories.
    */
   private void deleteSharedTestRoot() throws IOException {
-    rm(getFileSystem(), SHARED_TEST_ROOT, true, false);
+    rm(getFileSystem(), sharedTestRoot, true, false);
   }
 
   /**
@@ -178,10 +178,10 @@ public class TestJobThroughManifestCommitter
    * @return true if the path was set
    */
   private static synchronized boolean setSharedPath(final Path path) {
-    if (SHARED_TEST_ROOT == null) {
+    if (sharedTestRoot == null) {
       // set this as needed
       LOG.info("Set shared path to {}", path);
-      SHARED_TEST_ROOT = path;
+      sharedTestRoot = path;
       return true;
     }
     return false;

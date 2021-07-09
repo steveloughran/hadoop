@@ -31,7 +31,7 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_RENAME;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
-public class ManifestCommitterStatisticNames {
+public final class ManifestCommitterStatisticNames {
 
   /** "Count of successful tasks:: {@value}. */
   public static final String COMMITTER_TASKS_COMPLETED_COUNT =
@@ -168,4 +168,7 @@ public class ManifestCommitterStatisticNames {
   /** Task Scan directory Stage: {@value}. */
   public static final String OP_STAGE_TASK_SCAN_DIRECTORY
       = "op_stage_task_scan_directory";
+
+  private ManifestCommitterStatisticNames() {
+  }
 }

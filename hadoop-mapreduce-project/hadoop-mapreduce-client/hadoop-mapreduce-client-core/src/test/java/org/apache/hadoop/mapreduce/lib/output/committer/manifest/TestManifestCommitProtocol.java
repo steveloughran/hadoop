@@ -78,17 +78,17 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsTo
 import static org.apache.hadoop.mapreduce.lib.output.PathOutputCommitterFactory.COMMITTER_FACTORY_CLASS;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.MANIFEST_COMMITTER_FACTORY;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SPARK_WRITE_UUID;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_BYTES_COMMITTED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_FILES_COMMITTED_COUNT;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_LOAD_MANIFEST;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_ABORT;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.SUCCESS_MARKER;
-import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.COMMITTER_TASKS_COMPLETED_COUNT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_COMMIT;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterSupport.createJobSummaryFilename;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.randomJobId;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterTestSupport.validateSuccessFile;
+import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.DiagnosticKeys.STAGE;
 import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 
 /**
@@ -106,7 +106,6 @@ public class TestManifestCommitProtocol
   private static final String SUB_DIR = "SUB_DIR";
 
   protected static final String PART_00000 = "part-m-00000";
-
 
   private final String jobId;
 
@@ -149,7 +148,7 @@ public class TestManifestCommitProtocol
    * Snapshot of stats, which will be collected from
    * committers.
    */
-  private static final IOStatisticsSnapshot iostatistics =
+  private static final IOStatisticsSnapshot IOSTATISTICS =
       IOStatisticsSupport.snapshotIOStatistics();
 
   /**
@@ -207,7 +206,7 @@ public class TestManifestCommitProtocol
       // stop the job
       abortJobQuietly(jobData);
       // and then get its statistics
-      iostatistics.aggregate(jobData.committer.getIOStatistics());
+      IOSTATISTICS.aggregate(jobData.committer.getIOStatistics());
     }
     if (outDir != null) {
       try {
@@ -219,11 +218,10 @@ public class TestManifestCommitProtocol
     super.teardown();
   }
 
-
   @AfterClass
   public static void logAggregateIOStatistics() {
     LOG.info("Final IOStatistics {}",
-        ioStatisticsToPrettyString(iostatistics));
+        ioStatisticsToPrettyString(IOSTATISTICS));
   }
 
   /**
@@ -242,7 +240,7 @@ public class TestManifestCommitProtocol
   }
 
   /***
-   * Set job up to use the manifest committer
+   * Set job up to use the manifest committer.
    * @param conf configuration to set up
    */
   protected void bindCommitter(Configuration conf) {
@@ -272,7 +270,6 @@ public class TestManifestCommitProtocol
       TaskAttemptContext context) throws IOException {
     return new ManifestCommitter(outputPath, context);
   }
-
 
   protected Path getOutDir() {
     return outDir;
@@ -780,7 +777,6 @@ public class TestManifestCommitProtocol
     return successData;
   }
 
-
   /**
    * Identify any path under the directory which begins with the
    * {@code "part-m-00000"} sequence. There's some compensation for
@@ -844,7 +840,6 @@ public class TestManifestCommitProtocol
         tContext.getWorkingDirectory());
     validateTaskAttemptWorkingDirectory(committer, tContext);
 
-
     // write output
     describe("1. Writing output");
     final Path textOutputPath = writeTextOutput(tContext);
@@ -903,7 +898,8 @@ public class TestManifestCommitProtocol
         COMMITTER_BYTES_COMMITTED_COUNT, st.getLen());
 
     // now load an examine the job report.
-    // this MUST contain all the stats of the summary, plus timings on job commit itself
+    // this MUST contain all the stats of the summary, plus timings on
+    // job commit itself
 
     ManifestSuccessData report = loadReport(jobUniqueId, true);
     Map<String, String> diag = report.getDiagnostics();
@@ -1002,7 +998,6 @@ public class TestManifestCommitProtocol
         .describedAs("Working dir of %s", committer)
         .isNotEqualTo(committer2.getWorkPath());
 
-
     // write output for TA 2,
     Path outputTA2 = writeTextOutput(tContext2);
 
@@ -1025,7 +1020,8 @@ public class TestManifestCommitProtocol
 
     // validate output
     FileSystem fs = getFileSystem();
-    ManifestSuccessData successData = validateSuccessFile(outDir, fs, "query", 1,
+    ManifestSuccessData successData = validateSuccessFile(outDir, fs, "query",
+        1,
         "");
     Assertions.assertThat(successData.getFilenames())
         .describedAs("Files committed")
@@ -1066,6 +1062,7 @@ public class TestManifestCommitProtocol
     expectJobCommitToFail(jContext, committer);
   }
 */
+
   /**
    * Override point: the failure expected on the attempt to commit a failed
    * job.
@@ -1135,7 +1132,6 @@ public class TestManifestCommitProtocol
     expectJobCommitFailure(jContext, committer,
         CommitterFaultInjectionImpl.Failure.class);
   }*/
-
   @Test
   public void testMapFileOutputCommitter() throws Exception {
     describe("Test that the committer generates map output into a directory\n" +
@@ -1210,6 +1206,7 @@ public class TestManifestCommitProtocol
 
   public static final PathFilter HIDDEN_FILE_FILTER = (path) ->
       !path.getName().startsWith("_") && !path.getName().startsWith(".");
+
   /**
    * A functional interface which an action to test must implement.
    */
@@ -1321,15 +1318,14 @@ public class TestManifestCommitProtocol
     Assertions.assertThat(diag.get(STAGE))
         .describedAs("Stage entry in report")
         .isEqualTo(OP_STAGE_JOB_ABORT);
-   IOStatisticsSnapshot reportStats = report.getIOStatistics();
-   verifyStatisticCounterValue(reportStats,
-       OP_STAGE_JOB_ABORT, 1);
+    IOStatisticsSnapshot reportStats = report.getIOStatistics();
+    verifyStatisticCounterValue(reportStats,
+        OP_STAGE_JOB_ABORT, 1);
 
     // try again; expect abort to be idempotent.
     committer.abortJob(jContext, JobStatus.State.FAILED);
 
   }
-
 
   /**
    * Assert that the given dir does not have the {@code _SUCCESS} marker.
@@ -1393,7 +1389,7 @@ public class TestManifestCommitProtocol
     taCtx[1] = new TaskAttemptContextImpl(conf, taskAttempt1);
 
     final TextOutputFormat[] tof = new TextOutputForTests[2];
-    
+
     for (int i = 0; i < tof.length; i++) {
       tof[i] = new TextOutputForTests() {
         @Override
@@ -1453,7 +1449,8 @@ public class TestManifestCommitProtocol
 
 
 /*
-  protected ManifestCommitter createFailingCommitter(final TaskAttemptContext tContext)
+  protected ManifestCommitter createFailingCommitter(
+  final TaskAttemptContext tContext)
       throws IOException {
     //     TODO
     return null;
@@ -1467,7 +1464,6 @@ public class TestManifestCommitProtocol
       return createFailingCommitter(context);
     }
   }*/
-
   @Test
   public void testOutputFormatIntegration() throws Throwable {
     Configuration conf = getConfiguration();
@@ -1512,8 +1508,6 @@ public class TestManifestCommitProtocol
     final TaskManifest manifest = loadManifest(
         committer.getTaskManifestPath(tContext));
     LOG.info("Manifest {}", manifest.toJson());
-
-
 
     commitJob(committer, jContext);
     LOG.info("committer iostatistics {}",
@@ -1560,7 +1554,6 @@ public class TestManifestCommitProtocol
     committer2.abortTask(tContext);
 
   }*/
-
   @Test
   public void testParallelJobsToAdjacentPaths() throws Throwable {
 
@@ -1590,12 +1583,13 @@ public class TestManifestCommitProtocol
         attempt20);
     Configuration conf2 = job2.getConfiguration();
     conf2.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, 1);
+    ManifestCommitter committer2 = null;
     try {
       JobContext jContext2 = new JobContextImpl(conf2,
           taskAttempt20.getJobID());
       TaskAttemptContext tContext2 =
           new TaskAttemptContextImpl(conf2, taskAttempt20);
-      ManifestCommitter committer2 = createCommitter(job2Dest, tContext2);
+      committer2 = createCommitter(job2Dest, tContext2);
       JobData jobData2 = new JobData(job2, jContext2, tContext2, committer2);
       setupJob(jobData2);
       abortInTeardown(jobData2);
@@ -1626,8 +1620,14 @@ public class TestManifestCommitProtocol
       getPart0000(job2Dest);
 
     } finally {
-      // uncommitted files to this path need to be deleted in tests which fail
-
+      // clean things up in test failures.
+      FileSystem fs = getFileSystem();
+      if (committer1 != null) {
+        fs.delete(committer1.getOutputPath());
+      }
+      if (committer2 != null) {
+        fs.delete(committer2.getOutputPath());
+      }
     }
 
   }

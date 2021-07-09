@@ -40,8 +40,6 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSnapshot;
 import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.util.JsonSerialization;
 
-import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
-
 /**
  * Summary data saved into a {@code _SUCCESS} marker file.
  *

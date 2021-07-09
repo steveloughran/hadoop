@@ -97,7 +97,8 @@ public final class ManifestCommitterSupport {
    * @param jobId job ID from YARN or spark.
    * @return (a job ID, source)
    */
-  public static Pair<String, String> buildJobUUID(Configuration conf, JobID jobId) {
+  public static Pair<String, String> buildJobUUID(Configuration conf,
+      JobID jobId) {
     String jobUUID = conf.getTrimmed(SPARK_WRITE_UUID, "");
     if (jobUUID.isEmpty()) {
       jobUUID = jobId.toString();
@@ -143,7 +144,7 @@ public final class ManifestCommitterSupport {
    * Get the path in the job attempt dir for a manifest for a task.
    * @param jobAttemptDir job attempt dir.
    * @param taskId taskID.
-   * @return the path to rename the manifest file to, once saved to the temp path.
+   * @return the final path to rename the manifest file to
    */
   public static Path manifestPathForTask(Path jobAttemptDir, String taskId) {
 
@@ -153,7 +154,7 @@ public final class ManifestCommitterSupport {
   /**
    * Get the path in the job attempt dir for the temp path to save a
    * task attempt's manifest before renaming it to the
-   * path defined by {@link #manifestPathForTask(Path, String)}
+   * path defined by {@link #manifestPathForTask(Path, String)}.
    * @param jobAttemptDir job attempt dir.
    * @param taskAttemptId task attempt ID.
    * @return the path to save/load the manifest.
@@ -212,7 +213,7 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create the filename for a report from the jobID
+   * Create the filename for a report from the jobID.
    * @param jobId jobId
    * @return filename for a report.
    */

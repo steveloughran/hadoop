@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Support for committer tests.
  */
-public class ManifestCommitterTestSupport {
+public final class ManifestCommitterTestSupport {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ManifestCommitterTestSupport.class);
@@ -59,6 +59,9 @@ public class ManifestCommitterTestSupport {
    */
   public static final String PROJECT_BUILD_DIRECTORY_PROPERTY
       = "project.build.directory";
+
+  private ManifestCommitterTestSupport() {
+  }
 
   /**
    * Create a random Job ID using the fork ID as part of the number if
@@ -128,8 +131,8 @@ public class ManifestCommitterTestSupport {
         successData.dumpDiagnostics("  ", " = ", "\n"));
     assertThat(successData.getCommitter())
         .describedAs("Committer field in " + commitDetails)
-        .isEqualTo(
-            "org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitter");
+        .isEqualTo("org.apache.hadoop.mapreduce.lib.output.committer"
+            + ".manifest.ManifestCommitter");
     assertThat(successData.getFilenames())
         .describedAs("Files committed in " + commitDetails)
         .hasSizeGreaterThanOrEqualTo(minimumFileCount);
@@ -240,7 +243,7 @@ public class ManifestCommitterTestSupport {
 
   /**
    * Creates a random JobID and then as many tasks
-   * with the specific number of task attempts
+   * with the specific number of task attempts.
    */
   public static class JobAndTaskIDsForTests {
 
@@ -251,7 +254,7 @@ public class ManifestCommitterTestSupport {
      * Store the details as strings; generate
      * IDs on demand.
      */
-    private final String taskAttempts[][];
+    private final String[][] taskAttempts;
 
     /**
      * Constructor.

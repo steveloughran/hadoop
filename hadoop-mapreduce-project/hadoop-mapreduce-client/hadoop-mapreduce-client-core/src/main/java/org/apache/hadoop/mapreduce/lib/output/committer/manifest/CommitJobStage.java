@@ -111,8 +111,8 @@ public class CommitJobStage extends
    * Result of the stage.
    */
   public static final class Result {
-    final ManifestSuccessData jobSuccessData;
-    final List<TaskManifest> manifests;
+    private final ManifestSuccessData jobSuccessData;
+    private final List<TaskManifest> manifests;
 
     public Result(ManifestSuccessData jobSuccessData,
         List<TaskManifest> manifests) {

@@ -98,11 +98,12 @@ public class UnreliableStoreOperations implements StoreOperations {
     this.timeoutSleepTimeMillis = timeoutSleepTimeMillis;
   }
 
-  public boolean isRenameToFailWithException() {
+  public boolean getRenameToFailWithException() {
     return renameToFailWithException;
   }
 
-  public void setRenameToFailWithException(final boolean renameToFailWithException) {
+  public void setRenameToFailWithException(
+      final boolean renameToFailWithException) {
     this.renameToFailWithException = renameToFailWithException;
   }
 

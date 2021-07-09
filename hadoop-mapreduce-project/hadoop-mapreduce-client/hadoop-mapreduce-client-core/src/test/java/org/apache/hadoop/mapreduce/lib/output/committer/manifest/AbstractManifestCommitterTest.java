@@ -555,7 +555,8 @@ public abstract class AbstractManifestCommitterTest
 
     // if there's a task attempt ID set, set up its details
     if (taskIndex >= 0) {
-      String taskAttempt = TASK_IDS.getTaskAttempt(taskIndex, taskAttemptNumber);
+      String taskAttempt = TASK_IDS.getTaskAttempt(taskIndex,
+          taskAttemptNumber);
       config
           .withTaskAttemptId(taskAttempt)
           .withTaskId(TASK_IDS.getTaskIdType(taskIndex).toString())

@@ -21,7 +21,7 @@ package org.apache.hadoop.mapreduce.lib.output.committer.manifest.files;
 /**
  * Diagnostic keys in the manifests.
  */
-public class DiagnosticKeys {
+public final class DiagnosticKeys {
   /**
    * Attribute added to diagnostics in _SUCCESS file.
    */
@@ -29,4 +29,7 @@ public class DiagnosticKeys {
   public static final String STAGE = "stage";
   public static final String EXCEPTION = "exception";
   public static final String STACKTRACE = "stacktrace";
+
+  private DiagnosticKeys() {
+  }
 }

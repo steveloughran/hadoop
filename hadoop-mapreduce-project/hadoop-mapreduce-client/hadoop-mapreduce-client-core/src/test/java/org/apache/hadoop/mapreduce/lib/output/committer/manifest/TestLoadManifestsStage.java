@@ -97,8 +97,8 @@ public class TestLoadManifestsStage extends AbstractManifestCommitterTest {
    * them via the {@link LoadManifestsStage}.
    * The directory preparation process is then executed after this.
    * Because we know each task attempt creates the same number of directories,
-   * they will all be merged and so only a limited number of output dirs created.
-   *
+   * they will all be merged and so only a limited number of output dirs
+   * will be created.
    */
   @Test
   public void testSaveThenLoadManyManifests() throws Throwable {
@@ -170,7 +170,8 @@ public class TestLoadManifestsStage extends AbstractManifestCommitterTest {
     List<Path> createdDirectories = new PrepareDirectoriesStage(jobStageConfig)
         .apply(loadedManifests);
 
-    // but after the merge process, only one per generated file output dir exists
+    // but after the merge process, only one per generated file output
+    // dir exists
     Assertions.assertThat(createdDirectories)
         .describedAs("Directories created")
         .hasSize(filesPerTaskAttempt);
