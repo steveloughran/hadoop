@@ -20,7 +20,6 @@ package org.apache.hadoop.util;
 
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -256,7 +255,6 @@ public class JsonSerialization<T> {
           e);
     }
   }
-
 
   /**
    * Save to a Hadoop filesystem.

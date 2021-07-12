@@ -342,10 +342,12 @@ public class ManifestCommitter extends PathOutputCommitter implements
       failure = e;
       throw e;
     } finally {
-      maybeSaveSummary(committerConfig,
+      maybeSaveSummary(activeStage,
+          committerConfig,
           marker,
           failure,
-          true, true);
+          true,
+          true);
       // print job commit stats
       LOG.info("Job Commit statistics {}",
           ioStatisticsToPrettyString(iostatistics));
@@ -380,7 +382,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
       report.setSuccess(false);
       // job abort does not overwrite any existing report, so a job commit
       // failure cause will be preserved.
-      maybeSaveSummary(committerConfig, report, failure, true, false);
+      maybeSaveSummary(activeStage, committerConfig, report, failure, true, false);
     }
     // print job stats
     LOG.info("Job Abort statistics {}",
@@ -573,7 +575,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * to date.
    * The report will updated with the current active stage,
    * and if {@code thrown} is non-null, it will be added to the
-   * diagnistics (and the job tagged as a failure)
+   * diagnistics (and the job tagged as a failure).
+   * Static for testability.
+   * @param activeStage active stage
    * @param config configuration to use.
    * @param report summary file.
    * @param thrown any exception indicting failure.
@@ -582,7 +586,8 @@ public class ManifestCommitter extends PathOutputCommitter implements
    * @return the path of a file, if successfully saved
    * @throws IOException if a failure occured and quiet==false
    */
-  private Path maybeSaveSummary(
+  private static Path maybeSaveSummary(
+      String activeStage,
       ManifestCommitterConfig config,
       ManifestSuccessData report,
       Throwable thrown,
@@ -594,7 +599,7 @@ public class ManifestCommitter extends PathOutputCommitter implements
       return null;
     }
     // update to the latest statistics
-    report.snapshotIOStatistics(getIOStatistics());
+    report.snapshotIOStatistics(config.getIOStatistics());
 
     Path reportDirPath = new Path(reportDir);
     Path path = new Path(reportDirPath,

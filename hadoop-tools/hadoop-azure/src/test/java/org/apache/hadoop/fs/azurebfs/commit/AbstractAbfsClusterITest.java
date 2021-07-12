@@ -51,7 +51,6 @@ import static org.apache.hadoop.io.IOUtils.closeStream;
 public abstract class AbstractAbfsClusterITest extends
     AbstractManifestCommitterTest {
 
-
   public static final int NO_OF_NODEMANAGERS = 2;
 
   private final ABFSContractTestBinding binding;
@@ -68,7 +67,6 @@ public abstract class AbstractAbfsClusterITest extends
   protected AbstractAbfsClusterITest() throws Exception {
     binding = new ABFSContractTestBinding();
   }
-
 
   @Override
   protected int getTestTimeoutMillis() {

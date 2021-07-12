@@ -26,6 +26,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.statistics.IOStatistics;
+import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.fs.statistics.impl.IOStatisticsStore;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -49,7 +51,7 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
  * and data passed down from the committer factory.
  * Isolated for ease of dev/test
  */
-final class ManifestCommitterConfig {
+final class ManifestCommitterConfig implements IOStatisticsSource {
 
   /**
    * Final destination of work.
@@ -286,6 +288,11 @@ final class ManifestCommitterConfig {
 
   boolean getValidateOutput() {
     return validateOutput;
+  }
+
+  @Override
+  public IOStatisticsStore getIOStatistics() {
+    return iostatistics;
   }
 
   /**

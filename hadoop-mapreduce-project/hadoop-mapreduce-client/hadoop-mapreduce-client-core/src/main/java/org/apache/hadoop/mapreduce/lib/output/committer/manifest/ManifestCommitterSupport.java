@@ -102,7 +102,7 @@ public final class ManifestCommitterSupport {
     String jobUUID = conf.getTrimmed(SPARK_WRITE_UUID, "");
     if (jobUUID.isEmpty()) {
       jobUUID = jobId.toString();
-      return Pair.of(jobId.toString(), JOB_ID_SOURCE_MAPREDUCE);
+      return Pair.of(jobUUID, JOB_ID_SOURCE_MAPREDUCE);
     } else  {
       return Pair.of(jobUUID, SPARK_WRITE_UUID);
     }

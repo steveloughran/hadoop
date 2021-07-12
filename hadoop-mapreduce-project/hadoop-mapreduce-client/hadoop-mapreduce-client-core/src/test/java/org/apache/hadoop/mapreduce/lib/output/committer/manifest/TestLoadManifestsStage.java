@@ -68,7 +68,6 @@ public class TestLoadManifestsStage extends AbstractManifestCommitterTest {
   private final int filesPerTaskAttempt = 10;
 
   private List<String> taskAttemptIds = new ArrayList<>(taskAttemptCount);
-  ;
 
   private List<String> taskIds = new ArrayList<>(taskAttemptCount);
 

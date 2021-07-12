@@ -96,8 +96,11 @@ public class RenameFilesStage extends
         .stopOnFailure()
         .run(this::commitOneFile);
 
-    LOG.info("Files fileRenamedCount: {}. Total size {}",
-        fileRenamedCount, totalFileSize);
+    // synchronized block to keep spotbugs happy.
+    synchronized (this) {
+      LOG.info("Files fileRenamedCount: {}. Total size {}",
+          fileRenamedCount, totalFileSize);
+    }
 
     // Add a subset of the destination files to the success file;
     // enough for simple testing
