@@ -55,6 +55,9 @@
     <job.id>00</job.id>
     <!-- are root tests enabled. Set to false when running parallel jobs on same bucket -->
     <root.tests.enabled>unset</root.tests.enabled>
+
+    <!-- This requires the changes of the Iceberg PR #12055 -->
+    <iceberg.version>1.11.0-SNAPSHOT</iceberg.version>
   </properties>
 
   <profiles>
@@ -607,6 +610,40 @@
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-launcher</artifactId>
       <scope>test</scope>
+    </dependency>
+
+    <!-- Apache Iceberg, used for testing/regression testing BulkDelete -->
+    <dependency>
+      <groupId>org.apache.iceberg</groupId>
+      <artifactId>iceberg-core</artifactId>
+      <version>${iceberg.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.core5</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents.client5</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.airlift</groupId>
+          <artifactId>aircompressor</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.checkerframework</groupId>
+          <artifactId>checker-qual</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.github.RoaringBitmap.RoaringBitmap</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 </project>

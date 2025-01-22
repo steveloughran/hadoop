@@ -1917,6 +1917,12 @@
 </property>
 
 <property>
+  <name>fs.s3.impl</name>
+  <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+  <description>s3:// URLs are mapped to S3A FS too.</description>
+</property>
+
+<property>
   <name>fs.s3a.retry.limit</name>
   <value>7</value>
   <description>

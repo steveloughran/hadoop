@@ -67,6 +67,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <!-- Jitpack is unusual in that it dynamically builds artifacts from a module then caches; from a security PoV that i "bold".
+         but it is needed until roaringbitmap-->
+<!--    <repository>
+      <id>Jitpack</id>
+      <url>https://jitpack.io/</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>-->
+
   </repositories>
 
   <licenses>

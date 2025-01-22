@@ -46,6 +46,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -54,7 +55,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -62,6 +65,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static java.util.Optional.empty;
+import static java.util.Optional.of;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.util.functional.RemoteIterators.foreach;
@@ -1870,6 +1875,49 @@ public class ContractTestUtils extends Assertions {
     return fileRanges.stream()
         .mapToLong(FileRange::getLength)
         .sum();
+  }
+
+  /**
+   * Assert on returned entries after bulk delete operation.
+   * Entries should be empty after successful delete.
+   */
+  public static void assertSuccessfulBulkDelete(List<Map.Entry<Path, String>> entries) {
+    assertThat(entries)
+        .describedAs("Bulk delete failed;"
+            + " return entries should be empty after successful delete")
+        .isEmpty();
+  }
+
+  /**
+   * Get a file status value or, if the path doesn't exist, return null.
+   * @param fs filesystem
+   * @param path path
+   * @return status or empty
+   * @throws UncheckedIOException Any IO Failure other than file not found.
+   */
+  public static final Optional<FileStatus> getFileStatusIfPresent(
+      final FileSystem fs,
+      final Path path) {
+    try {
+      return of(fs.getFileStatus(path));
+    } catch (FileNotFoundException e) {
+      return empty();
+    } catch (IOException ioe) {
+      throw new UncheckedIOException(ioe);
+    }
+  }
+
+  /**
+   * Create a list of paths with the given count
+   * under the given base path.
+   */
+  public static  List<Path> createListOfPaths(int count, Path basePath) {
+    List<Path> paths = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      Path path = new Path(basePath, "file-" + i);
+      paths.add(path);
+    }
+    return paths;
   }
 
   /**
